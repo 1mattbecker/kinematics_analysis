@@ -1,3 +1,3 @@
-# aind-capsule-template
+# kinematics_analysis
 
-Basic structure of a capsule to be customized as needed.
+copied initial from AIND capsule template
