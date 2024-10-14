@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"attached_datasets": [
+		{
+			"id": "f908dd4d-d7ed-4d52-97cf-ccd0e167c659",
+			"mount": "foraging_nwb_bonsai"
+		}
+	]
+}
