@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-
+import subprocess
+import os
 
 def extract_clips_ffmpeg_encode(input_video_path, timestamps, clip_length, output_dir):
     # Ensure output directory exists
