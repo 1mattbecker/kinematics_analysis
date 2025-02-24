@@ -199,6 +199,81 @@ def mask_keypoint_data(keypoint_dfs,keypoint, confidence_threshold=0.9, mask_val
         print(f"Keypoint {keypoint} not found")
         return None
 
+def integrate_keypoints_with_video_time(video_csv_path, keypoint_dfs):
+    """
+    Imports, checks, and preprocesses video CSV, then trims keypoint data to match video length.
+
+    Parameters:
+    - video_csv_path: Path to the original bonsai video acquisition CSV
+    - keypoint_dfs: Dictionary of dataframes from load_keypoints_from_csv
+
+    Returns:
+    - keypoint_dfs_trimmed: Trimmed keypoint dataframes
+    - video_csv_trimmed: Processed and trimmed video CSV dataframe
+    - keypoint_timebase: Timebase for kinematics data, in time aligned to NWB time.
+    """
+
+    # Step 1: Load video CSV
+    video_csv = pd.read_csv(video_csv_path, names=['Behav_Time', 'Frame', 'Camera_Time', 'Gain', 'Exposure'])
+    
+    # Step 2: Convert Camera_Time to seconds
+    video_csv['Camera_Time'] = video_csv['Camera_Time'] / 1e9
+
+    # Step 3: Quality control checks
+    def check_frame_monotonicity(df):
+        """Ensure frame numbers increase strictly by 1."""
+        frame_diff = df['Frame'].diff().dropna()
+        if not (frame_diff == 1).all():
+            print("Warning: Non-monotonic frame numbering detected.")
+            print(df.loc[frame_diff[frame_diff != 1].index])
+        else:
+            print("Video QC: Frame numbers are sequential with no gaps.")
+
+    def check_timing_consistency(df, expected_interval=1/500):
+        """Check consistency between Behav_Time and Camera_Time."""
+        behav_diffs = df['Behav_Time'].diff().dropna()
+        camera_diffs = df['Camera_Time'].diff().dropna()
+        time_diff = (behav_diffs - camera_diffs).abs()
+        flagged_indices = time_diff[time_diff > expected_interval * 2].index
+
+        if not flagged_indices.empty:
+            print("Warning: Timing differences exceed expected variation.")
+            print(df.loc[flagged_indices, ['Behav_Time', 'Camera_Time']])
+        else:
+            print("Video QC: Timing differences are within expected range.")
+
+    check_frame_monotonicity(video_csv)
+    check_timing_consistency(video_csv)
+
+    # Step 4: Trim kinematics timebase to match video
+    def trim_kinematics_timebase_to_match(keypoint_dfs, video_csv):
+        LP_samples = len(keypoint_dfs[list(keypoint_dfs.keys())[0]])
+        video_samples = len(video_csv)
+
+        if LP_samples > video_samples:
+            print(f"keypoint_df trimmed from {LP_samples} to {video_samples}")
+        elif LP_samples < video_samples:
+            print(f"video_csv trimmed from {video_samples} to {LP_samples}")
+        else:
+            print("no change")
+
+        min_samples = min(LP_samples, video_samples)
+        video_csv_trimmed = video_csv.iloc[:min_samples]
+
+        keypoint_dfs_trimmed = keypoint_dfs.copy()
+        for key in keypoint_dfs.keys():
+            keypoint_dfs_trimmed[key] = keypoint_dfs[key].iloc[:min_samples]
+
+        return keypoint_dfs_trimmed, video_csv_trimmed
+
+    keypoint_dfs_trimmed, video_csv_trimmed = trim_kinematics_timebase_to_match(keypoint_dfs, video_csv)
+    keypoint_timebase = video_csv_trimmed['Behav_Time']
+
+    # Step 5: Add 'time' column to each keypoint dataframe
+    for key in keypoint_dfs_trimmed.keys():
+        keypoint_dfs_trimmed[key].insert(0, 'time', keypoint_timebase - keypoint_timebase.iloc[0])
+
+    return keypoint_dfs_trimmed, video_csv_trimmed, keypoint_timebase
 
 def load_keypoints_from_csv(path_to_csv):
     """
@@ -214,7 +289,7 @@ def load_keypoints_from_csv(path_to_csv):
     - keypoint_dfs: DataFrame with 'x', 'y', and 'confidence' values, organized by keypoint
     """
     
-    df = pd.read_csv(path_to_csv)
+    df = pd.read_csv(path_to_csv, dtype=str, low_memory=False)
 
     #remove first column
     df = df.iloc[:, 1:]
@@ -226,6 +301,9 @@ def load_keypoints_from_csv(path_to_csv):
     # Drop the first two rows and reset the index
     df = df[2:].reset_index(drop=True)
 
+    # Convert data to numeric, replacing errors with NaN
+    df = df.apply(pd.to_numeric, errors='coerce')
+
     # Create a dictionary to store DataFrames for each keypoint
     keypoint_dfs = {}
 
@@ -233,11 +311,6 @@ def load_keypoints_from_csv(path_to_csv):
     for i in range(0, len(df.columns), 3):
         # Extract keypoint name from the header_labels
         keypoint = header_labels.iloc[i]
-        
-        # Define column names for this keypoint
-        x_col = header_labels.iloc[i] + '_x'
-        y_col = header_labels.iloc[i] + '_y'
-        conf_col = header_labels.iloc[i] + '_confidence'
         
         # Check if the columns exist in the DataFrame
         if i + 2 < len(df.columns):
@@ -249,4 +322,7 @@ def load_keypoints_from_csv(path_to_csv):
             keypoint_dfs[keypoint] = keypoint_df
         else:
             print(f"Warning: Missing columns for keypoint {keypoint}")
+    
+    print(f'keypoints extracted: {list(keypoint_dfs.keys())}')
+
     return keypoint_dfs
