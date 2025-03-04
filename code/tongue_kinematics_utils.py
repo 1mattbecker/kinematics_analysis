@@ -1,6 +1,10 @@
 import numpy as np
 import pandas as pd
-
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib import colormaps  
+import scipy
+from scipy.signal import butter, filtfilt
 
 def filter_timestamps_refractory(timestamps, t_refractory):
     
@@ -174,6 +178,30 @@ def detect_licks(tongue_df, timestamps, spoutL, spoutR, threshold):
 
     return detected_licks
 
+### PROCESSING / ANNOTATING ###
+def segment_movements(df, max_dropped_frames=3):
+    df = df.copy()
+    df['movement_id'] = pd.NA  # Initialize movement ID column
+    movement_id = 0
+    nan_counter = 0
+    in_movement = False
+    
+    for i, row in df.iterrows():
+        if pd.isna(row['x']) or pd.isna(row['y']):  # Object not detected
+            nan_counter += 1
+        else:  # Object detected
+            nan_counter = 0
+            if not in_movement:
+                movement_id += 1  # Start a new movement
+                in_movement = True
+        
+        if in_movement:
+            if nan_counter <= max_dropped_frames:
+                df.at[i, 'movement_id'] = movement_id
+            else:
+                in_movement = False  # End current movement
+    
+    return df
 
 def mask_keypoint_data(keypoint_dfs,keypoint, confidence_threshold=0.9, mask_value=np.nan):
     """
@@ -199,6 +227,165 @@ def mask_keypoint_data(keypoint_dfs,keypoint, confidence_threshold=0.9, mask_val
         print(f"Keypoint {keypoint} not found")
         return None
 
+
+
+def kinematics_filter(df, frame_rate=500, cutoff_freq=20, filter_order=8):
+    """
+    Applies interpolation and low-pass filtering to kinematic data to smooth trajectories and velocities.
+    
+    Parameters:
+    df : pandas.DataFrame
+        Input DataFrame containing time-series kinematic data with required columns: ['time', 'x', 'y'].
+    frame_rate : int, optional
+        Sampling frequency of the data in Hz (default is 500 Hz).
+    cutoff_freq : float, optional
+        Cutoff frequency for the low-pass Butterworth filter in Hz (default is 20 Hz).
+    filter_order : int, optional
+        Order of the Butterworth filter (default is 8).
+
+    Returns:
+    pandas.DataFrame
+        A DataFrame with interpolated and filtered kinematic data, including time, position (x, y),
+        velocity components (xv, yv), and speed (v).
+    
+    Notes:
+    - Interpolates missing data points to ensure evenly spaced timestamps.
+    - Computes velocity from positional changes over time.
+    - Applies a zero-phase low-pass Butterworth filter to smooth kinematic signals.
+    - Retains only the originally available (non-NaN) time points in the final output.
+    """
+    # Ensure the DataFrame has the required columns
+    required_columns = ['time', 'x', 'y']
+    if not all(col in df.columns for col in required_columns):
+        raise ValueError(f"Input DataFrame must contain the columns: {required_columns}")
+    
+    # Generate new timestamps for interpolation
+    t = df['time'].values
+    dt = np.diff(t)
+    new_ts = []
+    for num in range(len(dt)):
+        tspace = dt[num] / (1 / frame_rate)
+        intgr = int(np.floor(tspace))
+        if intgr >= 2:
+            new_t = np.linspace(t[num], t[num + 1], intgr)
+            new_ts.extend(new_t)
+    new_t = np.unique(np.concatenate((t, new_ts)))
+    
+    # Interpolate missing data points
+    x_nonan = df['x'][df['x'].notna()].values
+    y_nonan = df['y'][df['y'].notna()].values
+    t_nonan = df['time'][df['x'].notna()].values
+    
+    x = np.interp(new_t, t_nonan, x_nonan)
+    y = np.interp(new_t, t_nonan, y_nonan)
+    intrp = pd.DataFrame({'time': new_t, 'x': x, 'y': y})
+    
+    # Apply low-pass Butterworth filter to position data
+    cutoff = cutoff_freq / (frame_rate / 2)              
+    b, a = butter(int(filter_order / 2), cutoff)          
+    filtered_xy = filtfilt(b, a, intrp[['x', 'y']].values, axis=0)  
+    intrp['x'] = filtered_xy[:, 0]                        
+    intrp['y'] = filtered_xy[:, 1]                        
+    
+    # Compute velocity from filtered positions
+    times = intrp['time'].values
+    t_diff = np.gradient(times)
+    xv = np.gradient(intrp['x'].values) / t_diff          
+    yv = np.gradient(intrp['y'].values) / t_diff          
+    v = np.sqrt(xv**2 + yv**2)                            
+    
+    intrp['v'] = v
+    intrp['xv'] = xv
+    intrp['yv'] = yv
+    
+    # Keep data only at original (non-NaN) timestamps
+    df_temp = df.reindex(columns=list(intrp.columns.tolist()))
+    df_nonan_index = df['time'][df['x'].notna()].index.tolist()
+    filtered_df_nonan_index = intrp[intrp['time'].isin(t_nonan)].index.tolist()
+    df_temp.iloc[df_nonan_index] = intrp.iloc[filtered_df_nonan_index]
+    
+    return df_temp.reset_index(drop=True)
+
+
+### PLOTTING ###
+def plot_keypoint_confidence_analysis(keypoint_dfs, keypt):
+    """Generates a 2x2 grid of plots analyzing confidence data for a specified keypoint.
+
+    Parameters:
+    keypoint_dfs (dict): Dictionary containing DataFrames of keypoint data.
+    keypt (str): The name of the keypoint to analyze.
+    """
+    
+    df = keypoint_dfs[keypt].copy()  # Copy DataFrame for safety
+    conf_values = df['confidence']
+    
+    fig, axs = plt.subplots(2, 2, figsize=(7.5, 6), gridspec_kw={'width_ratios': [1, 1]}, sharex='col')
+    bins = 100  
+
+    # --- Top Left (0,0): Histogram (Linear Scale) ---
+    sns.histplot(conf_values, bins=bins, edgecolor='black', ax=axs[0, 0])
+    axs[0, 0].set_xlabel('')
+    axs[0, 0].set_ylabel('Frequency')
+    axs[0, 0].set_title('Confidence Distribution (Linear)')
+    axs[0, 0].grid(True)
+
+    avg_conf = conf_values.mean()
+    axs[0, 0].text(
+        0.5, 0.95, f'Avg Conf: {avg_conf:.2f}', transform=axs[0, 0].transAxes,
+        fontsize=10, color='black', ha='center', va='top',
+        bbox=dict(facecolor='white', alpha=0.5, edgecolor='black')
+    )
+
+    # --- Bottom Left (1,0): Histogram (Log-Scaled Y-axis + KDE) ---
+    sns.histplot(conf_values, bins=bins, kde=True, edgecolor='black', ax=axs[1, 0])
+    axs[1, 0].set_yscale('log')
+    axs[1, 0].set_xlabel('Confidence')
+    axs[1, 0].set_ylabel('Frequency (Log Scale)')
+    axs[1, 0].set_title('Confidence Distribution (Log) & KDE')
+    axs[1, 0].grid(True, which='both', axis='y')
+
+    # --- Top Right (0,1): Confidence Over Time with Moving Averages ---
+    window_sizes_s = [0.1, 3, 100]  
+    frame_rate = 500  
+    window_sizes = [int(w * frame_rate) for w in window_sizes_s]  
+    cmap = colormaps['jet']
+    colors = [cmap(i / (len(window_sizes) - 1)) for i in range(len(window_sizes))]
+
+    axs[0, 1].plot(df['time'], df['confidence'], alpha=0.2, label='Raw', color='gray')
+
+    for i, (window, color) in enumerate(zip(window_sizes, colors)):
+        smoothed = df['confidence'].rolling(window=window, center=True).mean()
+        axs[0, 1].plot(df['time'], smoothed, label=f'{window_sizes_s[i]} sec', 
+                       linewidth=2 if window > 1 else 0.4, alpha=0.6 if window > 1 else 0.3, color=color)
+
+    axs[0, 1].set_xlabel('Time (s)')
+    axs[0, 1].set_ylabel('Confidence')
+    axs[0, 1].set_title('Confidence Over Time')
+    axs[0, 1].legend(title="Moving Avg.", fontsize=8, title_fontsize=10, loc="lower left",
+                     labelspacing=0.4, handlelength=1.5)
+    axs[0, 1].grid(True)
+
+    # --- Bottom Right (1,1): Spatial Heatmap of Confidence ---
+    hb = axs[1, 1].hexbin(df['x'], df['y'], C=df['confidence'], gridsize=30,
+                          reduce_C_function=np.mean, cmap='viridis')
+    axs[1, 1].set_xlim(0, 720)
+    axs[1, 1].set_ylim(0, 540)
+    axs[1, 1].set_xlabel("X Pos (pixels)")
+    axs[1, 1].set_ylabel("Y Pos (pixels)")
+    axs[1, 1].set_title("Avg Confidence over Space")
+
+    # Add colorbar
+    cbar = fig.colorbar(hb, ax=axs[1, 1], aspect=20)
+    cbar.set_label("Average Confidence")
+
+    # Overall figure title
+    fig.suptitle(f"{keypt.capitalize()} Confidence Analysis", fontsize=14)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.98])  # Adjust layout to fit the title
+    plt.show()
+
+
+### LOADING DATA ###
 def integrate_keypoints_with_video_time(video_csv_path, keypoint_dfs):
     """
     Imports, checks, and preprocesses video CSV, then trims keypoint data to match video length.
