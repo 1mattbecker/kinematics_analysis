@@ -181,7 +181,7 @@ def detect_licks(tongue_df, timestamps, spoutL, spoutR, threshold):
 ### PROCESSING / ANNOTATING ###
 def segment_movements(df, max_dropped_frames=3):
     df = df.copy()
-    df['movement_id'] = pd.NA  # Initialize movement ID column
+    df['movement_id'] = np.nan  # Initialize movement ID column
     movement_id = 0
     nan_counter = 0
     in_movement = False
@@ -226,8 +226,6 @@ def mask_keypoint_data(keypoint_dfs,keypoint, confidence_threshold=0.9, mask_val
     else:
         print(f"Keypoint {keypoint} not found")
         return None
-
-
 
 def kinematics_filter(df, frame_rate=500, cutoff_freq=20, filter_order=8):
     """
@@ -308,6 +306,60 @@ def kinematics_filter(df, frame_rate=500, cutoff_freq=20, filter_order=8):
 
 
 ### PLOTTING ###
+def plot_basic_kinematics_movement_segment(tongue_segmented, movement_ids=None):
+    """
+    Plot kinematic data for specified movement segments from the tongue_segmented DataFrame (output of segment_movements annotation)
+    
+    Parameters:
+        tongue_segmented (DataFrame): DataFrame containing kinematics data with at least
+                                      columns: 'time', 'x', 'y', 'v', 'xv', 'yv', 'movement_id'
+        movement_ids (int, list, or range, optional): A single movement id or a sequence of movement ids.
+                                                     If None, the function plots the first 10 unique movements.
+    """
+    # Determine which movement ids to plot (filtering out np.nan values)
+    if movement_ids is None:
+        unique_ids = sorted(tongue_segmented['movement_id'].dropna().unique())
+        movement_ids = unique_ids[:10]
+    elif isinstance(movement_ids, int):
+        movement_ids = [movement_ids]
+    elif isinstance(movement_ids, range):
+        movement_ids = list(movement_ids)
+    
+    # Loop through each specified movement id
+    for movement_id in movement_ids:
+        filtered_df = tongue_segmented[tongue_segmented['movement_id'] == movement_id]
+        if filtered_df.empty:
+            print(f"No data found for movement_id {movement_id}")
+            continue
+
+        # Create a figure with two subplots (position and velocity)
+        fig, ax = plt.subplots(2, 1, figsize=(5, 5), sharex=True)
+
+        # Plot Position: offset the x and y coordinates relative to their initial value
+        ax[0].plot(filtered_df['time'], filtered_df['x'] - filtered_df['x'].iloc[0],
+                   label='X Position', color='b')
+        ax[0].plot(filtered_df['time'], filtered_df['y'] - filtered_df['y'].iloc[0],
+                   label='Y Position', color='r')
+        ax[0].set_ylabel('Change in Pos. (pixel)')
+        ax[0].set_title('Position')
+        ax[0].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # Plot Velocity: plot speed and the x and y components of velocity
+        ax[1].plot(filtered_df['time'], filtered_df['v'], label='Speed', color='g')
+        ax[1].plot(filtered_df['time'], filtered_df['xv'], label='X Velocity',
+                   color='b', linestyle='--')
+        ax[1].plot(filtered_df['time'], filtered_df['yv'], label='Y Velocity',
+                   color='r', linestyle='--')
+        ax[1].axhline(0, color='k', linestyle='--')
+        ax[1].set_xlabel('Time (s)')
+        ax[1].set_ylabel('Velocity (pixel/s)')
+        ax[1].set_title('Velocity')
+        ax[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        plt.suptitle(f'Movement ID: {int(movement_id)}')
+        plt.tight_layout()
+        plt.show()
+
 def plot_keypoint_confidence_analysis(keypoint_dfs, keypt):
     """Generates a 2x2 grid of plots analyzing confidence data for a specified keypoint.
 
