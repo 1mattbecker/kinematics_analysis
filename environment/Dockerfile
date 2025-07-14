@@ -42,6 +42,7 @@ RUN pip install -U --no-cache-dir \
     zarr==2.18.2 \
     aind_dynamic_foraging_basic_analysis \
     aind_dynamic_foraging_data_utils \
+    aind_analysis_arch_result_access \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@main#egg=aind-dynamic-foraging-behavior-video-analysis
 
     # opencv_python==4.11.0.86 \

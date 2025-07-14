@@ -1,0 +1,17 @@
+{
+	"version": 1,
+	"attached_datasets": [
+		{
+			"id": "2c00fd74-e87a-463b-8a07-47d568851d24",
+			"mount": "BottomViewPylon1-MIB-2025-02-17"
+		},
+		{
+			"id": "2d28ccd9-48ab-429e-92ef-7723135ee306",
+			"mount": "behavior_716325_2024-05-31_10-31-14"
+		},
+		{
+			"id": "f908dd4d-d7ed-4d52-97cf-ccd0e167c659",
+			"mount": "foraging_nwb_bonsai"
+		}
+	]
+}
