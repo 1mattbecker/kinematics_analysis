@@ -197,6 +197,73 @@ def detect_licks(tongue_df, spoutL, spoutR, threshold):
 
     return detected_licks
 
+import numpy as np
+
+def detect_licks_multiple(
+    tongue_center, tongue_left, tongue_right,
+    spoutL, spoutR, threshold
+):
+    """
+    Detect lick onsets from three tongue markers.
+
+    Parameters
+    ----------
+    tongue_center, tongue_left, tongue_right : pd.DataFrame
+        Each must have columns ['time', 'x', 'y'], and identical 'time' values in the same order.
+    spoutL, spoutR : pd.Series or dict-like
+        Must contain keys/indices 'x' and 'y' for spout positions.
+    threshold : float
+        Distance threshold (in same units as x,y) for detecting a lick.
+
+    Returns
+    -------
+    List[float]
+        Timestamps at which a new lick onset occurs.
+    """
+
+    # 1) Quick sanity check on times
+    times = tongue_center['time'].values
+    if not (
+        np.array_equal(times, tongue_left['time'].values) and
+        np.array_equal(times, tongue_right['time'].values)
+    ):
+        raise ValueError("All three tongue‐dfs must have identical 'time' columns in the same order.")
+
+    # 2) Spout positions as arrays
+    spoutL_pos = np.array([spoutL['x'], spoutL['y']])
+    spoutR_pos = np.array([spoutR['x'], spoutR['y']])
+
+    # 3) Helper to compute “within threshold” mask for one marker
+    def within_threshold(df):
+        # Extract x,y as (n,2), leaving NaNs intact
+        coords = df[['x','y']].to_numpy()
+
+        # Distance to each spout (NaNs propagate)
+        dL = np.linalg.norm(coords - spoutL_pos, axis=1)
+        dR = np.linalg.norm(coords - spoutR_pos, axis=1)
+
+        # Boolean: True where either distance ≤ threshold
+        return (dL <= threshold) | (dR <= threshold)
+
+    # 4) Compute masks for each of the three markers
+    lick_c = within_threshold(tongue_center)
+    lick_l = within_threshold(tongue_left)
+    lick_r = within_threshold(tongue_right)
+
+    # 5) Combined licking mask: any marker triggers
+    licking = lick_c | lick_l | lick_r
+
+    # 6) Find onsets (rising edges)
+    detected_licks = []
+    is_licking = False
+    for i, now in enumerate(licking):
+        if now and not is_licking:
+            detected_licks.append(times[i])
+            is_licking = True
+        elif not now:
+            is_licking = False
+
+    return detected_licks
 
 
 def mask_keypoint_data(keypoint_dfs,keypoint, confidence_threshold=0.9, mask_value=np.nan):
