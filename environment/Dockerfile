@@ -31,6 +31,7 @@ RUN pip install -U --no-cache-dir \
     ipywidgets==7.7.2 \
     open-ephys-python-tools==0.1.7 \
     pillow==10.3.0 \
+    pyarrow==21.0.0 \
     pymupdf==1.24.2 \
     pynwb==3.0.0 \
     pypdf2==3.0.1 \
@@ -40,8 +41,8 @@ RUN pip install -U --no-cache-dir \
     statsmodels==0.14.2 \
     wavpack-numcodecs==0.1.5 \
     zarr==2.18.2 \
-    aind_dynamic_foraging_basic_analysis \
-    aind_dynamic_foraging_data_utils \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
     aind_analysis_arch_result_access \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@main#egg=aind-dynamic-foraging-behavior-video-analysis
 
