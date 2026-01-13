@@ -6,7 +6,7 @@ save_root = "/root/capsule/scratch/session_analysis_halloween"
 data_root = Path("/root/capsule/data")
 
 # Load list from JSON
-pred_list_path = Path("/root/capsule/scratch/pred_csv_list_halloween.json")
+pred_list_path = Path("/root/capsule/scratch/pred_csv_list_20250113.json")
 with open(pred_list_path, "r") as f:
     pred_csv_list = json.load(f)
 
