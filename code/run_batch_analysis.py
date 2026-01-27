@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_analysis import run_batch_analysis
 
-save_root = "/root/capsule/scratch/session_analysis_halloween"
+save_root = "/root/capsule/scratch/session_analysis_mlk"
 data_root = Path("/root/capsule/data")
 
 # Load list from JSON
