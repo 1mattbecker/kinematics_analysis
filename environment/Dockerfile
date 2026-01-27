@@ -46,7 +46,9 @@ RUN pip install -U --no-cache-dir \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@main#egg=aind-dynamic-foraging-behavior-video-analysis \
     opencv_python==4.11.0.86 \
-    moviepy==1.0.3 
+    moviepy==1.0.3 \
+    scikit-image==0.24.0 \
+    trimesh==4.11.0
     # hdmf==3.12.2 \
     # aind_dynamic_foraging_data_utils==0.1.5
 
