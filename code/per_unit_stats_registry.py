@@ -488,7 +488,7 @@ class PerUnitStatsRegistry:
         """
         Screen one entry's t-stats against many others via Spearman
         correlation of t-values across units.
-
+ 
         Parameters
         ----------
         name : str
@@ -505,11 +505,13 @@ class PerUnitStatsRegistry:
             Sort results by "abs_rho", "rho", or "p".
         top_n : int, optional
             Return only the top N results.
-
+ 
         Returns
         -------
-        DataFrame with columns: entry, n, rho, p, abs_rho
+        DataFrame with columns: entry, n, rho, p, abs_rho,
+        fisher_OR, fisher_p, n_both, n_ref_only, n_tgt_only
         """
+        from scipy.stats import fisher_exact
         # Resolve target list
         targets = []
         if against:
@@ -520,221 +522,63 @@ class PerUnitStatsRegistry:
             targets.extend(self.list_by_source(source))
         if not targets:
             targets = [n for n in self.names if n != name]
-
+ 
         targets = sorted(set(t for t in targets if t != name))
-
+ 
         ref = self.get(name)
         rows = []
-
+ 
         for tgt in targets:
             tgt_df = self.get(tgt)
-            merged = ref[_KEY_COLS + ["t"]].merge(
-                tgt_df[_KEY_COLS + ["t"]],
+            merged = ref[_KEY_COLS + ["t", "sig_fdr"]].merge(
+                tgt_df[_KEY_COLS + ["t", "sig_fdr"]],
                 on=_KEY_COLS,
                 how="inner",
                 suffixes=("_ref", "_tgt"),
             ).dropna(subset=["t_ref", "t_tgt"])
-
+ 
             n = len(merged)
             if n < min_n:
                 rows.append({"entry": tgt, "n": n, "rho": np.nan,
-                             "p": np.nan, "abs_rho": np.nan})
+                             "p": np.nan, "abs_rho": np.nan,
+                             "fisher_OR": np.nan, "fisher_p": np.nan,
+                             "n_both": 0, "n_ref_only": 0, "n_tgt_only": 0})
                 continue
-
+ 
             rho, p = spearmanr(merged["t_ref"], merged["t_tgt"])
+ 
+            # Fisher exact test on significance overlap
+            sa = merged["sig_fdr_ref"].values.astype(bool)
+            sb = merged["sig_fdr_tgt"].values.astype(bool)
+            contingency = np.array([
+                [int((~sa & ~sb).sum()), int((~sa &  sb).sum())],
+                [int(( sa & ~sb).sum()), int(( sa &  sb).sum())],
+            ])
+            odds_ratio, fisher_p = fisher_exact(contingency)
+ 
             rows.append({
                 "entry": tgt,
                 "n": n,
                 "rho": float(rho),
                 "p": float(p),
                 "abs_rho": float(abs(rho)),
+                "fisher_OR": float(odds_ratio),
+                "fisher_p": float(fisher_p),
+                "n_both": int((sa & sb).sum()),
+                "n_ref_only": int((sa & ~sb).sum()),
+                "n_tgt_only": int((~sa & sb).sum()),
             })
-
+ 
         result = pd.DataFrame(rows)
         if rank_by in result.columns:
             ascending = rank_by == "p"
             result = result.sort_values(rank_by, ascending=ascending)
-
+ 
         if top_n:
             result = result.head(top_n)
-
+ 
         return result.reset_index(drop=True)
-
-    # ----------------------------------------------------------
-    # Heatmap: pairwise Spearman correlation matrix of t-stats
-    # ----------------------------------------------------------
-    def heatmap(
-        self,
-        entries: Optional[List[str]] = None,
-        *,
-        source: Optional[str] = None,
-        labels: Optional[Dict[str, str]] = None,
-        cluster: bool = True,
-        annot: bool = True,
-        figsize: Optional[Tuple[float, float]] = None,
-        title: Optional[str] = None,
-        save_path: Optional[str] = None,
-        show: bool = True,
-        vmin: float = -1.0,
-        vmax: float = 1.0,
-    ) -> pd.DataFrame:
-        """
-        Compute and plot a pairwise Spearman correlation matrix of t-stats
-        across all specified registry entries.
  
-        Parameters
-        ----------
-        entries : list of str, optional
-            Registry keys to include. If None, uses all entries
-            (or filtered by `source`).
-        source : str, optional
-            If entries is None, include only entries from this source.
-        labels : dict, optional
-            Mapping from entry name to short display label.
-            If None, uses entry names directly.
-        cluster : bool
-            Whether to reorder rows/cols by hierarchical clustering.
-        annot : bool
-            Whether to annotate cells with ρ values.
-        figsize : tuple, optional
-            Figure size. If None, auto-scaled from number of entries.
-        title : str, optional
-            Plot title.
-        save_path : str, optional
-            If provided, save .png and .svg (pass path without extension).
-        show : bool
-            Whether to display the figure.
-        vmin, vmax : float
-            Color scale limits (default -1 to 1).
- 
-        Returns
-        -------
-        DataFrame
-            Symmetric correlation matrix (entry × entry).
-        """
-        import matplotlib.pyplot as plt
- 
-        # Resolve entry list
-        if entries is None:
-            if source is not None:
-                entries = self.list_by_source(source)
-            else:
-                entries = self.names
-        if len(entries) < 2:
-            raise ValueError("Need at least 2 entries for a heatmap")
- 
-        n_entries = len(entries)
- 
-        # Build the t-stat matrix: units × entries (inner join across all)
-        # Use pairwise correlations to handle different unit sets per entry
-        rho_mat = np.full((n_entries, n_entries), np.nan)
-        p_mat = np.full((n_entries, n_entries), np.nan)
-        n_mat = np.full((n_entries, n_entries), 0, dtype=int)
- 
-        for i in range(n_entries):
-            rho_mat[i, i] = 1.0
-            p_mat[i, i] = 0.0
-            df_i = self.get(entries[i])
-            for j in range(i + 1, n_entries):
-                df_j = self.get(entries[j])
-                merged = df_i[_KEY_COLS + ["t"]].merge(
-                    df_j[_KEY_COLS + ["t"]],
-                    on=_KEY_COLS,
-                    how="inner",
-                    suffixes=("_i", "_j"),
-                ).dropna(subset=["t_i", "t_j"])
- 
-                n_overlap = len(merged)
-                n_mat[i, j] = n_mat[j, i] = n_overlap
- 
-                if n_overlap >= 3:
-                    rho, p = spearmanr(merged["t_i"], merged["t_j"])
-                    rho_mat[i, j] = rho_mat[j, i] = rho
-                    p_mat[i, j] = p_mat[j, i] = p
- 
-        # Display labels
-        if labels is None:
-            labels = {e: e for e in entries}
-        display_names = [labels.get(e, e) for e in entries]
- 
-        rho_df = pd.DataFrame(rho_mat, index=display_names, columns=display_names)
- 
-        # Optional clustering
-        order = np.arange(n_entries)
-        if cluster and n_entries >= 3:
-            try:
-                from scipy.cluster.hierarchy import linkage, leaves_list
-                from scipy.spatial.distance import squareform
-                dist = 1 - np.abs(rho_mat)
-                np.fill_diagonal(dist, 0)
-                # Handle NaN distances
-                dist = np.nan_to_num(dist, nan=1.0)
-                dist = (dist + dist.T) / 2
-                condensed = squareform(dist, checks=False)
-                Z = linkage(condensed, method="average")
-                order = leaves_list(Z)
-            except Exception:
-                pass  # fall back to input order
- 
-        rho_ordered = rho_mat[np.ix_(order, order)]
-        p_ordered = p_mat[np.ix_(order, order)]
-        names_ordered = [display_names[i] for i in order]
- 
-        rho_df_ordered = pd.DataFrame(
-            rho_ordered, index=names_ordered, columns=names_ordered
-        )
- 
-        # Plot
-        if figsize is None:
-            side = max(6, 0.7 * n_entries + 2)
-            figsize = (side, side)
- 
-        fig, ax = plt.subplots(figsize=figsize)
- 
-        im = ax.imshow(
-            rho_ordered, cmap="RdBu_r", vmin=vmin, vmax=vmax,
-            aspect="equal",
-        )
- 
-        ax.set_xticks(range(n_entries))
-        ax.set_yticks(range(n_entries))
-        ax.set_xticklabels(names_ordered, rotation=45, ha="right", fontsize=8)
-        ax.set_yticklabels(names_ordered, fontsize=8)
- 
-        # Annotate cells
-        if annot:
-            for i in range(n_entries):
-                for j in range(n_entries):
-                    if i == j:
-                        continue
-                    rho_val = rho_ordered[i, j]
-                    p_val = p_ordered[i, j]
-                    if not np.isfinite(rho_val):
-                        continue
-                    # Bold/star for significant
-                    star = "*" if p_val < 0.05 else ""
-                    color = "white" if abs(rho_val) > 0.6 else "black"
-                    ax.text(
-                        j, i, f"{rho_val:.2f}{star}",
-                        ha="center", va="center",
-                        fontsize=7, color=color,
-                    )
- 
-        cbar = fig.colorbar(im, ax=ax, shrink=0.8, label="Spearman ρ")
-        ax.set_title(title or "Pairwise t-stat correlations", fontsize=12)
- 
-        plt.tight_layout()
- 
-        if save_path is not None:
-            self._save_fig(fig, save_path)
- 
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
- 
-        return rho_df_ordered
-
 
     # ----------------------------------------------------------
     # UpSet plot: significance overlap across entries
