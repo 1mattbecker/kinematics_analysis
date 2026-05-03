@@ -78,6 +78,10 @@
 			"mount": "behavior_751181_2025-02-25_12-12-30"
 		},
 		{
+			"id": "1a8bede7-bdc1-4b41-8290-bc0bdafdf019",
+			"mount": "merfish_data"
+		},
+		{
 			"id": "1c088c3b-9448-4154-8fa2-11951c98cd35",
 			"mount": "behavior_751766_2025-02-11_11-53-32"
 		},
@@ -314,6 +318,10 @@
 			"mount": "behavior_751766_2025-02-14_11-37-11_videoprocessed_2025-10-28_23-21-23"
 		},
 		{
+			"id": "78d5ebdd-9b79-4c49-8f83-144f5f7899db",
+			"mount": "LC_retro"
+		},
+		{
 			"id": "79da570a-b9a8-461b-9965-74abeee934ec",
 			"mount": "behavior_751769_2025-01-17_11-37-35_videoprocessed_2025-10-28_23-21-23"
 		},
@@ -536,6 +544,10 @@
 		{
 			"id": "c6bed16a-7fda-4468-a530-f15122e8d31d",
 			"mount": "behavior_758017_2025-02-06_11-26-09_videoprocessed_2025-09-09_18-59-42"
+		},
+		{
+			"id": "c712751d-f744-4fe8-9657-93a7084eab22",
+			"mount": "LC_percentile_meshes"
 		},
 		{
 			"id": "c76f712f-d276-4a26-bc3e-bfd6a9cf035d",
