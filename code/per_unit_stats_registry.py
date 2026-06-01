@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 from statsmodels.stats.multitest import multipletests
+import matplotlib.pyplot as plt
 
 
 # ============================================================
@@ -66,6 +67,93 @@ def _fdr_bh(pvals: np.ndarray, alpha: float = 0.05) -> np.ndarray:
         _, q_vals, _, _ = multipletests(p[m], alpha=alpha, method='fdr_bh')
         q[m] = q_vals
     return q
+
+def _add_regression_if_possible(ax, x, y, xscale="linear"):
+    """Overlay OLS regression line on a scatter axis."""
+    mask = np.isfinite(x) & np.isfinite(y)
+    if mask.sum() < 3:
+        return
+    x_fit, y_fit = x[mask], y[mask]
+    if xscale == "log":
+        x_fit = np.log(x_fit)
+    z = np.polyfit(x_fit, y_fit, 1)
+    x_line = np.linspace(x_fit.min(), x_fit.max(), 200)
+    y_line = np.polyval(z, x_line)
+    if xscale == "log":
+        x_line = np.exp(x_line)
+    ax.plot(x_line, y_line, color="C1", lw=1.2, alpha=0.8)
+
+
+def plot_example_scatter(
+    df: pd.DataFrame,
+    examples: List[Tuple],
+    x_col: str,
+    x_label: str,
+    y_col: str = "spike_count",
+    *,
+    jitter_x: Union[float, str] = "auto",
+    jitter_y: Union[float, str] = "auto",
+    jitter_seed: int = 0,
+    xscale: str = "linear",   
+):
+    """
+    Scatter example units with optional jitter.
+    """
+
+    if not examples:
+        print("No example units to plot.")
+        return None
+
+    rng = np.random.default_rng(jitter_seed)
+
+    n = len(examples)
+    fig, axes = plt.subplots(1, n, figsize=(5*n, 4), squeeze=False)
+
+    for ax, (uid, sess) in zip(axes.ravel(), examples):
+        g = df[(df["unit_id"] == uid) & (df["session"] == sess)]
+
+        x = g[x_col].to_numpy()
+        y = g[y_col].to_numpy()
+
+        # --- if log scale, remove non-positive values ---
+        if xscale == "log":
+            keep = x > 0
+            x = x[keep]
+            y = y[keep]
+
+        x_plot = x.copy()
+        y_plot = y.copy()
+
+        # --- auto detect integer-ish ---
+        jy = jitter_y
+        if jy == "auto":
+            jy = 0.2 if np.all(np.isclose(y, np.round(y), atol=1e-6)) else 0.0
+
+        jx = jitter_x
+        if jx == "auto":
+            jx = 0.2 if np.all(np.isclose(x, np.round(x), atol=1e-6)) else 0.0
+
+        if isinstance(jx, (int, float)) and jx > 0:
+            x_plot = x_plot + rng.normal(0, jx, size=len(x_plot))
+
+        if isinstance(jy, (int, float)) and jy > 0:
+            y_plot = y_plot + rng.normal(0, jy, size=len(y_plot))
+
+        ax.scatter(x_plot, y_plot, s=20, alpha=0.2, edgecolors="none")
+
+        _add_regression_if_possible(ax, x, y, xscale=xscale)
+
+        ax.set_xscale(xscale)  
+
+        ax.grid(True, ls=":", alpha=0.5)
+        ax.set_title(f"{uid} ({sess}) • n={len(x)}")
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_col.replace("_", " "))
+
+    fig.suptitle(f"Examples: {y_col} vs {x_label}", y=1.02)
+    plt.tight_layout()
+
+    return fig
 
 
 class PerUnitStatsRegistry:
@@ -408,7 +496,6 @@ class PerUnitStatsRegistry:
         show : bool
             Whether to plot (default True).
         """
-        import matplotlib.pyplot as plt
  
         alpha = alpha or self.alpha
         a = self.get(name_a)
@@ -632,7 +719,6 @@ class PerUnitStatsRegistry:
             Symmetric correlation matrix (entry x entry), ordered by
             clustering if ``cluster=True``.
         """
-        import matplotlib.pyplot as plt
  
         # Resolve entry list
         if entries is None:
@@ -802,7 +888,6 @@ class PerUnitStatsRegistry:
             Membership table: one row per unit, boolean columns for
             each entry's significance, plus session_prefix and unit.
         """
-        import matplotlib.pyplot as plt
         from matplotlib.gridspec import GridSpec
  
         if len(entries) < 2:
@@ -981,7 +1066,6 @@ class PerUnitStatsRegistry:
         n_pos_sig, n_neg_sig, wilcoxon_stat, wilcoxon_p,
         binom_p.
         """
-        import matplotlib.pyplot as plt
         from scipy.stats import wilcoxon, binomtest
 
         df = self.get(name)
@@ -1072,6 +1156,144 @@ class PerUnitStatsRegistry:
         return stats
 
     # ----------------------------------------------------------
+    # Example scatter: trial-level view of selected units
+    # ----------------------------------------------------------
+    def plot_examples(
+        self,
+        name: str,
+        trial_df: pd.DataFrame,
+        x_col: str,
+        x_label: str,
+        *,
+        y_col: str = "spike_count",
+        examples: Optional[List[Tuple]] = None,
+        n_examples: int = 4,
+        select: str = "top_t",
+        jitter_x: Union[float, str] = "auto",
+        jitter_y: Union[float, str] = "auto",
+        jitter_seed: int = 0,
+        xscale: str = "linear",
+        save_path: Optional[str] = None,
+        show: bool = True,
+    ) -> Optional["plt.Figure"]:
+        """
+        Plot trial-level scatter for a handful of example units drawn from
+        a registered entry.
+
+        Parameters
+        ----------
+        name : str
+            Registry entry to draw units from.
+        trial_df : DataFrame
+            Trial-level data. Must contain 'unit_id', 'session',
+            x_col, and y_col.
+        x_col : str
+            Column in trial_df to use as the x-axis predictor.
+        x_label : str
+            Human-readable x-axis label.
+        y_col : str
+            Column in trial_df for the y-axis (default 'spike_count').
+        examples : list of (unit_id, session), optional
+            Explicit list of units to plot.  If None, units are chosen
+            automatically using `select`.
+        n_examples : int
+            Number of units to auto-select (ignored if examples given).
+        select : str
+            Auto-selection strategy:
+            'top_t'      — units with highest |t| in the entry
+            'random_sig' — random sample from significant units
+            'random'     — random sample from all units
+        xscale : str
+            'linear' or 'log'.
+        save_path : str, optional
+            Base path (no extension) for .png / .svg output.
+        show : bool
+            Whether to call plt.show().
+
+        Returns
+        -------
+        matplotlib Figure or None
+        """
+
+        reg_df = self.get(name)  # session_prefix, unit, t, sig_fdr, ...
+
+        # --- Auto-select examples from registry ---
+        if examples is None:
+            if select == "top_t":
+                candidates = reg_df.dropna(subset=["t"]).copy()
+                candidates["abs_t"] = candidates["t"].abs()
+                chosen = (
+                    candidates.nlargest(n_examples, "abs_t")
+                    [["session_prefix", "unit"]]
+                )
+            elif select == "random_sig":
+                sig_units = reg_df[reg_df["sig_fdr"]].copy()
+                n = min(n_examples, len(sig_units))
+                chosen = sig_units.sample(n, random_state=jitter_seed)[
+                    ["session_prefix", "unit"]
+                ]
+            else:  # "random"
+                n = min(n_examples, len(reg_df))
+                chosen = reg_df.sample(n, random_state=jitter_seed)[
+                    ["session_prefix", "unit"]
+                ]
+
+            if len(chosen) == 0:
+                print(f"plot_examples('{name}'): no units matched select='{select}'.")
+                return None
+
+            # Resolve back to (unit_id, session) pairs present in trial_df.
+            # trial_df uses raw session strings; registry uses session_prefix.
+            trial_df = trial_df.copy()
+            trial_df["_sp"] = trial_df["session"].astype(str).map(self._gsp)
+            trial_df["_u"] = trial_df["unit_id"].map(_canon_unit)
+
+            examples = []
+            for _, row in chosen.iterrows():
+                mask = (
+                    (trial_df["_sp"] == row["session_prefix"])
+                    & (trial_df["_u"] == row["unit"])
+                )
+                sub = trial_df[mask]
+                if sub.empty:
+                    warnings.warn(
+                        f"plot_examples: unit {row['unit']} / "
+                        f"{row['session_prefix']} not found in trial_df"
+                    )
+                    continue
+                uid = sub["unit_id"].iloc[0]
+                sess = sub["session"].iloc[0]
+                examples.append((uid, sess))
+
+        if not examples:
+            print("plot_examples: no matching examples found in trial_df.")
+            return None
+
+        fig = plot_example_scatter(
+            trial_df,
+            examples=examples,
+            x_col=x_col,
+            x_label=x_label,
+            y_col=y_col,
+            jitter_x=jitter_x,
+            jitter_y=jitter_y,
+            jitter_seed=jitter_seed,
+            xscale=xscale,
+        )
+
+        if fig is None:
+            return None
+
+        if save_path is not None:
+            self._save_fig(fig, save_path)
+
+        if show:
+            plt.show()
+        else:
+            plt.close(fig)
+
+        return fig
+    # ----------------------------------------------------------
     # Internal helpers
     # ----------------------------------------------------------
     def _check_overwrite(self, name: str, overwrite: bool) -> None:
@@ -1110,7 +1332,6 @@ class PerUnitStatsRegistry:
         significance), using a single hue with sig units in saturated color
         and non-sig in a pale tint.
         """
-        import matplotlib.pyplot as plt
         from matplotlib.gridspec import GridSpec
  
         # --- Color palette: additive logic ---
