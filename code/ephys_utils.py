@@ -197,6 +197,76 @@ def make_session_bundle(
     }
 
 
+# ── All-counts table ──────────────────────────────────────────────────────────
+
+def build_all_counts_df(
+    units_with_spikes: pd.DataFrame,
+    cfg: "AnalysisConfig",
+    base_dirs: List[Path],
+    *,
+    verbose: bool = True,
+) -> pd.DataFrame:
+    """Build the trial × unit spike counts + kinematics table.
+
+    This is the primary intermediate used by encoding analyses.
+    Loops over every session × unit in units_with_spikes, builds
+    a session bundle (alignment times + trial features), then extracts
+    spike counts for each trial.
+
+    Parameters
+    ----------
+    units_with_spikes : DataFrame from data_loading.load_units_with_spike_times
+    cfg : AnalysisConfig — controls spike-count window, alignment key, etc.
+    base_dirs : list of Path — roots to search for session intermediate data
+    verbose : print per-session progress
+
+    Returns
+    -------
+    DataFrame sorted by (session, unit_id, trial) with columns:
+        session, unit_id, trial, spike_count, spike_rate_hz,
+        first_spike_latency_s, baseline_spike_count, baseline_spike_rate_hz,
+        delta_spike_count, reaction_time_firstmove, reaction_time_cueresponse,
+        first_move_* and cue_response_* kinematics columns.
+    """
+    bundle_cache: dict = {}
+    all_counts: list = []
+    n_ok = n_skip = 0
+
+    for u in units_with_spikes.itertuples(index=False):
+        session = u.session
+        if session not in bundle_cache:
+            try:
+                bundle_cache[session] = make_session_bundle(session, cfg, base_dirs=base_dirs)
+            except Exception as e:
+                if verbose:
+                    print(f"[skip session] {session}: {e}")
+                n_skip += 1
+                continue
+
+        try:
+            unit_counts = analyze_unit_for_session(
+                pd.Series(u._asdict()), bundle_cache[session], cfg
+            )
+            all_counts.append(unit_counts)
+            n_ok += 1
+        except Exception as e:
+            if verbose:
+                print(f"[skip unit] {getattr(u, 'unit_id', '?')} in {session}: {e}")
+            n_skip += 1
+
+    if verbose:
+        print(f"build_all_counts_df: {n_ok} units OK, {n_skip} skipped")
+
+    if not all_counts:
+        return pd.DataFrame()
+
+    return (
+        pd.concat(all_counts, ignore_index=True)
+        .sort_values(["session", "unit_id", "trial"])
+        .reset_index(drop=True)
+    )
+
+
 # ── Per-unit analysis ─────────────────────────────────────────────────────────
 
 def analyze_unit_for_session(
