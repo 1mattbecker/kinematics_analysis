@@ -391,6 +391,24 @@ class PerUnitStatsRegistry:
         out = out.drop_duplicates(subset=_KEY_COLS, keep="first")
         self._store(name, out, source="regression")
 
+    def register(self, result, *, overwrite: bool = False) -> None:
+        """Register an AnalysisResult directly (convenience wrapper).
+
+        Equivalent to register_regression(result.spec.name, result.stats, ...).
+        The stats DataFrame is expected to already have the standard schema
+        (T, p, q, coef, sig_fdr) as produced by fit_encoding.
+        """
+        self.register_regression(
+            result.spec.name,
+            result.stats,
+            t_col="T",
+            p_col="p",
+            q_col="q",
+            coef_col="coef",
+            n_col="n_trials",
+            overwrite=overwrite,
+        )
+
     # ----------------------------------------------------------
     # Registration: Sue's encoding table (batch)
     # ----------------------------------------------------------

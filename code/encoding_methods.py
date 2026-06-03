@@ -13,9 +13,11 @@ Design principles
 - All methods return the same standard schema so downstream consumers
   (registry, spatial encoder) are method-agnostic.
 - log/zscore transforms are part of the spec, not hardcoded to RT.
+- AnalysisResult stores only spec + unit-level stats (no trial_df).
+  To recover filtered trials: all_counts_df.query(result.spec.trial_query)
 
-Standard result schema
-----------------------
+Standard result schema (result.stats)
+--------------------------------------
     session_prefix  str
     unit            str
     n_trials        int
@@ -27,7 +29,7 @@ Standard result schema
 
 Usage
 -----
-    from encoding_methods import AnalysisSpec, fit_encoding
+    from encoding_methods import AnalysisSpec, AnalysisResult, fit_encoding
 
     spec = AnalysisSpec(
         name="ols_rt_response",
@@ -40,20 +42,22 @@ Usage
     )
 
     result = fit_encoding(all_counts_df, spec)
-    # result["results"]   -> per-unit stats DataFrame
-    # result["trial_df"]  -> trial-level rows that passed the filter
+    # result.stats  -> per-unit stats DataFrame
+    # result.spec   -> the AnalysisSpec used to produce it
 
     # Register in the shared registry:
     reg.register_regression(
-        spec.name, result["results"],
+        spec.name, result.stats,
         t_col="T", p_col="p", q_col="q", coef_col="coef",
     )
+    # Or use the convenience method:
+    reg.register(result)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -176,9 +180,49 @@ class AnalysisSpec:
         return "AnalysisSpec(" + ", ".join(parts) + ")"
 
 
+# ── AnalysisResult ────────────────────────────────────────────────────────────
+
+@dataclass
+class AnalysisResult:
+    """Output of fit_encoding: spec + unit-level stats only.
+
+    No trial_df stored — recover filtered trials on demand via:
+        all_counts_df.query(result.spec.trial_query)
+
+    Attributes
+    ----------
+    spec : AnalysisSpec
+        The full specification used to produce this result.
+    stats : pd.DataFrame
+        Per-unit summary with columns: session_prefix, unit, n_trials,
+        T, p, q, coef, sig_fdr.
+    """
+
+    spec: AnalysisSpec
+    stats: pd.DataFrame
+
+    def sig(self) -> pd.DataFrame:
+        """Return only significant rows (sig_fdr == True)."""
+        return self.stats.loc[self.stats["sig_fdr"]].copy()
+
+    def n_sig(self) -> dict:
+        s = self.stats
+        pos = int(((s["T"] > 0) & s["sig_fdr"]).sum())
+        neg = int(((s["T"] < 0) & s["sig_fdr"]).sum())
+        return {"pos": pos, "neg": neg, "total": pos + neg}
+
+    def __repr__(self) -> str:
+        ns = self.n_sig()
+        return (
+            f"AnalysisResult({self.spec.name!r}: "
+            f"{len(self.stats)} units, "
+            f"sig +{ns['pos']}/-{ns['neg']})"
+        )
+
+
 # ── OLS ──────────────────────────────────────────────────────────────────────
 
-def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> dict:
+def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     """OLS regression: response_col ~ 1 + predictor_col, per (session_prefix, unit).
 
     df should already have trial filtering applied (via spec.trial_query or
@@ -186,13 +230,10 @@ def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> dict:
 
     Returns
     -------
-    dict with keys:
-        "results"   : DataFrame, standard schema (see module docstring)
-        "trial_df"  : subset of df rows used in at least one unit fit
+    AnalysisResult with .stats in the standard schema (see module docstring).
     """
     counts = _add_session_prefix(df)
     rows = []
-    keep_idx = []
 
     for (sp, u), g in counts.groupby(["session_prefix", "unit"]):
         g = g.dropna(subset=[spec.predictor_col, spec.response_col])
@@ -204,7 +245,6 @@ def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> dict:
         else:
             valid = np.isfinite(x_raw) & np.isfinite(y)
 
-        keep_idx.extend(g.index[valid].tolist())
         x_raw, y = x_raw[valid], y[valid]
         n = int(x_raw.size)
 
@@ -239,13 +279,12 @@ def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> dict:
     print(f"[{spec.name}] {len(out)} units, {n_valid} valid, "
           f"sig: +{n_pos} / -{n_neg} (FDR α={spec.fdr_alpha})")
 
-    trial_df = counts.loc[counts.index.isin(keep_idx)].copy() if keep_idx else counts.iloc[:0].copy()
-    return {"results": out, "trial_df": trial_df}
+    return AnalysisResult(spec=spec, stats=out)
 
 
 # ── Spearman ─────────────────────────────────────────────────────────────────
 
-def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> dict:
+def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     """Spearman correlation: response_col ~ predictor_col, per (session_prefix, unit).
 
     Returns the same standard schema as fit_ols.
@@ -256,14 +295,12 @@ def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> dict:
     """
     counts = _add_session_prefix(df)
     rows = []
-    keep_idx = []
 
     for (sp, u), g in counts.groupby(["session_prefix", "unit"]):
         g = g.dropna(subset=[spec.predictor_col, spec.response_col])
         x = g[spec.predictor_col].to_numpy(dtype=float)
         y = g[spec.response_col].to_numpy(dtype=float)
         valid = np.isfinite(x) & np.isfinite(y)
-        keep_idx.extend(g.index[valid].tolist())
         x, y = x[valid], y[valid]
         n = int(x.size)
 
@@ -287,13 +324,12 @@ def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> dict:
     print(f"[{spec.name}] {len(out)} units, {n_valid} valid, "
           f"sig: +{n_pos} / -{n_neg} (FDR α={spec.fdr_alpha})")
 
-    trial_df = counts.loc[counts.index.isin(keep_idx)].copy() if keep_idx else counts.iloc[:0].copy()
-    return {"results": out, "trial_df": trial_df}
+    return AnalysisResult(spec=spec, stats=out)
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
-def fit_encoding(all_counts_df: pd.DataFrame, spec: AnalysisSpec) -> dict:
+def fit_encoding(all_counts_df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     """Apply trial filter from spec, then dispatch to OLS or Spearman.
 
     Parameters
@@ -303,7 +339,8 @@ def fit_encoding(all_counts_df: pd.DataFrame, spec: AnalysisSpec) -> dict:
 
     Returns
     -------
-    dict with "results" (per-unit stats) and "trial_df" (filtered trials used)
+    AnalysisResult with .spec and .stats (per-unit summary).
+    To recover filtered trials: all_counts_df.query(result.spec.trial_query)
     """
     if spec.trial_query:
         try:
