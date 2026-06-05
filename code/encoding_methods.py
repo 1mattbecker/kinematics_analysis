@@ -130,8 +130,11 @@ class AnalysisSpec:
         Column in all_counts_df used as the x / independent variable.
     response_col : str
         Column in all_counts_df used as the y / dependent variable.
-    method : "ols" | "spearman"
+    method : "ols" | "spearman" | "glm"
         Fitting method.
+    glm_family : str
+        GLM family name, used only when method="glm". One of "poisson",
+        "nb" (negative binomial), "gaussian". Default "poisson".
     trial_query : str
         pandas DataFrame.query() string applied to all_counts_df before fitting.
         Leave empty to use all rows.  Examples:
@@ -154,6 +157,7 @@ class AnalysisSpec:
     predictor_col: str
     response_col: str
     method: str = "ols"
+    glm_family: str = "poisson"
     trial_query: str = ""
     log_x: bool = False
     zscore_x: bool = True
@@ -168,6 +172,8 @@ class AnalysisSpec:
             f"x={self.predictor_col}",
             f"y={self.response_col}",
         ]
+        if self.method == "glm":
+            parts.append(f"family={self.glm_family}")
         if self.trial_query:
             parts.append(f"filter={self.trial_query!r}")
         if self.log_x:
@@ -327,10 +333,86 @@ def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     return AnalysisResult(spec=spec, stats=out)
 
 
+# ── GLM ───────────────────────────────────────────────────────────────────────
+
+_GLM_FAMILIES = {
+    "poisson":  lambda: sm.families.Poisson(),
+    "nb":       lambda: sm.families.NegativeBinomial(),
+    "gaussian": lambda: sm.families.Gaussian(),
+}
+
+
+def fit_glm(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
+    """GLM regression: response_col ~ 1 + predictor_col, per (session_prefix, unit).
+
+    Family is controlled by spec.glm_family ("poisson", "nb", "gaussian").
+    For Poisson, response must be non-negative counts; the link is log so
+    coef is in units of log(mean spike count) per SD of predictor.
+
+    log_x and zscore_x apply to the predictor as in fit_ols.
+    The response is NOT z-scored (GLM handles the mean-variance relationship).
+    """
+    if spec.glm_family not in _GLM_FAMILIES:
+        raise ValueError(
+            f"Unknown glm_family {spec.glm_family!r}. "
+            f"Choose from: {list(_GLM_FAMILIES)}"
+        )
+
+    counts = _add_session_prefix(df)
+    rows = []
+
+    for (sp, u), g in counts.groupby(["session_prefix", "unit"]):
+        g = g.dropna(subset=[spec.predictor_col, spec.response_col])
+        x_raw = g[spec.predictor_col].to_numpy(dtype=float)
+        y = g[spec.response_col].to_numpy(dtype=float)
+
+        if spec.log_x:
+            valid = np.isfinite(x_raw) & (x_raw > 0) & np.isfinite(y) & (y >= 0)
+        else:
+            valid = np.isfinite(x_raw) & np.isfinite(y) & (y >= 0)
+
+        x_raw, y = x_raw[valid], y[valid]
+        n = int(x_raw.size)
+
+        base = {"session_prefix": sp, "unit": u, "n_trials": n,
+                "T": np.nan, "p": np.nan, "coef": np.nan}
+        if n < spec.min_trials or np.nanstd(x_raw) == 0:
+            rows.append(base)
+            continue
+
+        x = np.log(x_raw) if spec.log_x else x_raw.copy()
+        if spec.zscore_x:
+            mu, sd = np.nanmean(x), np.nanstd(x)
+            if sd > 0:
+                x = (x - mu) / sd
+
+        try:
+            family = _GLM_FAMILIES[spec.glm_family]()
+            res = sm.GLM(y, sm.add_constant(x), family=family).fit(disp=False)
+            rows.append({**base,
+                         "coef": float(res.params[1]),
+                         "T":    float(res.tvalues[1]),
+                         "p":    float(res.pvalues[1])})
+        except Exception:
+            rows.append(base)
+
+    out = pd.DataFrame(rows).reset_index(drop=True)
+    out["q"] = _fdr_bh(out["p"].to_numpy(), spec.fdr_alpha)
+    out["sig_fdr"] = out["q"] < spec.fdr_alpha
+
+    n_valid = int(out["T"].notna().sum())
+    n_pos = int(((out["T"] > 0) & out["sig_fdr"]).sum())
+    n_neg = int(((out["T"] < 0) & out["sig_fdr"]).sum())
+    print(f"[{spec.name}] {len(out)} units, {n_valid} valid, "
+          f"sig: +{n_pos} / -{n_neg} (FDR α={spec.fdr_alpha})")
+
+    return AnalysisResult(spec=spec, stats=out)
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 def fit_encoding(all_counts_df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
-    """Apply trial filter from spec, then dispatch to OLS or Spearman.
+    """Apply trial filter from spec, then dispatch to OLS, Spearman, or GLM.
 
     Parameters
     ----------
@@ -354,5 +436,7 @@ def fit_encoding(all_counts_df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisRes
         return fit_ols(df, spec)
     elif spec.method == "spearman":
         return run_spearman(df, spec)
+    elif spec.method == "glm":
+        return fit_glm(df, spec)
     else:
-        raise ValueError(f"Unknown method {spec.method!r}. Use 'ols' or 'spearman'.")
+        raise ValueError(f"Unknown method {spec.method!r}. Use 'ols', 'spearman', or 'glm'.")
