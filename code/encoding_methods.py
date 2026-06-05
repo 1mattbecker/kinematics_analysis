@@ -157,13 +157,13 @@ class AnalysisSpec:
     predictor_col: str
     response_col: str
     method: str = "ols"
-    glm_family: str = "poisson"
     trial_query: str = ""
     log_x: bool = False
     zscore_x: bool = True
     min_trials: int = 20
     fdr_alpha: float = 0.05
     notes: str = ""
+    glm_family: str = "poisson"
 
     def summary(self) -> str:
         parts = [
