@@ -6,15 +6,14 @@ All functions:
 - return (fig, ax) or (fig, axes)
 - do NOT set rcParams — call plotstyle.apply_style() once per notebook
 
-Primitives (repeated across multiple notebook cells):
+Primitives (reused across multiple notebooks):
     tstat_hist          Per-unit T-stat histogram with FDR-significant overlay
     t_scatter           Paired T-stat scatter with identity line or crosshair
     annotated_heatmap   imshow with per-cell text labels and colorbar
     tuning_band         Population LOWESS tuning curves with SEM bands
 
-Composite (multi-panel figures for specific analyses):
-    sign_contingency    3×3 observed counts + Pearson residuals (early × late)
-    rt_distribution     log(RT) density + QQ plot
+Analysis-specific figures (used once, in one notebook) belong as local
+helper functions inside that notebook — not here.
 """
 
 from __future__ import annotations
@@ -276,135 +275,3 @@ def tuning_band(
     ax.legend()
     style_ax(ax)
     return fig, ax
-
-
-# ── 3×3 sign contingency ──────────────────────────────────────────────────────
-
-def sign_contingency(
-    table_3x3: pd.DataFrame,
-    pearson_resid: np.ndarray,
-    *,
-    tick_labels: Optional[List[str]] = None,
-    row_label: str = "Early window sign",
-    col_label: str = "Late window sign",
-    suptitle: str = "Early × late window sign classification",
-) -> Tuple[Figure, np.ndarray]:
-    """Two-panel figure: observed 3×3 counts (left) and Pearson residuals (right).
-
-    Parameters
-    ----------
-    table_3x3 : DataFrame (3, 3)
-        Contingency table of observed counts.
-    pearson_resid : 2-D array (3, 3)
-        Pearson residuals (O − E) / √E from chi-square test.
-    tick_labels : list of 3 str, optional
-        Defaults to ["neg_sig", "not_sig", "pos_sig"].
-    """
-    ticks = tick_labels or ["neg_sig", "not_sig", "pos_sig"]
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-
-    ax = axes[0]
-    im = ax.imshow(table_3x3.values, cmap="Blues", aspect="auto")
-    plt.colorbar(im, ax=ax, shrink=0.8, label="n units")
-    for i in range(3):
-        for j in range(3):
-            ax.text(j, i, int(table_3x3.values[i, j]),
-                    ha="center", va="center", fontsize=12, fontweight="bold")
-    ax.set_xticks(range(3)); ax.set_xticklabels(ticks)
-    ax.set_yticks(range(3)); ax.set_yticklabels(ticks)
-    ax.set_xlabel(col_label); ax.set_ylabel(row_label)
-    ax.set_title("Observed counts (3×3)")
-
-    ax = axes[1]
-    _vmax = max(float(np.abs(pearson_resid).max()), 2.1)
-    im2 = ax.imshow(pearson_resid, cmap="RdBu_r", aspect="auto", vmin=-_vmax, vmax=_vmax)
-    plt.colorbar(im2, ax=ax, shrink=0.8, label="Pearson residual")
-    for i in range(3):
-        for j in range(3):
-            v = float(pearson_resid[i, j])
-            ax.text(j, i, f"{v:.1f}", ha="center", va="center",
-                    fontsize=11, fontweight="bold",
-                    color="white" if abs(v) > _vmax * 0.6 else "black")
-    ax.set_xticks(range(3)); ax.set_xticklabels(ticks)
-    ax.set_yticks(range(3)); ax.set_yticklabels(ticks)
-    ax.set_xlabel(col_label); ax.set_ylabel(row_label)
-    ax.set_title("Pearson residuals (O−E)/√E\n|residual| > 2 → enriched/depleted")
-
-    if suptitle:
-        fig.suptitle(suptitle)
-    plt.tight_layout()
-    return fig, axes
-
-
-# ── RT distribution ───────────────────────────────────────────────────────────
-
-def rt_distribution(
-    log_rt: np.ndarray,
-    *,
-    p_da: float,
-    sk: float,
-    ku: float,
-    gm2=None,
-    delta_bic: Optional[float] = None,
-) -> Tuple[Figure, np.ndarray]:
-    """log(RT) density histogram + normal QQ plot.
-
-    Parameters
-    ----------
-    log_rt : 1-D array
-        Log-transformed reaction times.
-    p_da : float
-        p-value from D'Agostino-Pearson normality test.
-    sk, ku : float
-        Skewness and excess kurtosis of log_rt.
-    gm2 : GaussianMixture, optional
-        Fitted 2-component sklearn mixture. If given and delta_bic > 10,
-        the mixture density curve is overlaid.
-    delta_bic : float, optional
-        BIC₁ − BIC₂. Required when gm2 is given.
-    """
-    from scipy.stats import norm as _norm, probplot
-
-    x_range = np.linspace(log_rt.min(), log_rt.max(), 300)
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-
-    ax = axes[0]
-    ax.hist(log_rt, bins=40, density=True, alpha=0.65,
-            color=PALETTE["neg"], label="Data")
-    ax.plot(x_range, _norm.pdf(x_range, log_rt.mean(), log_rt.std()),
-            "k--", lw=1.5, label=f"Log-normal fit\np={p_da:.2e}")
-    if gm2 is not None and delta_bic is not None and delta_bic > 10:
-        y_mix = np.zeros_like(x_range)
-        for i in range(2):
-            y_mix += gm2.weights_[i] * _norm.pdf(
-                x_range, gm2.means_[i, 0], np.sqrt(gm2.covariances_[i, 0, 0]))
-        ax.plot(x_range, y_mix, "-", color=PALETTE["pos"], lw=1.5,
-                label=f"2-component mixture\nΔBIC={delta_bic:.0f}")
-
-    ms_ticks = [0.05, 0.1, 0.2, 0.3, 0.5, 1.0]
-    ax2 = ax.twiny()
-    ax2.set_xlim(ax.get_xlim())
-    valid_ticks = [t for t in np.log(ms_ticks) if log_rt.min() <= t <= log_rt.max()]
-    ax2.set_xticks(valid_ticks)
-    ax2.set_xticklabels([f"{int(np.exp(t)*1000)}" for t in valid_ticks], fontsize=7)
-    ax2.set_xlabel("RT (ms)")
-    ax.set_xlabel("log(RT)")
-    ax.set_ylabel("Density")
-    ax.set_title(f"log(RT) distribution\nskew={sk:.2f}  excess kurt={ku:.2f}")
-    ax.legend()
-    style_ax(ax)
-
-    ax = axes[1]
-    res_qq = probplot(log_rt, dist="norm")
-    ax.scatter(res_qq[0][0], res_qq[0][1], s=2, alpha=0.3, color=PALETTE["neg"])
-    mn, mx = res_qq[0][0].min(), res_qq[0][0].max()
-    slope, intercept = res_qq[1][0], res_qq[1][1]
-    ax.plot([mn, mx], [slope*mn+intercept, slope*mx+intercept],
-            "-", color=PALETTE["pos"], lw=1.5)
-    ax.set_xlabel("Theoretical quantiles (normal)")
-    ax.set_ylabel("log(RT) quantiles")
-    ax.set_title(f"QQ plot: log(RT) vs normal\np={p_da:.3e}")
-    style_ax(ax)
-
-    plt.tight_layout()
-    return fig, axes
