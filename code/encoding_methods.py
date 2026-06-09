@@ -57,7 +57,7 @@ Usage
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -86,10 +86,18 @@ def _canon_unit(x) -> str:
 
 
 def _add_session_prefix(df: pd.DataFrame) -> pd.DataFrame:
-    """Add session_prefix and canonical unit columns in-place (copy)."""
+    """Ensure session_prefix and canonical unit columns exist (returns a copy).
+
+    Ephys tables carry raw ``session`` / ``unit_id`` columns that must be
+    derived into the grouping columns. Tables from other modalities may already
+    provide the grouping columns directly (e.g. ``session_prefix`` / ``roi``),
+    in which case nothing is synthesized and the frame passes through unchanged.
+    """
     out = df.copy()
-    out["session_prefix"] = out["session"].astype(str).map(_get_session_prefix_pkg)
-    out["unit"] = out["unit_id"].map(_canon_unit)
+    if "session_prefix" not in out.columns and "session" in out.columns:
+        out["session_prefix"] = out["session"].astype(str).map(_get_session_prefix_pkg)
+    if "unit" not in out.columns and "unit_id" in out.columns:
+        out["unit"] = out["unit_id"].map(_canon_unit)
     return out
 
 
@@ -151,6 +159,12 @@ class AnalysisSpec:
         FDR threshold for sig_fdr flag and q-value computation.
     notes : str
         Free-text description stored for manifest / provenance.
+    group_cols : tuple of str
+        Columns that identify one statistical unit (the per-X loop). Defaults
+        to ("session_prefix", "unit") for ephys. For another modality whose
+        table names its unit column differently, pass e.g.
+        ("session_prefix", "roi"). These names are carried through to the
+        output stats schema.
     """
 
     name: str
@@ -164,6 +178,7 @@ class AnalysisSpec:
     fdr_alpha: float = 0.05
     notes: str = ""
     glm_family: str = "poisson"
+    group_cols: Tuple[str, ...] = ("session_prefix", "unit")
 
     def summary(self) -> str:
         parts = [
@@ -176,6 +191,8 @@ class AnalysisSpec:
             parts.append(f"family={self.glm_family}")
         if self.trial_query:
             parts.append(f"filter={self.trial_query!r}")
+        if tuple(self.group_cols) != ("session_prefix", "unit"):
+            parts.append(f"group_cols={tuple(self.group_cols)}")
         if self.log_x:
             parts.append("log_x=True")
         if not self.zscore_x:
@@ -241,7 +258,9 @@ def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     counts = _add_session_prefix(df)
     rows = []
 
-    for (sp, u), g in counts.groupby(["session_prefix", "unit"]):
+    for keys, g in counts.groupby(list(spec.group_cols)):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
         g = g.dropna(subset=[spec.predictor_col, spec.response_col])
         x_raw = g[spec.predictor_col].to_numpy(dtype=float)
         y = g[spec.response_col].to_numpy(dtype=float)
@@ -254,8 +273,8 @@ def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
         x_raw, y = x_raw[valid], y[valid]
         n = int(x_raw.size)
 
-        base = {"session_prefix": sp, "unit": u, "n_trials": n,
-                "T": np.nan, "p": np.nan, "coef": np.nan}
+        base = dict(zip(spec.group_cols, keys))
+        base.update({"n_trials": n, "T": np.nan, "p": np.nan, "coef": np.nan})
         if n < spec.min_trials or np.nanstd(x_raw) == 0 or np.nanstd(y) == 0:
             rows.append(base)
             continue
@@ -302,7 +321,9 @@ def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     counts = _add_session_prefix(df)
     rows = []
 
-    for (sp, u), g in counts.groupby(["session_prefix", "unit"]):
+    for keys, g in counts.groupby(list(spec.group_cols)):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
         g = g.dropna(subset=[spec.predictor_col, spec.response_col])
         x = g[spec.predictor_col].to_numpy(dtype=float)
         y = g[spec.response_col].to_numpy(dtype=float)
@@ -310,8 +331,8 @@ def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
         x, y = x[valid], y[valid]
         n = int(x.size)
 
-        base = {"session_prefix": sp, "unit": u, "n_trials": n,
-                "T": np.nan, "p": np.nan, "coef": np.nan}
+        base = dict(zip(spec.group_cols, keys))
+        base.update({"n_trials": n, "T": np.nan, "p": np.nan, "coef": np.nan})
         if n < spec.min_trials or np.unique(x).size < 2 or np.unique(y).size < 2:
             rows.append(base)
             continue
@@ -361,7 +382,9 @@ def fit_glm(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     counts = _add_session_prefix(df)
     rows = []
 
-    for (sp, u), g in counts.groupby(["session_prefix", "unit"]):
+    for keys, g in counts.groupby(list(spec.group_cols)):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
         g = g.dropna(subset=[spec.predictor_col, spec.response_col])
         x_raw = g[spec.predictor_col].to_numpy(dtype=float)
         y = g[spec.response_col].to_numpy(dtype=float)
@@ -374,8 +397,8 @@ def fit_glm(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
         x_raw, y = x_raw[valid], y[valid]
         n = int(x_raw.size)
 
-        base = {"session_prefix": sp, "unit": u, "n_trials": n,
-                "T": np.nan, "p": np.nan, "coef": np.nan}
+        base = dict(zip(spec.group_cols, keys))
+        base.update({"n_trials": n, "T": np.nan, "p": np.nan, "coef": np.nan})
         if n < spec.min_trials or np.nanstd(x_raw) == 0:
             rows.append(base)
             continue
