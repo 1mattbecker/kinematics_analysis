@@ -6,35 +6,37 @@ Normalizes per-unit effect-size tables from heterogeneous sources
 into a common schema keyed by (session_prefix, unit), enabling
 one-liner pairwise comparisons, screening, and spatial analyses.
 
+Visualization is handled by encoding_plots (no matplotlib in this module):
+    registry_heatmap        pairwise Spearman rho heatmap
+    registry_upset          significance overlap UpSet plot
+    registry_summary        t-stat histogram + Wilcoxon/binom tests
+    registry_compare_plot   scatter + marginals for compare() output
+    registry_plot_examples  trial-level scatter for auto-selected units
+    example_unit_scatter    trial-level scatter for explicit (unit, session) list
+
 Usage
 -----
     from per_unit_stats_registry import PerUnitStatsRegistry
 
     reg = PerUnitStatsRegistry(get_session_prefix=get_session_prefix)
-
-    # Register from your correlation pipeline
     reg.register_cor_df("rt_response", spkct_rt["cor_df"])
     reg.register_cor_df("rt_baseline", spkct_rt_bl["cor_df"])
-
-    # Register from Sue's encoding table
     reg.register_sue(sue_plus)
 
-    # Compare any two entries
-    reg.compare("rt_response", "sue::T_baseline_hit_all")
-    reg.screen("rt_response", prefix="sue::")
+    merged = reg.compare("rt_response", "sue::T_baseline_hit_all")
+    results = reg.screen("rt_response", prefix="sue::")
 """
 
 from __future__ import annotations
 
 import re
 import warnings
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 from statsmodels.stats.multitest import multipletests
-import matplotlib.pyplot as plt
 
 
 # ============================================================
@@ -43,7 +45,6 @@ import matplotlib.pyplot as plt
 _KEY_COLS = ["session_prefix", "unit"]
 
 # Every registered entry gets normalized to this schema.
-# Only t and p are required; coef and q are optional.
 _STAT_COLS = ["t", "p", "q", "coef", "sig_fdr", "n_trials"]
 
 
@@ -68,98 +69,10 @@ def _fdr_bh(pvals: np.ndarray, alpha: float = 0.05) -> np.ndarray:
         q[m] = q_vals
     return q
 
-def _add_regression_if_possible(ax, x, y, xscale="linear"):
-    """Overlay OLS regression line on a scatter axis."""
-    mask = np.isfinite(x) & np.isfinite(y)
-    if mask.sum() < 3:
-        return
-    x_fit, y_fit = x[mask], y[mask]
-    if xscale == "log":
-        x_fit = np.log(x_fit)
-    z = np.polyfit(x_fit, y_fit, 1)
-    x_line = np.linspace(x_fit.min(), x_fit.max(), 200)
-    y_line = np.polyval(z, x_line)
-    if xscale == "log":
-        x_line = np.exp(x_line)
-    ax.plot(x_line, y_line, color="C1", lw=1.2, alpha=0.8)
-
-
-def plot_example_scatter(
-    df: pd.DataFrame,
-    examples: List[Tuple],
-    x_col: str,
-    x_label: str,
-    y_col: str = "spike_count",
-    *,
-    jitter_x: Union[float, str] = "auto",
-    jitter_y: Union[float, str] = "auto",
-    jitter_seed: int = 0,
-    xscale: str = "linear",   
-):
-    """
-    Scatter example units with optional jitter.
-    """
-
-    if not examples:
-        print("No example units to plot.")
-        return None
-
-    rng = np.random.default_rng(jitter_seed)
-
-    n = len(examples)
-    fig, axes = plt.subplots(1, n, figsize=(5*n, 4), squeeze=False)
-
-    for ax, (uid, sess) in zip(axes.ravel(), examples):
-        g = df[(df["unit_id"] == uid) & (df["session"] == sess)]
-
-        x = g[x_col].to_numpy()
-        y = g[y_col].to_numpy()
-
-        # --- if log scale, remove non-positive values ---
-        if xscale == "log":
-            keep = x > 0
-            x = x[keep]
-            y = y[keep]
-
-        x_plot = x.copy()
-        y_plot = y.copy()
-
-        # --- auto detect integer-ish ---
-        jy = jitter_y
-        if jy == "auto":
-            jy = 0.2 if np.all(np.isclose(y, np.round(y), atol=1e-6)) else 0.0
-
-        jx = jitter_x
-        if jx == "auto":
-            jx = 0.2 if np.all(np.isclose(x, np.round(x), atol=1e-6)) else 0.0
-
-        if isinstance(jx, (int, float)) and jx > 0:
-            x_plot = x_plot + rng.normal(0, jx, size=len(x_plot))
-
-        if isinstance(jy, (int, float)) and jy > 0:
-            y_plot = y_plot + rng.normal(0, jy, size=len(y_plot))
-
-        ax.scatter(x_plot, y_plot, s=20, alpha=0.2, edgecolors="none")
-
-        _add_regression_if_possible(ax, x, y, xscale=xscale)
-
-        ax.set_xscale(xscale)  
-
-        ax.grid(True, ls=":", alpha=0.5)
-        ax.set_title(f"{uid} ({sess}) • n={len(x)}")
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_col.replace("_", " "))
-
-    fig.suptitle(f"Examples: {y_col} vs {x_label}", y=1.02)
-    plt.tight_layout()
-
-    return fig
-
 
 class PerUnitStatsRegistry:
     """
-    Registry of per-unit t-statistic tables, all keyed by
-    (session_prefix, unit).
+    Registry of per-unit t-statistic tables, all keyed by (session_prefix, unit).
 
     Parameters
     ----------
@@ -286,7 +199,6 @@ class PerUnitStatsRegistry:
         # significance flag
         df["sig_fdr"] = df["q"] < self.alpha
 
-        # optional columns
         if "n_trials" in df.columns:
             df["n_trials"] = df["n_trials"].astype(float)
         else:
@@ -294,8 +206,7 @@ class PerUnitStatsRegistry:
 
         df["coef"] = df.get("spearman_rho", pd.Series(np.nan, index=df.index)).astype(float)
 
-        # Deduplicate on (session_prefix, unit) — keep first if multiple
-        # sessions map to same prefix (shouldn't happen with 1 session/day)
+        # Deduplicate on (session_prefix, unit)
         before = len(df)
         df = df.drop_duplicates(subset=_KEY_COLS, keep="first")
         if len(df) < before:
@@ -322,7 +233,6 @@ class PerUnitStatsRegistry:
         Register output of `analyze_unit_partial_correlations`.
         Same column expectations as cor_df.
         """
-        # Partial correlation tables have the same schema as cor_df
         self.register_cor_df(
             name, partial_df,
             session_col=session_col,
@@ -332,7 +242,7 @@ class PerUnitStatsRegistry:
         self._meta[name]["source"] = "partial"
 
     # ----------------------------------------------------------
-    # Registration: OLS regression (like build_sue_plus_with_rt_models)
+    # Registration: OLS regression
     # ----------------------------------------------------------
     def register_regression(
         self,
@@ -431,13 +341,6 @@ class PerUnitStatsRegistry:
         Each T_{suffix} column becomes a registry entry named
         "{registry_prefix}::{suffix}".
 
-        Parameters
-        ----------
-        sue_df : DataFrame
-            Sue's per-unit features table.
-        registry_prefix : str
-            Prefix for registry names (default "sue").
-
         Returns
         -------
         int
@@ -445,14 +348,12 @@ class PerUnitStatsRegistry:
         """
         df = sue_df.copy()
 
-        # Build keys
         if session_prefix_col and session_prefix_col in df.columns:
             df["session_prefix"] = df[session_prefix_col].astype(str)
         else:
             df["session_prefix"] = df[session_col].astype(str).map(self._gsp)
         df["unit"] = df[unit_col].map(_canon_unit)
 
-        # Find all T_ columns
         t_cols = [c for c in df.columns
                   if isinstance(c, str) and c.startswith(t_prefix)]
 
@@ -461,17 +362,15 @@ class PerUnitStatsRegistry:
             suffix = t_col[len(t_prefix):]
             p_col = f"{p_prefix}{suffix}"
             coef_col = f"{coef_prefix}{suffix}"
-
             entry_name = f"{registry_prefix}::{suffix}"
 
             if not overwrite and entry_name in self._entries:
                 continue
 
             out = df[_KEY_COLS].copy()
-            out["t"] = df[t_col].astype(float) if t_col in df.columns else np.nan
-            out["p"] = df[p_col].astype(float) if p_col in df.columns else np.nan
+            out["t"]    = df[t_col].astype(float) if t_col in df.columns else np.nan
+            out["p"]    = df[p_col].astype(float) if p_col in df.columns else np.nan
             out["coef"] = df[coef_col].astype(float) if coef_col in df.columns else np.nan
-
             out["q"] = _fdr_bh(out["p"].values, self.alpha)
             out["sig_fdr"] = out["q"] < self.alpha
             out["n_trials"] = np.nan
@@ -483,7 +382,7 @@ class PerUnitStatsRegistry:
         return count
 
     # ----------------------------------------------------------
-    # Comparison: pairwise scatter + overlap stats
+    # Comparison: pairwise overlap stats (no plotting)
     # ----------------------------------------------------------
     def compare(
         self,
@@ -491,90 +390,41 @@ class PerUnitStatsRegistry:
         name_b: str,
         *,
         alpha: Optional[float] = None,
-        show: bool = True,
-        figsize: Tuple[float, float] = (7, 7),
-        title: Optional[str] = None,
-        save_path: Optional[str] = None,
     ) -> pd.DataFrame:
-        """
-        Pairwise comparison of two registered entries.
- 
+        """Pairwise comparison of two registered entries.
+
         Returns a merged DataFrame with columns:
-            session_prefix, unit, t_a, t_b, sig_a, sig_b, sig_category
- 
-        If show=True, plots a scatter of t_a vs t_b colored by
-        significance category, with marginal histograms.
- 
+            session_prefix, unit, t_a, t_b, sig_fdr_a, sig_fdr_b, sig_category
+
+        For visualization pass the result to encoding_plots.registry_compare_plot().
+
         Parameters
         ----------
         name_a, name_b : str
             Registry keys to compare.
         alpha : float, optional
             Override registry-level alpha for significance.
-        show : bool
-            Whether to plot (default True).
         """
- 
         alpha = alpha or self.alpha
         a = self.get(name_a)
         b = self.get(name_b)
- 
+
         merged = a[_KEY_COLS + ["t", "sig_fdr"]].merge(
             b[_KEY_COLS + ["t", "sig_fdr"]],
             on=_KEY_COLS,
             how="inner",
             suffixes=("_a", "_b"),
         )
- 
-        # Significance categories
+
         sa = merged["sig_fdr_a"]
         sb = merged["sig_fdr_b"]
         cats = pd.Series("neither", index=merged.index)
-        cats[sa & sb] = "both"
-        cats[sa & ~sb] = f"{name_a} only"
-        cats[~sa & sb] = f"{name_b} only"
+        cats[sa & sb]   = "both"
+        cats[sa & ~sb]  = f"{name_a} only"
+        cats[~sa & sb]  = f"{name_b} only"
         merged["sig_category"] = cats
- 
-        # Drop rows with NaN t-stats
-        merged = merged.dropna(subset=["t_a", "t_b"]).reset_index(drop=True)
- 
-        # Population-level stats
-        n = len(merged)
-        rho, rho_p = spearmanr(merged["t_a"], merged["t_b"]) if n >= 3 else (np.nan, np.nan)
- 
-        counts = merged["sig_category"].value_counts()
- 
-        # Fisher exact test: sig overlap vs independence
-        from scipy.stats import fisher_exact
-        sa_arr = merged["sig_fdr_a"].values
-        sb_arr = merged["sig_fdr_b"].values
-        contingency = np.array([
-            [int((~sa_arr & ~sb_arr).sum()), int((~sa_arr &  sb_arr).sum())],
-            [int(( sa_arr & ~sb_arr).sum()), int(( sa_arr &  sb_arr).sum())],
-        ])
-        odds_ratio, fisher_p = fisher_exact(contingency)
- 
-        if show:
-            fig, ax_main, ax_top, ax_right = self._scatter_with_marginals(
-                merged["t_a"].values,
-                merged["t_b"].values,
-                merged["sig_category"].values,
-                sig_x=merged["sig_fdr_a"].values,
-                sig_y=merged["sig_fdr_b"].values,
-                x_label=name_a,
-                y_label=name_b,
-                title=title or f"{name_a} vs {name_b}  (n={n})",
-                rho=rho,
-                rho_p=rho_p,
-                fisher_or=odds_ratio,
-                fisher_p=fisher_p,
-                figsize=figsize,
-            )
-            if save_path is not None:
-                self._save_fig(fig, save_path)
-            plt.show()
- 
-        return merged
+
+        return merged.dropna(subset=["t_a", "t_b"]).reset_index(drop=True)
 
     # ----------------------------------------------------------
     # Screening: one entry vs many
@@ -593,7 +443,7 @@ class PerUnitStatsRegistry:
         """
         Screen one entry's t-stats against many others via Spearman
         correlation of t-values across units.
- 
+
         Parameters
         ----------
         name : str
@@ -610,14 +460,14 @@ class PerUnitStatsRegistry:
             Sort results by "abs_rho", "rho", or "p".
         top_n : int, optional
             Return only the top N results.
- 
+
         Returns
         -------
         DataFrame with columns: entry, n, rho, p, abs_rho,
         fisher_OR, fisher_p, n_both, n_ref_only, n_tgt_only
         """
         from scipy.stats import fisher_exact
-        # Resolve target list
+
         targets = []
         if against:
             targets.extend(against)
@@ -627,12 +477,12 @@ class PerUnitStatsRegistry:
             targets.extend(self.list_by_source(source))
         if not targets:
             targets = [n for n in self.names if n != name]
- 
+
         targets = sorted(set(t for t in targets if t != name))
- 
+
         ref = self.get(name)
         rows = []
- 
+
         for tgt in targets:
             tgt_df = self.get(tgt)
             merged = ref[_KEY_COLS + ["t", "sig_fdr"]].merge(
@@ -641,7 +491,7 @@ class PerUnitStatsRegistry:
                 how="inner",
                 suffixes=("_ref", "_tgt"),
             ).dropna(subset=["t_ref", "t_tgt"])
- 
+
             n = len(merged)
             if n < min_n:
                 rows.append({"entry": tgt, "n": n, "rho": np.nan,
@@ -649,10 +499,9 @@ class PerUnitStatsRegistry:
                              "fisher_OR": np.nan, "fisher_p": np.nan,
                              "n_both": 0, "n_ref_only": 0, "n_tgt_only": 0})
                 continue
- 
+
             rho, p = spearmanr(merged["t_ref"], merged["t_tgt"])
- 
-            # Fisher exact test on significance overlap
+
             sa = merged["sig_fdr_ref"].values.astype(bool)
             sb = merged["sig_fdr_tgt"].values.astype(bool)
             contingency = np.array([
@@ -660,7 +509,7 @@ class PerUnitStatsRegistry:
                 [int(( sa & ~sb).sum()), int(( sa &  sb).sum())],
             ])
             odds_ratio, fisher_p = fisher_exact(contingency)
- 
+
             rows.append({
                 "entry": tgt,
                 "n": n,
@@ -673,644 +522,16 @@ class PerUnitStatsRegistry:
                 "n_ref_only": int((sa & ~sb).sum()),
                 "n_tgt_only": int((~sa & sb).sum()),
             })
- 
+
         result = pd.DataFrame(rows)
         if rank_by in result.columns:
-            ascending = rank_by == "p"
-            result = result.sort_values(rank_by, ascending=ascending)
- 
+            result = result.sort_values(rank_by, ascending=(rank_by == "p"))
+
         if top_n:
             result = result.head(top_n)
- 
+
         return result.reset_index(drop=True)
 
-    # ----------------------------------------------------------
-    # Heatmap: pairwise Spearman correlation matrix of t-stats
-    # ----------------------------------------------------------
-    def heatmap(
-        self,
-        entries: Optional[List[str]] = None,
-        *,
-        source: Optional[str] = None,
-        labels: Optional[Dict[str, str]] = None,
-        cluster: bool = True,
-        annot: bool = True,
-        figsize: Optional[Tuple[float, float]] = None,
-        title: Optional[str] = None,
-        save_path: Optional[str] = None,
-        show: bool = True,
-        vmin: float = -1.0,
-        vmax: float = 1.0,
-    ) -> pd.DataFrame:
-        """
-        Compute and plot a pairwise Spearman correlation matrix of t-stats
-        across all specified registry entries.
- 
-        Parameters
-        ----------
-        entries : list of str, optional
-            Registry keys to include. If None, uses all entries
-            (or filtered by ``source``).
-        source : str, optional
-            If entries is None, include only entries from this source.
-        labels : dict, optional
-            Mapping from entry name to short display label.
-            If None, uses entry names directly.
-        cluster : bool
-            Whether to reorder rows/cols by hierarchical clustering.
-        annot : bool
-            Whether to annotate cells with rho values.
-        figsize : tuple, optional
-            Figure size. If None, auto-scaled from number of entries.
-        title : str, optional
-            Plot title.
-        save_path : str, optional
-            If provided, save .png and .svg (pass path without extension).
-        show : bool
-            Whether to display the figure.
-        vmin, vmax : float
-            Color scale limits (default -1 to 1).
- 
-        Returns
-        -------
-        DataFrame
-            Symmetric correlation matrix (entry x entry), ordered by
-            clustering if ``cluster=True``.
-        """
- 
-        # Resolve entry list
-        if entries is None:
-            if source is not None:
-                entries = self.list_by_source(source)
-            else:
-                entries = self.names
-        if len(entries) < 2:
-            raise ValueError("Need at least 2 entries for a heatmap")
- 
-        n_entries = len(entries)
- 
-        # Pairwise Spearman correlations (handles different unit sets
-        # per entry gracefully via inner join)
-        rho_mat = np.full((n_entries, n_entries), np.nan)
-        p_mat = np.full((n_entries, n_entries), np.nan)
-        n_mat = np.full((n_entries, n_entries), 0, dtype=int)
- 
-        for i in range(n_entries):
-            rho_mat[i, i] = 1.0
-            p_mat[i, i] = 0.0
-            df_i = self.get(entries[i])
-            for j in range(i + 1, n_entries):
-                df_j = self.get(entries[j])
-                merged = df_i[_KEY_COLS + ["t"]].merge(
-                    df_j[_KEY_COLS + ["t"]],
-                    on=_KEY_COLS,
-                    how="inner",
-                    suffixes=("_i", "_j"),
-                ).dropna(subset=["t_i", "t_j"])
- 
-                n_overlap = len(merged)
-                n_mat[i, j] = n_mat[j, i] = n_overlap
- 
-                if n_overlap >= 3:
-                    rho, p = spearmanr(merged["t_i"], merged["t_j"])
-                    rho_mat[i, j] = rho_mat[j, i] = rho
-                    p_mat[i, j] = p_mat[j, i] = p
- 
-        # Display labels
-        if labels is None:
-            labels = {e: e for e in entries}
-        display_names = [labels.get(e, e) for e in entries]
- 
-        rho_df = pd.DataFrame(rho_mat, index=display_names, columns=display_names)
- 
-        # Optional hierarchical clustering
-        order = np.arange(n_entries)
-        if cluster and n_entries >= 3:
-            try:
-                from scipy.cluster.hierarchy import linkage, leaves_list
-                from scipy.spatial.distance import squareform
-                dist = 1 - np.abs(rho_mat)
-                np.fill_diagonal(dist, 0)
-                # Handle NaN distances
-                dist = np.nan_to_num(dist, nan=1.0)
-                dist = (dist + dist.T) / 2
-                condensed = squareform(dist, checks=False)
-                Z = linkage(condensed, method="average")
-                order = leaves_list(Z)
-            except Exception:
-                pass  # fall back to input order
- 
-        rho_ordered = rho_mat[np.ix_(order, order)]
-        p_ordered = p_mat[np.ix_(order, order)]
-        names_ordered = [display_names[i] for i in order]
- 
-        rho_df_ordered = pd.DataFrame(
-            rho_ordered, index=names_ordered, columns=names_ordered
-        )
- 
-        # --- Plot ---
-        if figsize is None:
-            side = max(6, 0.7 * n_entries + 2)
-            figsize = (side, side)
- 
-        fig, ax = plt.subplots(figsize=figsize)
- 
-        im = ax.imshow(
-            rho_ordered, cmap="RdBu_r", vmin=vmin, vmax=vmax,
-            aspect="equal",
-        )
- 
-        ax.set_xticks(range(n_entries))
-        ax.set_yticks(range(n_entries))
-        ax.set_xticklabels(names_ordered, rotation=45, ha="right", fontsize=8)
-        ax.set_yticklabels(names_ordered, fontsize=8)
- 
-        # Annotate cells
-        if annot:
-            for i in range(n_entries):
-                for j in range(n_entries):
-                    if i == j:
-                        continue
-                    rho_val = rho_ordered[i, j]
-                    p_val = p_ordered[i, j]
-                    if not np.isfinite(rho_val):
-                        continue
-                    star = "*" if p_val < 0.05 else ""
-                    color = "white" if abs(rho_val) > 0.6 else "black"
-                    ax.text(
-                        j, i, f"{rho_val:.2f}{star}",
-                        ha="center", va="center",
-                        fontsize=7, color=color,
-                    )
- 
-        fig.colorbar(im, ax=ax, shrink=0.8, label="Spearman \u03c1")
-        ax.set_title(title or "Pairwise t-stat correlations", fontsize=12)
- 
-        plt.tight_layout()
- 
-        if save_path is not None:
-            self._save_fig(fig, save_path)
- 
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
- 
-        return rho_df_ordered 
-
-    # ----------------------------------------------------------
-    # UpSet plot: significance overlap across entries
-    # ----------------------------------------------------------
-    def upset(
-        self,
-        entries: List[str],
-        *,
-        labels: Optional[Dict[str, str]] = None,
-        min_subset_size: int = 0,
-        max_subsets: int = 25,
-        figsize: Optional[Tuple[float, float]] = None,
-        title: Optional[str] = None,
-        save_path: Optional[str] = None,
-        show: bool = True,
-        sort_by: str = "cardinality",
-    ) -> pd.DataFrame:
-        """
-        UpSet plot showing how many units are significant for each
-        combination of registered entries.
- 
-        Parameters
-        ----------
-        entries : list of str
-            Registry keys to include (2–8 recommended).
-        labels : dict, optional
-            Mapping from entry name to short display label.
-        min_subset_size : int
-            Hide intersections with fewer than this many units.
-        max_subsets : int
-            Maximum number of intersection bars to show.
-        figsize : tuple, optional
-            Figure size. If None, auto-scaled.
-        title : str, optional
-            Plot title.
-        save_path : str, optional
-            If provided, save .png and .svg (path without extension).
-        show : bool
-            Whether to display the figure.
-        sort_by : str
-            "cardinality" (largest first) or "degree" (by number of
-            sets in the intersection).
- 
-        Returns
-        -------
-        DataFrame
-            Membership table: one row per unit, boolean columns for
-            each entry's significance, plus session_prefix and unit.
-        """
-        from matplotlib.gridspec import GridSpec
- 
-        if len(entries) < 2:
-            raise ValueError("Need at least 2 entries for an UpSet plot")
- 
-        # Build display labels
-        if labels is None:
-            labels = {e: e for e in entries}
-        display_names = [labels.get(e, e) for e in entries]
- 
-        # Collect sig_fdr per entry, keyed by (session_prefix, unit)
-        frames = []
-        for entry_name, display in zip(entries, display_names):
-            df = self.get(entry_name)
-            sig_col = df[["session_prefix", "unit", "sig_fdr"]].copy()
-            sig_col = sig_col.rename(columns={"sig_fdr": display})
-            frames.append(sig_col)
- 
-        # Merge all on (session_prefix, unit) — outer join
-        membership = frames[0]
-        for f in frames[1:]:
-            membership = membership.merge(f, on=_KEY_COLS, how="inner")
- 
-        for col in display_names:
-            membership[col] = membership[col].fillna(False).astype(bool)
- 
-        n_total = len(membership)
-        n_any_sig = int(membership[display_names].any(axis=1).sum())
- 
-        # Compute intersection counts
-        # Each unique combination of True/False across display_names is a subset
-        combo_cols = membership[display_names]
-        combo_tuples = [tuple(row) for row in combo_cols.values]
-        from collections import Counter
-        combo_counts = Counter(combo_tuples)
- 
-        # Build subset table
-        subsets = []
-        for combo, count in combo_counts.items():
-            if count < min_subset_size:
-                continue
-            degree = sum(combo)
-            subsets.append({
-                "combo": combo,
-                "count": count,
-                "degree": degree,
-            })
- 
-        if sort_by == "cardinality":
-            subsets.sort(key=lambda s: -s["count"])
-        elif sort_by == "degree":
-            subsets.sort(key=lambda s: (s["degree"], -s["count"]))
- 
-        subsets = subsets[:max_subsets]
-        n_subsets = len(subsets)
-        n_sets = len(display_names)
- 
-        # --- Plot ---
-        if figsize is None:
-            figsize = (max(8, n_subsets * 0.5 + 2), max(5, n_sets * 0.6 + 3))
- 
-        fig = plt.figure(figsize=figsize)
-        gs = GridSpec(
-            2, 1, figure=fig,
-            height_ratios=(3, n_sets * 0.6),
-            hspace=0.05,
-        )
- 
-        ax_bars = fig.add_subplot(gs[0])
-        ax_dots = fig.add_subplot(gs[1], sharex=ax_bars)
- 
-        x = np.arange(n_subsets)
-        counts = [s["count"] for s in subsets]
- 
-        # Bar chart
-        ax_bars.bar(x, counts, color="steelblue", edgecolor="white", linewidth=0.5)
-        for xi, c in zip(x, counts):
-            ax_bars.text(xi, c + max(counts) * 0.02, str(c),
-                         ha="center", va="bottom", fontsize=8)
-        ax_bars.set_ylabel("units")
-        ax_bars.set_xlim(-0.6, n_subsets - 0.4)
-        ax_bars.set_ylim(0, max(counts) * 1.15)
-        plt.setp(ax_bars.get_xticklabels(), visible=False)
-        ax_bars.tick_params(axis="x", length=0)
- 
-        # Dot matrix
-        dot_color_on = "#333333"
-        dot_color_off = "#d0d0d0"
-        line_color = "#333333"
- 
-        for i, s in enumerate(subsets):
-            combo = s["combo"]
-            active = [j for j, v in enumerate(combo) if v]
- 
-            # Draw all dots (off)
-            for j in range(n_sets):
-                ax_dots.scatter(
-                    i, j, s=80, zorder=3,
-                    color=dot_color_off, edgecolors="none",
-                )
- 
-            # Draw active dots (on)
-            for j in active:
-                ax_dots.scatter(
-                    i, j, s=80, zorder=4,
-                    color=dot_color_on, edgecolors="none",
-                )
- 
-            # Connect active dots with a line
-            if len(active) > 1:
-                ax_dots.plot(
-                    [i, i], [min(active), max(active)],
-                    color=line_color, linewidth=1.5, zorder=2,
-                )
- 
-        ax_dots.set_yticks(range(n_sets))
-        ax_dots.set_yticklabels(display_names, fontsize=9)
-        ax_dots.set_ylim(-0.5, n_sets - 0.5)
-        ax_dots.invert_yaxis()
-        ax_dots.set_xticks([])
-        ax_dots.set_xlim(-0.6, n_subsets - 0.4)
- 
-        # Clean up spines
-        for spine in ax_dots.spines.values():
-            spine.set_visible(False)
-        ax_dots.tick_params(axis="both", length=0)
-        ax_dots.set_facecolor("white")
- 
-        # Add set size annotation to the right of the dot matrix
-        set_sizes = [int(membership[col].sum()) for col in display_names]
-        for j, sz in enumerate(set_sizes):
-            ax_dots.text(
-                n_subsets - 0.3, j, f"n={sz}",
-                ha="left", va="center", fontsize=8, color="grey",
-            )
- 
-        if title:
-            fig.suptitle(f"{title}  (n={n_total})", fontsize=12, y=0.98)
-        else:
-            fig.suptitle(
-                f"Significance overlap (n={n_total}, any sig={n_any_sig})",
-                fontsize=12, y=0.98,
-            )
- 
-        if save_path is not None:
-            self._save_fig(fig, save_path)
- 
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
- 
-        return membership
-
-    # ----------------------------------------------------------
-    # Summary: t-stat distribution for one entry
-    # ----------------------------------------------------------
-    def summary(
-        self,
-        name: str,
-        *,
-        show: bool = True,
-        bins: int = 30,
-        save_path: Optional[str] = None,
-    ) -> dict:
-        """
-        Summary statistics and histogram for one entry's t-stats.
-
-        Tests:
-            1. Wilcoxon signed-rank test: is the t-stat distribution
-               centered at zero?
-            2. Binomial test: among significant units, is the ratio of
-               positive to negative different from 50/50?
-
-        Returns dict with: n, n_sig, frac_sig, mean_t, median_t,
-        n_pos_sig, n_neg_sig, wilcoxon_stat, wilcoxon_p,
-        binom_p.
-        """
-        from scipy.stats import wilcoxon, binomtest
-
-        df = self.get(name)
-        t = df["t"].dropna()
-        sig = df.loc[df["t"].notna(), "sig_fdr"]
-
-        n_pos_sig = int((sig & (t > 0)).sum())
-        n_neg_sig = int((sig & (t < 0)).sum())
-        n_sig = n_pos_sig + n_neg_sig
-
-        # Wilcoxon signed-rank: t-stats centered at 0?
-        t_arr = t.to_numpy()
-        if len(t_arr) >= 10:
-            w_stat, w_p = wilcoxon(t_arr)
-        else:
-            w_stat, w_p = np.nan, np.nan
-
-        # Binomial: pos/neg ratio among sig units
-        if n_sig >= 1:
-            binom_result = binomtest(n_pos_sig, n_sig, 0.5)
-            binom_p = binom_result.pvalue
-        else:
-            binom_p = np.nan
-
-        stats = {
-            "n": len(t),
-            "n_sig": n_sig,
-            "frac_sig": float(sig.mean()) if len(sig) > 0 else 0.0,
-            "mean_t": float(t.mean()),
-            "median_t": float(t.median()),
-            "n_pos_sig": n_pos_sig,
-            "n_neg_sig": n_neg_sig,
-            "wilcoxon_stat": float(w_stat) if np.isfinite(w_stat) else np.nan,
-            "wilcoxon_p": float(w_p) if np.isfinite(w_p) else np.nan,
-            "binom_p": float(binom_p) if np.isfinite(binom_p) else np.nan,
-        }
-
-        if show:
-            fig, ax = plt.subplots(figsize=(6, 4))
-
-            t_all = t.to_numpy()
-            sig_arr = sig.to_numpy()
-
-            bin_edges = np.histogram_bin_edges(t_all, bins=bins)
-
-            ax.hist(
-                [t_all[~sig_arr], t_all[sig_arr]],
-                bins=bin_edges,
-                stacked=True,
-                color=["#d0d0d0", "steelblue"],
-                label=["not sig", "sig (FDR)"],
-                alpha=0.9,
-                edgecolor="white",
-                linewidth=0.5,
-            )
-            ax.axvline(0, ls="--", color="black", lw=0.8)
-            ax.set_xlabel("t-statistic")
-            ax.set_ylabel("units")
-            ax.set_title(
-                f"{name}\n"
-                f"n={stats['n']}, sig={stats['n_sig']} "
-                f"({stats['frac_sig']:.0%}), "
-                f"+{stats['n_pos_sig']}/−{stats['n_neg_sig']}"
-            )
-
-            # Annotation with test results
-            annot_lines = []
-            annot_lines.append(f"Wilcoxon p={stats['wilcoxon_p']:.2g}")
-            if n_sig >= 1:
-                annot_lines.append(
-                    f"Binom +/− p={stats['binom_p']:.2g} "
-                    f"({n_pos_sig}/{n_sig})"
-                )
-            ax.text(
-                0.97, 0.95,
-                "\n".join(annot_lines),
-                transform=ax.transAxes, fontsize=8,
-                va="top", ha="right",
-                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="grey", alpha=0.7),
-            )
-
-            ax.legend()
-            plt.tight_layout()
-            if save_path is not None:
-                self._save_fig(fig, save_path)
-            plt.show()
-
-        return stats
-
-    # ----------------------------------------------------------
-    # Example scatter: trial-level view of selected units
-    # ----------------------------------------------------------
-    def plot_examples(
-        self,
-        name: str,
-        trial_df: pd.DataFrame,
-        x_col: str,
-        x_label: str,
-        *,
-        y_col: str = "spike_count",
-        examples: Optional[List[Tuple]] = None,
-        n_examples: int = 4,
-        select: str = "top_t",
-        jitter_x: Union[float, str] = "auto",
-        jitter_y: Union[float, str] = "auto",
-        jitter_seed: int = 0,
-        xscale: str = "linear",
-        save_path: Optional[str] = None,
-        show: bool = True,
-    ) -> Optional["plt.Figure"]:
-        """
-        Plot trial-level scatter for a handful of example units drawn from
-        a registered entry.
-
-        Parameters
-        ----------
-        name : str
-            Registry entry to draw units from.
-        trial_df : DataFrame
-            Trial-level data. Must contain 'unit_id', 'session',
-            x_col, and y_col.
-        x_col : str
-            Column in trial_df to use as the x-axis predictor.
-        x_label : str
-            Human-readable x-axis label.
-        y_col : str
-            Column in trial_df for the y-axis (default 'spike_count').
-        examples : list of (unit_id, session), optional
-            Explicit list of units to plot.  If None, units are chosen
-            automatically using `select`.
-        n_examples : int
-            Number of units to auto-select (ignored if examples given).
-        select : str
-            Auto-selection strategy:
-            'top_t'      — units with highest |t| in the entry
-            'random_sig' — random sample from significant units
-            'random'     — random sample from all units
-        xscale : str
-            'linear' or 'log'.
-        save_path : str, optional
-            Base path (no extension) for .png / .svg output.
-        show : bool
-            Whether to call plt.show().
-
-        Returns
-        -------
-        matplotlib Figure or None
-        """
-
-        reg_df = self.get(name)  # session_prefix, unit, t, sig_fdr, ...
-
-        # --- Auto-select examples from registry ---
-        if examples is None:
-            if select == "top_t":
-                candidates = reg_df.dropna(subset=["t"]).copy()
-                candidates["abs_t"] = candidates["t"].abs()
-                chosen = (
-                    candidates.nlargest(n_examples, "abs_t")
-                    [["session_prefix", "unit"]]
-                )
-            elif select == "random_sig":
-                sig_units = reg_df[reg_df["sig_fdr"]].copy()
-                n = min(n_examples, len(sig_units))
-                chosen = sig_units.sample(n, random_state=jitter_seed)[
-                    ["session_prefix", "unit"]
-                ]
-            else:  # "random"
-                n = min(n_examples, len(reg_df))
-                chosen = reg_df.sample(n, random_state=jitter_seed)[
-                    ["session_prefix", "unit"]
-                ]
-
-            if len(chosen) == 0:
-                print(f"plot_examples('{name}'): no units matched select='{select}'.")
-                return None
-
-            # Resolve back to (unit_id, session) pairs present in trial_df.
-            # trial_df uses raw session strings; registry uses session_prefix.
-            trial_df = trial_df.copy()
-            trial_df["_sp"] = trial_df["session"].astype(str).map(self._gsp)
-            trial_df["_u"] = trial_df["unit_id"].map(_canon_unit)
-
-            examples = []
-            for _, row in chosen.iterrows():
-                mask = (
-                    (trial_df["_sp"] == row["session_prefix"])
-                    & (trial_df["_u"] == row["unit"])
-                )
-                sub = trial_df[mask]
-                if sub.empty:
-                    warnings.warn(
-                        f"plot_examples: unit {row['unit']} / "
-                        f"{row['session_prefix']} not found in trial_df"
-                    )
-                    continue
-                uid = sub["unit_id"].iloc[0]
-                sess = sub["session"].iloc[0]
-                examples.append((uid, sess))
-
-        if not examples:
-            print("plot_examples: no matching examples found in trial_df.")
-            return None
-
-        fig = plot_example_scatter(
-            trial_df,
-            examples=examples,
-            x_col=x_col,
-            x_label=x_label,
-            y_col=y_col,
-            jitter_x=jitter_x,
-            jitter_y=jitter_y,
-            jitter_seed=jitter_seed,
-            xscale=xscale,
-        )
-
-        if fig is None:
-            return None
-
-        if save_path is not None:
-            self._save_fig(fig, save_path)
-
-        if show:
-            plt.show()
-        else:
-            plt.close(fig)
-
-        return fig
     # ----------------------------------------------------------
     # Internal helpers
     # ----------------------------------------------------------
@@ -1324,160 +545,3 @@ class PerUnitStatsRegistry:
         keep = _KEY_COLS + [c for c in _STAT_COLS if c in df.columns]
         self._entries[name] = df[keep].reset_index(drop=True)
         self._meta[name] = {"source": source}
-
-    @staticmethod
-    def _scatter_with_marginals(
-        x, y, categories,
-        x_label, y_label, title,
-        rho, rho_p,
-        figsize,
-        sig_x=None,
-        sig_y=None,
-        fisher_or=None,
-        fisher_p=None,
-    ):
-        """Scatter with marginal histograms, colored by significance category.
- 
-        Colors are chosen so the "both" color is the additive mix of the
-        two single-axis colors:
-            x-only  = warm red/orange
-            y-only  = blue
-            both    = purple  (red + blue)
-            neither = grey
- 
-        Marginal histograms show sig vs not-sig for their own axis only
-        (top marginal uses x-axis significance, right marginal uses y-axis
-        significance), using a single hue with sig units in saturated color
-        and non-sig in a pale tint.
-        """
-        from matplotlib.gridspec import GridSpec
- 
-        # --- Color palette: additive logic ---
-        #   x-only  = warm red       #e05539
-        #   y-only  = steel blue     #4682b4
-        #   both    = purple blend   #7b3e9a
-        #   neither = light grey     #d0d0d0
-        COLOR_X    = "#e05539"
-        COLOR_Y    = "#4682b4"
-        COLOR_BOTH = "#7b3e9a"
-        COLOR_NONE = "#d0d0d0"
- 
-        # Pale tints for non-sig in marginals
-        COLOR_X_PALE = "#f2c4b8"
-        COLOR_Y_PALE = "#b8d4e8"
- 
-        # Build category -> color map (category names are dynamic)
-        unique_cats = sorted(set(categories))
-        x_only_name = f"{x_label} only"
-        y_only_name = f"{y_label} only"
- 
-        cat_colors = {
-            "neither":    COLOR_NONE,
-            "both":       COLOR_BOTH,
-            x_only_name:  COLOR_X,
-            y_only_name:  COLOR_Y,
-        }
- 
-        fig = plt.figure(figsize=figsize)
-        gs = GridSpec(
-            4, 4, figure=fig,
-            hspace=0.05, wspace=0.05,
-        )
- 
-        ax_main  = fig.add_subplot(gs[1:, :3])
-        ax_top   = fig.add_subplot(gs[0, :3], sharex=ax_main)
-        ax_right = fig.add_subplot(gs[1:, 3], sharey=ax_main)
- 
-        # --- Main scatter: draw neither first, then single-axis, then both ---
-        draw_order = (
-            ["neither"]
-            + [c for c in unique_cats if c not in ("neither", "both")]
-            + ["both"]
-        )
-        draw_order = [c for c in draw_order if c in unique_cats]
- 
-        for cat in draw_order:
-            mask = np.array(categories) == cat
-            if not mask.any():
-                continue
-            ax_main.scatter(
-                x[mask], y[mask],
-                c=cat_colors.get(cat, COLOR_NONE),
-                label=f"{cat} ({mask.sum()})",
-                s=25, alpha=0.7, edgecolors="none",
-            )
- 
-        ax_main.axhline(0, ls=":", color="grey", lw=0.5)
-        ax_main.axvline(0, ls=":", color="grey", lw=0.5)
-        ax_main.set_xlabel(f"t  ({x_label})")
-        ax_main.set_ylabel(f"t  ({y_label})")
-        ax_main.legend(fontsize=7, loc="best")
- 
-        annot = f"n={len(x)}, ρ={rho:.3f}, p={rho_p:.2g}"
-        if fisher_or is not None and fisher_p is not None:
-            annot += f"\nFisher OR={fisher_or:.2f}, p={fisher_p:.2g}"
- 
-        ax_main.text(
-            0.02, 0.98,
-            annot,
-            transform=ax_main.transAxes, fontsize=8,
-            va="top", ha="left",
-        )
- 
-        # --- Marginals: per-axis sig/not-sig ---
-        bins_edge = np.linspace(
-            min(np.nanmin(x), np.nanmin(y)),
-            max(np.nanmax(x), np.nanmax(y)),
-            31,
-        )
- 
-        # Top marginal: x-axis significance
-        if sig_x is not None:
-            sig_x = np.asarray(sig_x, dtype=bool)
-            ax_top.hist(
-                x[~sig_x], bins=bins_edge,
-                color=COLOR_X_PALE, alpha=0.8, label="not sig",
-            )
-            ax_top.hist(
-                x[sig_x], bins=bins_edge,
-                color=COLOR_X, alpha=0.8, label="sig (FDR)",
-            )
-        else:
-            ax_top.hist(x, bins=bins_edge, color=COLOR_X_PALE, alpha=0.8)
- 
-        # Right marginal: y-axis significance
-        if sig_y is not None:
-            sig_y = np.asarray(sig_y, dtype=bool)
-            ax_right.hist(
-                y[~sig_y], bins=bins_edge, orientation="horizontal",
-                color=COLOR_Y_PALE, alpha=0.8, label="not sig",
-            )
-            ax_right.hist(
-                y[sig_y], bins=bins_edge, orientation="horizontal",
-                color=COLOR_Y, alpha=0.8, label="sig (FDR)",
-            )
-        else:
-            ax_right.hist(
-                y, bins=bins_edge, orientation="horizontal",
-                color=COLOR_Y_PALE, alpha=0.8,
-            )
- 
-        ax_top.set_ylabel("count")
-        ax_right.set_xlabel("count")
-        plt.setp(ax_top.get_xticklabels(), visible=False)
-        plt.setp(ax_right.get_yticklabels(), visible=False)
- 
-        fig.suptitle(title, fontsize=11, y=0.98)
- 
-        return fig, ax_main, ax_top, ax_right
-
-    @staticmethod
-    def _save_fig(fig, path: str, dpi: int = 300):
-        """Save figure as both .png and .svg to the given path (without extension)."""
-        from pathlib import Path
-        p = Path(path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        stem = p.parent / p.stem  # strip any extension the user included
-        fig.savefig(f"{stem}.png", dpi=dpi, bbox_inches="tight")
-        fig.savefig(f"{stem}.svg", bbox_inches="tight")
-        print(f"Saved: {stem}.png, {stem}.svg")
