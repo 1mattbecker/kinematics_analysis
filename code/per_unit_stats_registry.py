@@ -2,9 +2,12 @@
 PerUnitStatsRegistry — a lightweight registry for per-unit t-statistics.
 
 Normalizes per-unit effect-size tables from heterogeneous sources
-(Spearman correlations, OLS regressions, external encoding models)
+(OLS regressions, Spearman, partial correlations, external encoding models)
 into a common schema keyed by (session_prefix, unit), enabling
 one-liner pairwise comparisons, screening, and spatial analyses.
+
+Primary registration path: reg.register(AnalysisResult) from encoding_methods.
+Legacy paths: register_regression (raw DataFrame) and register_sue (batch T_ columns).
 
 Visualization is handled by encoding_plots (no matplotlib in this module):
     registry_heatmap        pairwise Spearman rho heatmap
@@ -17,21 +20,22 @@ Visualization is handled by encoding_plots (no matplotlib in this module):
 Usage
 -----
     from per_unit_stats_registry import PerUnitStatsRegistry
+    from encoding_methods import AnalysisSpec, fit_encoding
 
     reg = PerUnitStatsRegistry(get_session_prefix=get_session_prefix)
-    reg.register_cor_df("rt_response", spkct_rt["cor_df"])
-    reg.register_cor_df("rt_baseline", spkct_rt_bl["cor_df"])
+    result = fit_encoding(df, AnalysisSpec(name="rt_ols", ...))
+    reg.register(result)
     reg.register_sue(sue_plus)
 
-    merged = reg.compare("rt_response", "sue::T_baseline_hit_all")
-    results = reg.screen("rt_response", prefix="sue::")
+    merged = reg.compare("rt_ols", "sue::T_baseline_hit_all")
+    results = reg.screen("rt_ols", prefix="sue::")
 """
 
 from __future__ import annotations
 
 import re
 import warnings
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -131,115 +135,6 @@ class PerUnitStatsRegistry:
     def list_by_source(self, source: str) -> List[str]:
         """List entry names that came from a given source tag."""
         return [n for n, m in self._meta.items() if m.get("source") == source]
-
-    # ----------------------------------------------------------
-    # Registration: cor_df (from run_and_plot_for_predictor)
-    # ----------------------------------------------------------
-    def register_cor_df(
-        self,
-        name: str,
-        cor_df: Union[pd.DataFrame, dict],
-        *,
-        session_col: str = "session",
-        unit_col: str = "unit_id",
-        overwrite: bool = False,
-    ) -> None:
-        """
-        Register a per-unit correlation table produced by
-        `analyze_unit_correlations` / `run_and_plot_for_predictor`.
-
-        Expects columns: spearman_rho, spearman_p, n_trials, and
-        optionally spearman_q, spearman_t.
-
-        Parameters
-        ----------
-        name : str
-            Registry key (e.g. "rt_response", "velocity_partial").
-        cor_df : DataFrame or dict
-            If dict, expects key "cor_df" (the convention from
-            run_and_plot_for_predictor return dicts).
-        """
-        if isinstance(cor_df, dict):
-            cor_df = cor_df["cor_df"]
-
-        self._check_overwrite(name, overwrite)
-
-        df = cor_df.copy()
-
-        # Build keys
-        df["session_prefix"] = df[session_col].astype(str).map(self._gsp)
-        df["unit"] = df[unit_col].map(_canon_unit)
-
-        # Resolve t-stat: prefer pre-computed, else derive from rho + n
-        if "spearman_t" in df.columns:
-            df["t"] = df["spearman_t"].astype(float)
-        elif "spearman_rho" in df.columns and "n_trials" in df.columns:
-            r = df["spearman_rho"].to_numpy(dtype=float)
-            n = df["n_trials"].to_numpy(dtype=float)
-            with np.errstate(divide='ignore', invalid='ignore'):
-                df["t"] = r * np.sqrt((n - 2) / (1 - r**2))
-        else:
-            raise ValueError(
-                "cor_df must have 'spearman_t' or both "
-                "'spearman_rho' and 'n_trials'"
-            )
-
-        # p-value
-        if "spearman_p" in df.columns:
-            df["p"] = df["spearman_p"].astype(float)
-        else:
-            df["p"] = np.nan
-
-        # q-value (FDR)
-        if "spearman_q" in df.columns:
-            df["q"] = df["spearman_q"].astype(float)
-        else:
-            df["q"] = _fdr_bh(df["p"].values, self.alpha)
-
-        # significance flag
-        df["sig_fdr"] = df["q"] < self.alpha
-
-        if "n_trials" in df.columns:
-            df["n_trials"] = df["n_trials"].astype(float)
-        else:
-            df["n_trials"] = np.nan
-
-        df["coef"] = df.get("spearman_rho", pd.Series(np.nan, index=df.index)).astype(float)
-
-        # Deduplicate on (session_prefix, unit)
-        before = len(df)
-        df = df.drop_duplicates(subset=_KEY_COLS, keep="first")
-        if len(df) < before:
-            warnings.warn(
-                f"register_cor_df('{name}'): dropped {before - len(df)} "
-                f"duplicate (session_prefix, unit) rows"
-            )
-
-        self._store(name, df, source="cor_df")
-
-    # ----------------------------------------------------------
-    # Registration: partial correlation
-    # ----------------------------------------------------------
-    def register_partial(
-        self,
-        name: str,
-        partial_df: pd.DataFrame,
-        *,
-        session_col: str = "session",
-        unit_col: str = "unit_id",
-        overwrite: bool = False,
-    ) -> None:
-        """
-        Register output of `analyze_unit_partial_correlations`.
-        Same column expectations as cor_df.
-        """
-        self.register_cor_df(
-            name, partial_df,
-            session_col=session_col,
-            unit_col=unit_col,
-            overwrite=overwrite,
-        )
-        self._meta[name]["source"] = "partial"
 
     # ----------------------------------------------------------
     # Registration: OLS regression
