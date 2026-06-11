@@ -1,9 +1,9 @@
 """
 encoding_methods.py — Generic per-unit encoding analysis.
 
-Two first-order methods (OLS regression, Spearman correlation) that accept
-any predictor column from all_counts_df and return a standard result table
-compatible with PerUnitStatsRegistry.
+Three first-order methods (OLS regression, Spearman correlation, Spearman
+partial correlation) that accept any predictor column from all_counts_df
+and return a standard result table compatible with PerUnitStatsRegistry.
 
 Design principles
 -----------------
@@ -138,8 +138,8 @@ class AnalysisSpec:
         Column in all_counts_df used as the x / independent variable.
     response_col : str
         Column in all_counts_df used as the y / dependent variable.
-    method : "ols" | "spearman" | "glm"
-        Fitting method.
+    method : "ols" | "spearman" | "glm" | "partial"
+        Fitting method. Use "partial" with control_col for partial Spearman.
     glm_family : str
         GLM family name, used only when method="glm". One of "poisson",
         "nb" (negative binomial), "gaussian". Default "poisson".
@@ -165,6 +165,8 @@ class AnalysisSpec:
         table names its unit column differently, pass e.g.
         ("session_prefix", "roi"). These names are carried through to the
         output stats schema.
+    control_col : str, optional
+        Column to partial out. Required when method="partial"; ignored otherwise.
     """
 
     name: str
@@ -179,6 +181,7 @@ class AnalysisSpec:
     notes: str = ""
     glm_family: str = "poisson"
     group_cols: Tuple[str, ...] = ("session_prefix", "unit")
+    control_col: Optional[str] = None
 
     def summary(self) -> str:
         parts = [
@@ -189,6 +192,8 @@ class AnalysisSpec:
         ]
         if self.method == "glm":
             parts.append(f"family={self.glm_family}")
+        if self.method == "partial" and self.control_col:
+            parts.append(f"control={self.control_col!r}")
         if self.trial_query:
             parts.append(f"filter={self.trial_query!r}")
         if tuple(self.group_cols) != ("session_prefix", "unit"):
@@ -432,6 +437,90 @@ def fit_glm(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
     return AnalysisResult(spec=spec, stats=out)
 
 
+# ── Partial correlation ───────────────────────────────────────────────────────
+
+def _partial_corr_spearman(
+    x: np.ndarray, y: np.ndarray, z: np.ndarray
+) -> Tuple[float, float, int, float]:
+    """Closed-form Spearman partial correlation of x,y controlling for z.
+
+    Returns (rho_partial, p, n_used, t) where t uses df = n-3.
+    Returns (nan, nan, n, nan) when the computation is not possible.
+    """
+    from scipy.stats import t as tdist
+
+    mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
+    x, y, z = x[mask], y[mask], z[mask]
+    n = int(len(x))
+    if n < 5 or np.std(x) == 0 or np.std(y) == 0 or np.std(z) == 0:
+        return np.nan, np.nan, n, np.nan
+
+    rxy, _ = spearmanr(x, y)
+    rxz, _ = spearmanr(x, z)
+    ryz, _ = spearmanr(y, z)
+    denom = np.sqrt(max(1 - rxz ** 2, 1e-12) * max(1 - ryz ** 2, 1e-12))
+    r_part = float(np.clip((rxy - rxz * ryz) / denom, -0.999999, 0.999999))
+
+    df = n - 3
+    if df <= 0:
+        return r_part, np.nan, n, np.nan
+    t = r_part * np.sqrt(df / max(1 - r_part ** 2, 1e-12))
+    p = 2 * tdist.sf(abs(t), df)
+    return r_part, float(p), n, float(t)
+
+
+def run_partial(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
+    """Spearman partial correlation: response_col ~ predictor_col | control_col.
+
+    T-stat uses df = n-3 (one extra degree of freedom for the control variable).
+    coef = partial Spearman rho.
+    log_x and zscore_x are ignored (rank-based method).
+    spec.control_col must be set.
+
+    Returns
+    -------
+    AnalysisResult with .stats in the standard schema (see module docstring).
+    """
+    if not spec.control_col:
+        raise ValueError(
+            "method='partial' requires spec.control_col to be set."
+        )
+
+    counts = _add_session_prefix(df)
+    rows = []
+
+    for keys, g in counts.groupby(list(spec.group_cols)):
+        if not isinstance(keys, tuple):
+            keys = (keys,)
+        needed = [spec.predictor_col, spec.response_col, spec.control_col]
+        g = g.dropna(subset=needed)
+        x = g[spec.predictor_col].to_numpy(dtype=float)
+        y = g[spec.response_col].to_numpy(dtype=float)
+        z = g[spec.control_col].to_numpy(dtype=float)
+        n = int(len(x))
+
+        base = dict(zip(spec.group_cols, keys))
+        base.update({"n_trials": n, "T": np.nan, "p": np.nan, "coef": np.nan})
+        if n < spec.min_trials:
+            rows.append(base)
+            continue
+
+        r_part, p, n_used, t = _partial_corr_spearman(x, y, z)
+        rows.append({**base, "coef": r_part, "T": t, "p": p, "n_trials": n_used})
+
+    out = pd.DataFrame(rows).reset_index(drop=True)
+    out["q"] = _fdr_bh(out["p"].to_numpy(), spec.fdr_alpha)
+    out["sig_fdr"] = out["q"] < spec.fdr_alpha
+
+    n_valid = int(out["T"].notna().sum())
+    n_pos = int(((out["T"] > 0) & out["sig_fdr"]).sum())
+    n_neg = int(((out["T"] < 0) & out["sig_fdr"]).sum())
+    print(f"[{spec.name}] {len(out)} units, {n_valid} valid, "
+          f"sig: +{n_pos} / -{n_neg} (FDR α={spec.fdr_alpha})")
+
+    return AnalysisResult(spec=spec, stats=out)
+
+
 # ── Dispatcher ────────────────────────────────────────────────────────────────
 
 def fit_encoding(all_counts_df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
@@ -461,5 +550,9 @@ def fit_encoding(all_counts_df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisRes
         return run_spearman(df, spec)
     elif spec.method == "glm":
         return fit_glm(df, spec)
+    elif spec.method == "partial":
+        return run_partial(df, spec)
     else:
-        raise ValueError(f"Unknown method {spec.method!r}. Use 'ols', 'spearman', or 'glm'.")
+        raise ValueError(
+            f"Unknown method {spec.method!r}. Use 'ols', 'spearman', 'glm', or 'partial'."
+        )
