@@ -467,6 +467,8 @@ def _compare_scatter(
     """Scatter with marginal histograms, colored by significance category.
 
     Color convention: x-only → pos (warm), y-only → neg (cool), both → accent.
+    Marginals show per-category distributions stacked neither→both so the
+    informative categories are drawn last (on top).
     """
     from matplotlib.gridspec import GridSpec
 
@@ -519,22 +521,17 @@ def _compare_scatter(
         max(np.nanmax(x), np.nanmax(y)),
         31,
     )
-    if sig_x is not None:
-        sig_x = np.asarray(sig_x, dtype=bool)
-        ax_top.hist(x[~sig_x], bins=bins_edge, color=color_x_pale, alpha=0.8)
-        ax_top.hist(x[sig_x],  bins=bins_edge, color=PALETTE["pos"],     alpha=0.8)
-    else:
-        ax_top.hist(x, bins=bins_edge, color=color_x_pale, alpha=0.8)
-
-    if sig_y is not None:
-        sig_y = np.asarray(sig_y, dtype=bool)
-        ax_right.hist(y[~sig_y], bins=bins_edge, orientation="horizontal",
-                      color=color_y_pale, alpha=0.8)
-        ax_right.hist(y[sig_y],  bins=bins_edge, orientation="horizontal",
-                      color=PALETTE["neg"], alpha=0.8)
-    else:
-        ax_right.hist(y, bins=bins_edge, orientation="horizontal",
-                      color=color_y_pale, alpha=0.8)
+    # Marginals: one histogram layer per sig-category, drawn neither→both so
+    # the most informative categories are on top.
+    cats_arr = np.asarray(categories)
+    for cat in [c for c in draw_order if c in unique_cats]:
+        mask = cats_arr == cat
+        if not mask.any():
+            continue
+        color = cat_colors.get(cat, PALETTE["not_sig"])
+        ax_top.hist(x[mask], bins=bins_edge, color=color, alpha=0.7)
+        ax_right.hist(y[mask], bins=bins_edge, orientation="horizontal",
+                      color=color, alpha=0.7)
 
     ax_top.set_ylabel("count")
     ax_right.set_xlabel("count")
