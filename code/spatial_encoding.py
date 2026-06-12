@@ -176,7 +176,7 @@ class SpatialEncoder:
         v[:, 0] = -v[:, 0]                                 # negate X
         v = v - _BREGMA_LPS_MM                             # bregma-center
         if self.fold_left:
-            v[:, _ML] = np.abs(v[:, _ML])                  # positive ML
+            v[:, _ML] = -np.abs(v[:, _ML])                 # fold to negative ML
         self._contours = {
             name: project_to_plane(v, axes, pitch=0.02, margin=0.5)
             for name, axes in _PLANES.items()
@@ -209,7 +209,7 @@ class SpatialEncoder:
         )
         coords = merged[["x_ccf", "y_ccf", "z_ccf"]].to_numpy(float) - _BREGMA_LPS_MM
         if self.fold_left:
-            coords[:, _ML] = np.abs(coords[:, _ML]) #positive
+            coords[:, _ML] = -np.abs(coords[:, _ML])  # fold to negative ML
         return coords, merged["t"].to_numpy(float), merged["sig_fdr"].to_numpy(bool)
 
     # ---- statistical testing ----
@@ -408,7 +408,7 @@ class SpatialEncoder:
         n_neg, n_pos = int(neg_mask.sum()), int(pos_mask.sum())
 
         _ax_label = {
-            _ML: "ML (mm)" if self.fold_left else "ML (mm)",
+            _ML: "ML (mm, folded)" if self.fold_left else "ML (mm)",
             _AP: "AP (mm)",
             _DV: "DV (mm)",
         }
@@ -418,11 +418,6 @@ class SpatialEncoder:
         for (pname, paxes), ax in zip(_PLANES.items(), axes):
             for c in self._contours.get(pname, []):
                 cp = c.copy()
-                if self.fold_left:
-                    if paxes[0] == _ML:
-                        cp[:, 0] *= -1
-                    if paxes[1] == _ML:
-                        cp[:, 1] *= -1
                 ax.fill(cp[:, 0], cp[:, 1], color="lightgray", alpha=0.3, lw=0)
 
             if np.any(other_mask):
@@ -594,11 +589,6 @@ class SpatialEncoder:
         for (pname, paxes), ax in zip(_PLANES.items(), axes):
             for c in self._contours.get(pname, []):
                 cp = c.copy()
-                if self.fold_left:
-                    if paxes[0] == _ML:
-                        cp[:, 0] *= -1
-                    if paxes[1] == _ML:
-                        cp[:, 1] *= -1
                 ax.fill(cp[:, 0], cp[:, 1], color="lightgray", alpha=0.3, lw=0)
 
             for cat in draw_order:
