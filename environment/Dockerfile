@@ -25,7 +25,7 @@ RUN apt-get update \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install -U --no-cache-dir \
+RUN pip install -U --no-cache-dir --ignore-requires-python \
     aind-ephys-utils==0.0.15 \
     hdmf-zarr==0.11.0 \
     ipywidgets==7.7.2 \
