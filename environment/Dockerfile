@@ -45,6 +45,7 @@ RUN pip install -U --no-cache-dir \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@main#egg=aind-dynamic-foraging-behavior-video-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@main#egg=rachel-analysis-utils \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \
     scikit-image==0.24.0 \
