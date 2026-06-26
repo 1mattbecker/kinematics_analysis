@@ -25,7 +25,7 @@ RUN apt-get update \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install -U --no-cache-dir --ignore-requires-python \
+RUN pip install -U --no-cache-dir \
     aind-ephys-utils==0.0.15 \
     hdmf-zarr==0.11.0 \
     ipywidgets==7.7.2 \
@@ -45,13 +45,18 @@ RUN pip install -U --no-cache-dir --ignore-requires-python \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@main#egg=aind-dynamic-foraging-behavior-video-analysis \
-    -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@main#egg=rachel-analysis-utils \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \
     scikit-image==0.24.0 \
     trimesh==4.11.0
     # hdmf==3.12.2 \
     # aind_dynamic_foraging_data_utils==0.1.5
+
+# rachel-analysis-utils declares requires-python>=3.10 but its code is 3.9-safe and has
+# no deps. Install it in isolation with --ignore-requires-python so the flag does NOT leak
+# into the block above (which would let pip pull a too-new numpy and break the build).
+RUN pip install --no-cache-dir --ignore-requires-python \
+    -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@main#egg=rachel-analysis-utils
 
 COPY postInstall /
 RUN /postInstall
