@@ -12,6 +12,10 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   (42→37 cells). Removed old single-FIBER plots + FIBER/VARIANT scaffolding; consolidated
   helpers; excluded `pearsonR` series (signal-signal correlations, not photometry); curation
   set to `..._firstpass` (has `correct_mapping`; `secondpass` does not).
+- Motion energy: pad a leading 0 so ME is 1-to-1 with video frames. `aind-motion-energy`
+  emits a consecutive-frame difference (N frames → N−1 values, no value for frame 0); the
+  pad is gated on the ME metadata (`n_me_frames` vs `n_frames_decoded`) so it auto-disables
+  once the library pads upstream. Length-mismatch warning now fires only on genuine anomalies.
 - Simplified helpers: assert (don't sort) that `df_fip` timestamps are time-ordered per
   event after session-pick, so `get_trace` no longer re-sorts; merged
   `peri_event`/`peri_event_series` into one array-based
