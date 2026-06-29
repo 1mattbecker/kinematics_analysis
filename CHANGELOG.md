@@ -12,6 +12,11 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   (42→37 cells). Removed old single-FIBER plots + FIBER/VARIANT scaffolding; consolidated
   helpers; excluded `pearsonR` series (signal-signal correlations, not photometry); curation
   set to `..._firstpass` (has `correct_mapping`; `secondpass` does not).
+- Onset detection made causal: dropped the centered `uniform_filter1d` smoothing (acausal,
+  biased onsets early). `threshold_onsets` now uses a sustained-crossing rule (`min_run`
+  consecutive samples above threshold; onset time = true first crossing). `me_z` is raw
+  z-scored ME (no pre-smoothing); the xcorr runs on raw z-scored traces with NaN-safe
+  interpolation only.
 - Motion energy: pad a leading 0 so ME is 1-to-1 with video frames. `aind-motion-energy`
   emits a consecutive-frame difference (N frames → N−1 values, no value for frame 0); the
   pad is gated on the ME metadata (`n_me_frames` vs `n_frames_decoded`) so it auto-disables
