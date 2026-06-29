@@ -56,10 +56,15 @@ kinematics_analysis/
 - `compute_outbound_metrics()` — core function for kinematic feature extraction
 - UMAP embedding of movement bouts
 - Partial correlation analysis
-- `fip_00_explore.ipynb` — fiber photometry access/plotting; loads the saved parquet
-  hierarchy via `rachel_analysis_utils.nwb_utils.load_nwb_list`, `USE_CURATION` toggle for
-  `apply_curation_nwb_list`. Runs on Code Ocean (data asset `6babbf3d…`). First step toward
-  correlating FIP signals with tongue kinematics.
+- `fip_00_explore.ipynb` — fiber photometry access/plotting. Structured as imports →
+  data loading → data processing → data viz. Loads the saved parquet hierarchy via
+  `rachel_analysis_utils.nwb_utils.load_nwb_list`; `USE_CURATION` + `CURATION_FILE`
+  (`DA_NE_4channel_datacuration_firstpass`, which carries `correct_mapping`) annotate
+  `df_fip['intended_measurement']`. Processing picks three example signals (NAc DA/dLight,
+  PL/GCaMP, NAc ACh/rAch) and aligns motion energy to the FIP clock; `pearsonR` series are
+  excluded (signal-signal correlations, not photometry). Viz: full/60s traces, peri-go-cue
+  averages, FIP↔motion-energy onset alignment, and ME×FIP cross-correlation. Runs on Code
+  Ocean (data asset `6babbf3d…`). First step toward correlating FIP with tongue kinematics.
 
 ---
 
