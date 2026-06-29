@@ -12,8 +12,10 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   (42→37 cells). Removed old single-FIBER plots + FIBER/VARIANT scaffolding; consolidated
   helpers; excluded `pearsonR` series (signal-signal correlations, not photometry); curation
   set to `..._firstpass` (has `correct_mapping`; `secondpass` does not).
-- New helpers: `peri_event` (df_fip series by name, censor=True) vs `peri_event_series`
-  (raw t/y arrays — motion energy / z-scored traces — censor=False).
+- Simplified helpers: assert (don't sort) that `df_fip` timestamps are time-ordered per
+  event after session-pick, so `get_trace` no longer re-sorts; merged
+  `peri_event`/`peri_event_series` into one array-based
+  `peri_event(t, y, event_times, censor=...)` (FIP traces pass `*get_trace(df_fip, ev)`).
 
 ### eph_00_single_unit_inspection.ipynb
 - Import fix (`9f4b4ec`): `load_intermediate_data` / `find_session_dir` now come from
