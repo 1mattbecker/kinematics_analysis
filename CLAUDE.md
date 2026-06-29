@@ -110,6 +110,8 @@ and write/edit the logic without executing it.
 - Commit frequently with descriptive messages before and after significant changes
 - Format: `git commit -m "what changed and why"`
 - After any agentic task, summarize what files were changed and why
+- Record notable changes in `CHANGELOG.md` (newest first, dated `YYYY-MM-DD`); add a dated
+  section at the top for new work
 
 ---
 
