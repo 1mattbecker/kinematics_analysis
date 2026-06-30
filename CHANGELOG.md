@@ -20,6 +20,10 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 - `peri_event` gained an optional `censor_times` passthrough (additive) so streak/ITI go-cue
   subsets are censored against the full go-cue set.
 - Sessions missing ME/video assets are skipped and logged, not fatal.
+- 3.9 fix: dropped the `rachel_analysis_utils.analysis_utils` import (that module has a
+  nested-quote f-string at line 294 that doesn't parse on Python 3.9, the CO env). Reimplemented
+  the only piece we use — `num_reward_past` — as a local 3.9-safe `enrich_streaks` helper
+  (verified to match the package's definition exactly).
 
 ## 2026-06-29
 
