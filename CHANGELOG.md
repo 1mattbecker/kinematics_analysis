@@ -2,6 +2,25 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-06-30
+
+### fip_00_explore.ipynb — multi-session comparison
+- Added a "Multi-session comparison" section that reruns the single-session pipeline over all
+  curated sessions and pools results with session as the sampling unit (mean ± SEM), grouped
+  by region × subject. The single-session cells are unchanged and still serve as a detailed view.
+- New helpers: `process_session` (per-session enrich + ME load + onsets), `build_meta`,
+  `locate_me_assets`, `attach_me_to_df_fip` (injects motion energy as a `df_fip` pseudo-channel
+  `event="ME"` so the upstream `plot_fip` PSTH machinery can treat it like a FIP channel), plus
+  cross-session aggregation helpers (`session_etr_mean`, `aggregate_series`, `iter_region_signals`,
+  `collect_region_etr`, `plot_by_subject`, `window_mean`, `streak_go_cues`).
+- Four cross-session analyses: (1) ETR of FIP from ME onsets, (2) ETR of ME from FIP transients,
+  (3) within-trial (0–2 s) vs ITI (2–4 s) relative to go cue, (4) peri-go-cue responses binned by
+  consecutive rewards/failures via `rachel_analysis_utils.analysis_utils.enrich_df_trials`
+  (`num_reward_past`). Scalar summaries collected into an in-memory `df_results`.
+- `peri_event` gained an optional `censor_times` passthrough (additive) so streak/ITI go-cue
+  subsets are censored against the full go-cue set.
+- Sessions missing ME/video assets are skipped and logged, not fatal.
+
 ## 2026-06-29
 
 ### fip_00_explore.ipynb

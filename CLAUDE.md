@@ -65,6 +65,13 @@ kinematics_analysis/
   excluded (signal-signal correlations, not photometry). Viz: full/60s traces, peri-go-cue
   averages, FIP↔motion-energy onset alignment, and ME×FIP cross-correlation. Runs on Code
   Ocean (data asset `6babbf3d…`). First step toward correlating FIP with tongue kinematics.
+  A "Multi-session comparison" section reruns the single-session pipeline over all curated
+  sessions (`process_session` loop; missing-ME sessions skipped) and pools results with session
+  as the sampling unit (mean ± SEM), grouped by region × subject. Four cross-session analyses:
+  ETR of FIP from ME, ETR of ME from FIP, within-trial (0–2s) vs ITI (2–4s) by go cue, and
+  peri-go-cue responses by consecutive-reward/failure streak (`enrich_df_trials.num_reward_past`).
+  Motion energy can be injected into `df_fip` as a pseudo-channel (`event="ME"`, via
+  `attach_me_to_df_fip`) so the upstream `plot_fip` PSTH machinery treats it like a FIP channel.
 
 ---
 
