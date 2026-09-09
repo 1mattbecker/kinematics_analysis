@@ -2,6 +2,25 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-07
+
+### Repo housekeeping
+- Added `TODO.md` for deferred work. First entry: upgrading the Code Ocean environment off
+  Python 3.9, which is the shared root cause of the `--ignore-requires-python` layer in the
+  Dockerfile, the un-importable `rachel_analysis_utils.analysis_utils` (and the local
+  `enrich_streaks` reimplementation that works around it), and the repo-wide 3.9 syntax rule.
+- `.gitignore`: ignore `*.code-workspace`. VS Code multi-root workspace files point at
+  machine-specific paths (e.g. `../.venv/src/...`) and are not portable to Code Ocean.
+
+### Upstream: `video_alignment` merged to main
+- `aind-dynamic-foraging-behavior-video-analysis` merged the `video_alignment` branch to `main`
+  (PR #2). The module is now on `main`, which `environment/Dockerfile` already tracks.
+- **Follow-up, not yet done:** rebuild the Code Ocean environment, then delete the runtime
+  `git fetch`/`git checkout` bootstrap in `fip_00_explore.ipynb` section 8b — it exists only
+  because `main` previously lacked `video_alignment.py`, and becomes a no-op after the rebuild.
+  Worth adding `fastparquet` to the Dockerfile pip block at the same time, to retire the other
+  runtime `pip install` bootstrap in the imports section.
+
 ## 2026-06-30
 
 ### fip_00_explore.ipynb — multi-session comparison
