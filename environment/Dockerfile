@@ -28,6 +28,7 @@ RUN apt-get update \
 RUN pip install -U --no-cache-dir \
     aind-ephys-utils==0.0.15 \
     hdmf-zarr==0.11.0 \
+    fastparquet==2024.11.0 \
     ipywidgets==7.7.2 \
     open-ephys-python-tools==0.1.7 \
     pillow==10.3.0 \
