@@ -4,125 +4,442 @@ Deferred work items. Newest first. Dates are YYYY-MM-DD.
 
 ---
 
-## Port the ITI vs task bout-aligned ephys analysis into a new `eph_07`
+## Port plan for the five HOLD notebooks (overview)
 
-_Logged 2026-09-11._
+_Logged 2026-09-11. Revised 2026-09-11 after a full cell-by-cell audit of all five HOLD
+notebooks against the current `kin_*` / `eph_*` series._
 
-### Why
+Read this section before picking up any of the six port items below it. The five HOLD
+notebooks in `REORG.md` are **not** five independent ports — their unreplicated content
+clusters into five scientific questions that cut across notebooks, with real duplication
+between them. Porting notebook-by-notebook would reproduce that duplication in the new
+series.
 
-`code/tongue_kinematics_ephys_intertrialmovs.ipynb` (43 cells) is a distinct ephys analysis with
-no equivalent in the new `eph_*` series: it groups movements into **bouts**
-(`annotate_movement_bouts`, gap threshold) and compares LC unit responses to **within-trial
-(go-response) bouts vs inter-trial-interval (ITI) bouts** — bout-aligned rasters/PETHs, population
-overlays/waterfalls, and a per-unit `go_responsive` vs ITI Δhz encoding scatter. This is the ephys
-counterpart to the "covert / spontaneous preparatory movement" story in `tongue_latency.ipynb`.
+### The question clusters → target notebooks
 
-The notebook already imports the refactored modules (`data_loading`, `ephys_utils`), so it is
-partway to the new structure.
+| Target | Question it answers | Source material |
+|---|---|---|
+| `kin_02_latency` *(extend)* | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26 |
+| `kin_05_nonlick_movements` *(new)* | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; `tongue_latency` 3, 5, 8, 9 |
+| `kin_06_lick_geometry_choice` *(new)* | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
+| `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
+| `eph_07_bout_encoding` *(new)* | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
+| `eph_09_structural_axes` *(new)* | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
 
-### What to do
+Plus two new flat modules, `bout_utils.py` and `spatial_axes.py` (see the items below).
 
-- Create `eph_07_bout_encoding.ipynb`: bout segmentation → within-trial vs ITI bout event times →
-  reuse `eph_00`'s raster/PETH helpers and `encoding_methods` for the per-unit go-responsive vs ITI
-  comparison.
-- Pull bout event times from `all_tongue_movements` (has `start_time`, `trial`); align to spikes via
-  the cached `filtered_ephys.pkl`.
-- After it lands, archive `tongue_kinematics_ephys_intertrialmovs.ipynb` (see REORG.md).
+### Two findings that change the previous plan
+
+1. **`kin_07_value_encoding` is a topic this repo does not track at all.** Both
+   `cueresponse` (cells 17–28) and `tongue_kinematics` (cells 111–138) carry a
+   kinematics-vs-behavioral-model-latents analysis — `q_diff`, `q_sum`, `chosen_prob`,
+   previous-trial `rpe`, screened with Spearman / mutual information / RidgeCV R² / random-forest
+   importances. **No `kin_*` or `eph_*` notebook uses behavioral model latents** (`eph_06` uses
+   Sue's model outputs, but against ephys, not kinematics). Because this content lives in *two*
+   HOLD notebooks, `kin_07` gates **two** archivals — so on the previous plan neither
+   `tongue_kinematics` nor `cueresponse` could actually be retired.
+
+2. **`cueresponse` is not just "spatial geometry."** Cells 43–56 are a coherent
+   choice-prediction analysis: donut of pre-lick movement counts, ridge-logistic regression
+   (+ permutation importance, AUC) predicting left/right lick from pre-lick kinematics, violins
+   of last-pre-lick excursion angle by lick direction, and binned P(right lick) vs `endpoint_y`
+   and `excursion_angle_deg`. The landmark figures are the setup for that question, not the
+   point of it.
+
+### Why the boundaries are drawn where they are
+
+- **The RT decomposition goes *into* `kin_02`, not into a separate notebook.** An earlier
+  draft of this file floated `kin_05_latency_decomposition`. Don't. The decomposition
+  *is the explanation* for the ordinal effect `kin_02` §4 already shows — it is the
+  culmination of that notebook's existing line of questioning, not a new topic.
+- **Lick↔movement correspondence and preparatory non-lick movements merge into one notebook.**
+  Establishing that non-lick movements are real events (not lickometer misses) is the premise
+  for asking where in the trial they occur. Split across two notebooks, neither stands alone.
+
+### Known duplication between sources — port once
+
+- `tongue_kinematics` cell 60 **==** `cueresponse` cell 95 (max-excursion-from-jaw scatter,
+  lick vs non-lick). Port once, into `kin_06`.
+- `tongue_latency` cells 10 and 37 **≈** `cueresponse` cell 42 (the 2×2 lick-latency-by-ordinal
+  panel). Superseded by `kin_02` §4 — do not port.
+- `intertrialmovs` cells 14, 15, 19, 22 are four near-identical population-PETH cells.
+  Consolidate to one; keep the **cell 15** variant (session-wide z-scoring), which is the
+  most defensible normalization.
+- `tongue_kinematics` cells 78–79 (lick-detection FP/FN parameter sweep) are already covered
+  by `tongue_lickometer.ipynb`, which is KEEP. **No port needed.**
+
+### Orphan code that needs a home before its notebook is archived
+
+Same category as `compute_outbound_metrics` (see the outbound item below) — analysis logic
+living only in a notebook cell. Unlike the outbound case there is no duplicate to reconcile;
+there is exactly one copy, and it is inside a notebook slated for archiving.
+
+- `annotate_movement_bouts` — defined only at `intertrialmovs` cell 10; called 6× in that
+  same notebook and referenced nowhere else in the repo. Verified **absent from the library
+  on all three branches** (`main`, `LC_manuscript`, `video_alignment`), searching both the
+  function name and the `mov_bout_*` columns it emits. → `bout_utils.py`.
+- `plot_standard_lick_landmarks` — defined only at `cueresponse` cell 19. → `kin_06`, or
+  `plotstyle.py` if a second consumer appears.
+
+### Data-availability constraints (drives what is local-testable vs Code Ocean-only)
+
+`all_tongue_movements_04022026.parquet` carries 49 columns. What matters for these ports:
+
+- **Present, so pooled across sessions:** `has_lick`, `lick_count`, `lick_latency`, `event`,
+  `movement_before_cue_response`, `cue_response`, `cue_response_movement_number`,
+  `movement_number_in_trial`, `movement_latency_from_go`, `start_time`, `end_time`, `trial`,
+  `session`, `goCue_start_time_in_session`, `endpoint_x/y`, `excursion_angle_deg`,
+  `max_x_from_jaw`, `max_y_from_jaw`, `max_x_from_jaw_y`, `out_*`.
+- **Absent:** `nearest_movement_id` (licks-without-movements needs per-session
+  `nwb_df_licks.parquet`), spout/jaw **absolute** landmark positions (per-session keypoint
+  means — note the `max_*_from_jaw` columns are jaw-*relative* and therefore pooled-safe),
+  and any behavioral-model latent (`q_*`, `chosen_prob`, `rpe`).
+
+Consequence: `kin_02` ext is fully local-testable; `kin_05` and `kin_06` are mostly pooled with
+one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
+
+### Recommended order (value ÷ risk) and archiving gates
+
+1. `kin_02` extension — pure pooled parquet, no new dependencies, fully local-testable.
+2. `kin_05_nonlick_movements` — mostly pooled, one CO-only section.
+3. `eph_07_bout_encoding` + `bout_utils.py` — clear spec, reuses `eph_00`'s helpers.
+4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
+   **Confirm the MERFISH / retrograde assets are reachable on Code Ocean before starting.**
+5. `kin_06_lick_geometry_choice`.
+6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
+
+Archive only when **all** gates for a notebook are met:
+
+| HOLD notebook | Archive after |
+|---|---|
+| `tongue_latency.ipynb` | `kin_02` ext **+** `kin_05` |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` |
+| `tongue_kinematics.ipynb` | `kin_05` **+** `kin_07` |
+| `tongue_kinematics_cueresponse.ipynb` | `kin_06` **+** `kin_07` |
 
 ---
 
-## Port the MERFISH + retrograde-tracing axis comparisons into `eph_08`/`eph_09`
+## Extend `kin_02_latency` with the RT + IMI decomposition
 
 _Logged 2026-09-11._
 
 ### Why
 
-`code/spatial_axis_comparison_rt_encoding_update.ipynb` (41 cells) compares the RT-encoding spatial
-axis against **four** structural axes — waveform (CCA), **MERFISH transcriptomics (CCA)**,
-**retrograde tracing (LDA)** — with bootstrap direction comparison, 95% **confidence cones**
-(azimuth-elevation), and projection scatters. The refactored `eph_08_waveform_axis.ipynb` ported
-**only the waveform CCA axis** (§4–5). MERFISH, retrograde, LDA, and the multi-axis cone
-visualization are not replicated anywhere in `eph_04`/`eph_08`.
+`kin_02_latency.ipynb` absorbed the clean parts of `tongue_latency.ipynb` — latency
+distributions by ordinal (§4), k=1 log-normality (§5), session-level summaries (§6),
+cross-ordinal correlation (§7). It shows *that* lick latency grows with the cue-response
+movement ordinal k, but never explains *why*.
 
-(`spatial_axis_comparison_rt_encoding.ipynb` without `_update` is an older duplicate — archive it;
-keep `_update` as the source for this port.)
+The explanation is the "nice story" left behind in `tongue_latency`: reaction time modeled as
+a first-movement latency plus a sequence of inter-movement intervals,
+**RT ≈ RT₁ + (k−1)·Δt**. This is the natural culmination of `kin_02`'s existing line of
+questioning, which is why it belongs in `kin_02` rather than in a new notebook.
 
 ### What to do
 
-- Extend `eph_08` (or add `eph_09_structural_axes.ipynb`) with the MERFISH (CCA) and retrograde
-  (LDA) axis fits, the bootstrap `compare_bootstrap_directions` machinery, and the confidence-cone /
-  projection-scatter figures from `_update`.
-- The comparison axes load "from Han's capsule" — confirm those inputs are still reachable on Code
-  Ocean before porting.
-- After it lands, archive both `spatial_axis_comparison_rt_encoding*.ipynb` (see REORG.md).
+Append to `kin_02` as §8–§10, continuing from the existing §7:
+
+- **§8 — Δt estimate and de-shift.** Median within-trial inter-movement interval as Δt
+  (`tongue_latency` cell 15, §1–3); overlay `lick_latency` distributions by k, then de-shift
+  each by `(k−1)·Δt` and show they collapse. KDE variant is cell 17.
+- **§9 — Does the collapse hold?** KS tests of each de-shifted k against k=1
+  (`tongue_latency` cell 15 §4, cell 17 §4).
+- **§10 — Noise propagation.** SD of latency vs k, raw and aligned, with bootstrap 95% CI
+  (`tongue_latency` cell 17 §6 and cell 18 — `bootstrap_std_ci`). Then the cross-session
+  grand mean ± SEM by cue-response movement number (cell 26), which is the population version
+  of the same claim and should use session as the sampling unit.
+
+Carry over the notebook's own caveat (`tongue_latency` cell 19, markdown): the residual
+mismatch at k=1 and k=2 is attributed to *further* covert preparatory movements visible as a
+secondary bump in those distributions. State it as the open question it is — `kin_05` is where
+that claim gets tested.
+
+### Notes
+
+- Uses `lick_latency` (lickometer RT) conditioned on `cue_response_movement_number`, which is a
+  **different quantity** from the `movement_latency_from_go` that `kin_02` §4–§7 already plot.
+  Make the distinction explicit in the prose or the two halves of the notebook will read as
+  contradictory.
+- Reuse `kin_02`'s existing pooled-parquet load path. No spike data, no new dependency —
+  this item is fully testable locally against `data/for_local/`.
 
 ---
 
-## Port the RT+IMI latency story out of `tongue_latency.ipynb` before archiving it
+## Create `kin_05_nonlick_movements.ipynb`
 
 _Logged 2026-09-11._
 
 ### Why
 
-`code/tongue_latency.ipynb` is a legacy notebook mostly superseded by `kin_02_latency.ipynb`,
-but `kin_02` only absorbed the clean parts (latency distributions by ordinal, k=1 log-normality,
-cross-ordinal correlation). Three pieces of the notebook's scientific story were **not** ported and
-exist nowhere in the new `kin_*`/`eph_*` series:
+The lickometer and the video-derived movement stream do not describe the same set of events,
+and the mismatch is the whole point: movements without licks are the candidate "covert
+preparatory" movements that `kin_02`'s RT decomposition invokes but cannot test.
 
-1. **RT + IMI decomposition** — reaction time modeled as a sequence of inter-movement intervals
-   conditioned on movement number (uses `bootstrap_std_ci`). This is the core "nice story."
-2. **Single-trial example figure** — per-trial illustration of movements/licks colored by type
-   (`trial_to_plot`, `coerce_bool`, `color_for_row`); good explanatory/illustrative figure.
-3. **"Covert preparatory movements" narrative** — the interpretation tying later-ordinal latency to
-   additional covert preparatory tongue movements. Links to
-   `tongue_kinematics_ephys_intertrialmovs.ipynb` (inter-trial movements), which is also
-   not yet replicated.
+`kin_01` §5 currently compares lick vs no-lick movements on exactly two features
+(`out_peak_velocity`, `out_duration`), pooled. Nothing in `kin_*` covers the correspondence
+itself, the per-trial structure, or the pre-cue-response timing.
+
+**Framing warning.** This is *not* a QC filter and must not be written as one. Per the
+established noise definition, lickometer agreement, confidence, and duration are **not** valid
+noise criteria — QC noise means confident misdetection of the wrong body part, which is
+`kin_00`'s job. `kin_05` asks a definitional question (what are these events?), not a
+filtering one. Keeping it out of `kin_00` is deliberate.
 
 ### What to do
 
-- Port (1)–(3) into `kin_02_latency.ipynb`, or a new `kin_05_latency_decomposition.ipynb` if it's
-  cleaner to keep the ordinal-latency material separate from the RT-decomposition story.
-- Reuse the `all_tongue_movements.parquet` load path already used by `kin_02` (no spike data needed).
-- Only after the port lands: archive `tongue_latency.ipynb` (see REORG.md).
+One linear arc, roughly:
+
+- **§3 — Three-way correspondence tally** (`tongue_kinematics` cell 35): licks without
+  movements, movements with >1 lick, movements without licks, as counts and percentages.
+- **§4 — Licks without movements** (`tongue_kinematics` cells 37, 39): tongue trace around
+  unmatched licks, single and in sequences. **Code Ocean only** — needs per-session
+  `nwb_df_licks.parquet` (`nearest_movement_id`), which is not in the pooled parquet. Gate it
+  the way `kin_00` gates its trajectory/video sections.
+- **§5 — Movements with multiple licks** (`tongue_kinematics` cells 43, 44): pooled via
+  `lick_count > 1`.
+- **§6 — Kinematic profile of non-lick movements** (`tongue_kinematics` cells 50, 59):
+  duration and total-distance distributions, lick vs non-lick, including the fine-grained
+  sub-50 ms histogram. Extends `kin_01` §5 to more features — cross-reference rather than
+  duplicate.
+- **§7 — Per-trial structure** (`tongue_kinematics` cells 64, 65, 67, 68): counts of lick vs
+  non-lick movements per trial, percent non-lick, and their correlation.
+- **§8 — Preparatory timing** (`tongue_kinematics` cells 69, 70; `cueresponse` cell 43):
+  prevalence of ≥1 and ≥2 non-lick movements *before* the cue-response lick, via the pooled
+  `movement_before_cue_response` column, plus the donut of trials by pre-lick movement count.
+- **§9 — Illustrative single-trial and raster figures** (`tongue_latency` cells 3/5, 8, 9):
+  one trial's tongue position coloured by `has_lick`; the trial raster coloured by movement
+  type; the raster coloured by movement ordinal. Good explanatory figures, and the visual
+  payoff for the whole notebook.
+
+### Notes
+
+- `tongue_latency` cells 6/8 carry a `coerce_bool` helper written because `astype(bool)` on a
+  string column turns any non-empty string True. Keep it if the pooled dtypes need it; check
+  first rather than porting reflexively.
+- Sections §3–§8 are pooled and therefore locally testable; only §4 is CO-only.
 
 ---
 
-## Port the lick↔movement correspondence analysis out of `tongue_kinematics.ipynb`
+## Create `kin_06_lick_geometry_choice.ipynb`
 
 _Logged 2026-09-11._
 
 ### Why
 
-`code/tongue_kinematics.ipynb` (139-cell original monolith) is mostly superseded — its
-processing/QC (`segment_movements`, tracking QC, refractory filtering) now lives in the library
-(`tongue_kinematics_utils`). But its **lick↔movement correspondence** analysis has no equivalent in
-the new `kin_*` series: licks without movements, movements without licks, movements with multiple
-licks, and the associated duration / max-excursion comparisons across those categories.
+`kin_*` carries `endpoint_*`, `excursion_angle_deg` and the `max_*_from_jaw` columns, but never
+plots them in the anatomical frame that makes them interpretable (jaw and spout landmarks), and
+never asks the question that frame sets up: **does the direction of a preparatory tongue
+movement predict which spout the animal goes on to lick?**
+
+This is the content `REORG.md` previously summarized as "cue-response spatial geometry", which
+undersells it — the geometry is the setup, the choice prediction is the result.
 
 ### What to do
 
-- Port that section into `kin_00_movement_qc.ipynb` or `kin_01_population.ipynb` (whichever frames
-  it best), using the `all_tongue_movements.parquet` + lick annotations already loaded there.
-- After it lands, archive `tongue_kinematics.ipynb` (see REORG.md).
+- **§3 — Landmark frame** (`cueresponse` cells 19, 94): `plot_standard_lick_landmarks` helper
+  (promote it out of the notebook), plus the jaw↔spout distance printout that establishes the
+  scale. **CO-only** — needs per-session keypoint means.
+- **§4 — Endpoints by event type** (`cueresponse` cell 93): cue-response movement endpoints
+  coloured by left/right lick event, over the landmarks.
+- **§5 — Lick vs non-lick excursion geometry** (`tongue_kinematics` cell 60 == `cueresponse`
+  cell 95 — port once): max excursion from jaw, with and without licks. Jaw-relative, so
+  **poolable across sessions** even though §3–§4 are not.
+- **§6 — Non-lick endpoints by movement ordinal** (`cueresponse` cells 54, 56).
+- **§7 — Does pre-lick direction predict choice?** (`cueresponse` cells 49, 55): violins of
+  last-pre-lick `excursion_angle_deg` by subsequent lick direction; binned P(right lick) vs
+  pre-lick `endpoint_y` and vs `excursion_angle_deg`.
+- **§8 — Ridge-logistic decode** (`cueresponse` cells 44, 47, 48): predict left/right from
+  last-pre-lick kinematics, report AUC + classification report, with both absolute standardized
+  coefficients and permutation importance.
+- **§9 — Pre-lick → cue-response endpoint displacement** (`cueresponse` cells 50, 51, 52):
+  paired per-trial `endpoint_y`, pre-lick vs cue-response, against the jaw midline.
+
+### Notes
+
+- `cueresponse` runs on a single session. Re-do §5–§9 pooled where the columns allow it
+  (all of `endpoint_*`, `excursion_angle_deg`, `movement_before_cue_response`, `event` are in
+  the pooled parquet) — pooling turns the logistic decode from anecdote into a result.
+  Use session as the sampling unit for any population claim.
+- The `event` column encodes lick side as `right_lick_time` / `left_lick_time`.
 
 ---
 
-## Port the cue-response spatial geometry out of `tongue_kinematics_cueresponse.ipynb`
+## Create `kin_07_value_encoding.ipynb`
 
 _Logged 2026-09-11._
 
 ### Why
 
-`code/tongue_kinematics_cueresponse.ipynb` (115 cells) has cue-response **spatial geometry** not
-replicated in `kin_*`: jaw↔spout landmark positions, tongue endpoints colored by event type, and the
-spout-relative excursion geometry. `kin_*` currently carries endpoint / excursion_angle / trajectory
-columns but not these landmark-referenced spatial figures.
+**No notebook in the `kin_*` or `eph_*` series uses behavioral-model latents against
+kinematics.** `eph_06` compares RT encoding to Sue's model outputs, but that is ephys.
+The kinematics-side question — does action value or reward-prediction error show up in how the
+tongue moves? — exists only in the two HOLD notebooks, in two partly-overlapping copies.
+
+This item gates **two** archivals (`tongue_kinematics` and `cueresponse`), which is why it
+cannot simply be dropped even though it is the largest new dependency.
 
 ### What to do
 
-- Port the landmark geometry + endpoints-by-event figures into a `kin_*` notebook (new
-  `kin_06_cue_response_geometry.ipynb` if it doesn't fit cleanly into an existing one).
-- After it lands, archive `tongue_kinematics_cueresponse.ipynb` (see REORG.md).
+- **§3 — Attach model latents.** `attach_model_latents_to_trials` (defined identically at
+  `tongue_kinematics` cell 115 and `cueresponse` cell 13 — port once) over
+  `get_mle_model_fitting` from `aind_analysis_arch_result_access.han_pipeline`; merge onto
+  movements by `trial`. Derive `q_diff`, `q_sum`, `q_diff_c`, `chosen_prob`.
+- **§4 — Trajectories and endpoints coloured by value** (`cueresponse` cells 18, 20, 26):
+  tongue trajectories coloured by `q_diff` over the landmark frame; 2-D endpoint scatter
+  coloured by `q_diff_c`.
+- **§5 — Binned kinematics vs value** (`cueresponse` cells 21, 26, 27): binned scatter with
+  regression for the pairs the source pins — `q_diff`×`max_x_from_jaw_y`,
+  `q_diff_c`×`max_x_from_jaw_y_distance`, `q_diff_c`×`max_x_from_jaw`,
+  `chosen_prob`×`max_x_from_jaw_y_distance`.
+- **§6 — Systematic screen** (`tongue_kinematics` cell 135): all kinematic × all model columns,
+  four ways — Spearman ρ, mutual information, RidgeCV predictive R², random-forest importances —
+  as the 2×2 summary figure. This is the cell that earns the notebook; the pinned pairs in §5
+  should fall out of it rather than being asserted.
+- **§7 — Previous-trial RPE** (`tongue_kinematics` cell 137): shift `rpe` by one trial, merge
+  at movement level, repeat the Spearman + MI screen. Tests whether the *outcome* of the last
+  trial changes this trial's movement, which is the LC-relevant version of the question.
+
+### Notes
+
+- **Code Ocean only** and the heaviest new dependency of the six items — `get_mle_model_fitting`
+  hits Han's pipeline. Confirm it still resolves before committing to the port.
+- Both source copies are single-session. Decide early whether to pool; if pooling, model fits
+  must be fetched per session, which is the main cost driver here.
+- Scope risk is real. If the port stalls, land §3–§5 (which is all `cueresponse` needs) and
+  leave §6–§7 for a follow-up — but note that `tongue_kinematics` cannot be archived until
+  §6–§7 land.
+
+---
+
+## Create `eph_07_bout_encoding.ipynb` and `bout_utils.py`
+
+_Logged 2026-09-11._
+
+### Why
+
+`tongue_kinematics_ephys_intertrialmovs.ipynb` (43 cells) is a distinct ephys analysis with no
+equivalent in the new `eph_*` series: it groups movements into **bouts** and compares LC unit
+responses to **within-trial (go-response) bouts vs inter-trial-interval (ITI) bouts** —
+bout-aligned rasters/PETHs, population overlays and waterfalls, and a per-unit go-responsive vs
+ITI Δhz comparison. It is the ephys counterpart to the covert-preparatory-movement story that
+`kin_02` and `kin_05` tell on the behavior side.
+
+The notebook already imports the refactored `data_loading` and `ephys_utils`, so it is partway
+to the new structure.
+
+### The two bout definitions — pick deliberately
+
+The source notebook runs the comparison **twice**, on two different notions of bout:
+
+1. **Movement-derived** (cells 10–24): `annotate_movement_bouts` on `movs["start_time"]` with
+   a 0.5 s gap threshold. This is the definition that depends on the orphan function.
+2. **Lick-derived** (cells 26–32): `licks["bout_start"]`, produced upstream by
+   `aind_dynamic_foraging_basic_analysis.licks.lick_analysis`, read from the per-session
+   `nwb_df_licks.parquet`.
+
+Choose one as the notebook's primary and keep the other as a robustness check — don't port both
+at equal weight. The movement-derived definition is the better primary: it is the one that
+matches the behavioral story, and it does not inherit the lickometer's blind spot for non-lick
+movements (which is exactly what `kin_05` establishes).
+
+### What to do
+
+- **`bout_utils.py`** (new flat module): `annotate_movement_bouts` (from `intertrialmovs`
+  cell 10, the only copy in the repo — see the orphan-code note in the overview) plus the
+  within-trial / ITI classifier that is currently copy-pasted into four `get_session_bout_times`
+  variants. Parameterize the thresholds rather than hardcoding: `GAP_THRESHOLD_S=0.5`,
+  `GO_RESPONSE_WINDOW_S`, `ITI_MIN_POST_CUE_S`, `ITI_MIN_PRE_NEXT_S` — the source uses
+  **different values** in different cells (2.0/2.0/1.0 at cell 12 vs 1.0/2.0/0.5 at cell 29),
+  so pin one set in the notebook and state it.
+- **`eph_07`**: bout segmentation → within-trial vs ITI event times → reuse `eph_00`'s
+  `make_rp_and_events` / `compute_psth` / `smooth_vector` / `plot_psth` helpers for the
+  single-unit raster + PETH pair (cell 12), then the population heatmap, mean±SEM overlay
+  (cell 16/20), and waterfall (cell 17). **Consolidate cells 14/15/19/22 into one** — keep the
+  cell 15 variant, which z-scores against session-wide firing statistics rather than a
+  pre-event baseline.
+- Include the go-cue-aligned third condition (cell 24) as the reference the two bout conditions
+  are read against, and the ITI-bouts-per-session count distribution (cell 18) plus the
+  `MIN_BOUTS` session filter (cell 19) as the sampling-adequacy check.
+- Per-unit encoding comparison (cells 29, 30, 31): paired go-responsive vs ITI Δhz with
+  Wilcoxon, baseline-vs-response paired plots per class with per-unit significance, and the
+  go-responsive vs ITI scatter. Register through `per_unit_stats_registry` /
+  `encoding_methods` so it composes with `eph_01`–`eph_04`.
+- Keep the event-raster and single-trial timeseries figures (cells 35, 36) as the qualitative
+  setup. **Drop cell 37** (video-clip extraction) — that is a one-off, and the clip helpers are
+  library-owned.
+
+### Notes
+
+- Bout event times can come from the pooled `all_tongue_movements` parquet — it carries
+  `start_time`, `trial`, `session` and `goCue_start_time_in_session`. Align to spikes via the
+  cached `filtered_ephys.pkl`.
+- Consider promoting `annotate_movement_bouts` to the library once it settles, alongside the
+  outbound-metrics consolidation below. Both are the same orphan-code pattern.
+
+---
+
+## Create `spatial_axes.py` and `eph_09_structural_axes.ipynb`
+
+_Logged 2026-09-11._
+
+### Why
+
+`spatial_axis_comparison_rt_encoding_update.ipynb` (41 cells) compares the RT-encoding spatial
+axis against **four** structural axes — waveform (CCA), MERFISH transcriptomics (CCA), and
+retrograde tracing (LDA) — with bootstrap direction comparison, 95% confidence cones in
+azimuth-elevation, and projection scatters.
+
+`eph_08_waveform_axis.ipynb` is thinner than previously recorded. It ports the waveform CCA axis
+and the `|T_rt|` projection scatter, and **it never fits the RT-encoding spatial axis itself**
+(§6 of the source). So MERFISH, retrograde/LDA, `compare_bootstrap_directions`,
+`cone_half_angle`, and the multi-axis cone visualization have no home anywhere in `eph_*`.
+
+`spatial_encoding.py` is not that home either: it provides `SpatialEncoder` (CCF maps, subgroup
+maps, permutation tests) and contains **no axis-fitting machinery at all**. `eph_08` currently
+carries private inline copies of `fit_spatial_axis_cca` and `bootstrap_spatial_axis_cca`.
+
+(`spatial_axis_comparison_rt_encoding.ipynb` without `_update` was the older duplicate and is
+already archived. `_update` is the source for this port.)
+
+### What to do
+
+- **`spatial_axes.py`** (new flat module), from `spatial_axis_..._update` cells 14 and 15:
+  `fit_spatial_axis_linear` / `_cca` / `_LDA` and their bootstrap wrappers, `cone_half_angle`,
+  `compare_bootstrap_directions`, `vectors_to_az_el`, `plot_projected_arrow_with_cone`, and
+  `plot_projection_scatter` (cell 31). Keep it separate from `spatial_encoding.py` — different
+  question (direction of a gradient vs clustering in space), different inputs.
+- **Refactor `eph_08`** to import from `spatial_axes.py`, deleting its two inline copies.
+  Behavior must not change; the projection figure is a poster figure.
+- **`eph_09_structural_axes.ipynb`**:
+  - Fit the RT-encoding spatial axis (linear, scalar `T_rt` → OLS) and the baseline `T_rt_bl`
+    axis, with 2000-resample bootstrap and cone half-angles (cells 17, 18). *This is the piece
+    `eph_08` skipped.*
+  - Load and fit the three structural axes (cells 20, 21, 22), each in its own guarded block —
+    the source already uses `HAS_WAVEFORM` / `HAS_MERFISH` / `HAS_RETRO` flags so a missing
+    asset degrades instead of failing. Keep that pattern.
+  - Pairwise `compare_bootstrap_directions` over all axes, with angle, Wald W, χ² p and
+    bootstrap p (cell 24), and the summary table (cell 29).
+  - The three-plane projected-arrow figure with 95% confidence cones (cell 26) and the
+    azimuth-elevation bootstrap scatter (cell 27).
+  - Projection scatters of `T_rt` and `T_rt_bl` onto each structural axis, plus the combined
+    table (cells 34, 36, 38).
+  - Carry over the interpretation guide (cell 28 markdown) — it states how to read
+    angle × p-value, and without it the summary table is hard to act on.
+- Drop cell 40 (a commented-out registry sketch); register through `per_unit_stats_registry`
+  properly or not at all.
+
+### Notes
+
+- **Confirm the external assets are reachable on Code Ocean before starting this item** —
+  `merfish_data/adata/adata_mer_subset_2_2k.h5ad` and
+  `LC_retro/manual_proofread_ccf_18brains.csv`, both under `/root/capsule/data`, both from
+  Han's capsule. The MERFISH path also needs `scanpy`, which is not in the current pip block.
+  If either is gone, land the RT-axis fit + waveform comparison and record the gap.
+- Retrograde LDA sign is arbitrary; the source aligns it to the waveform axis (cell 22). Keep
+  that convention or the cone figure flips between runs.
+- Code Ocean only, like `eph_08`. Use the same `IS_CO` skip-guard structure so it runs clean
+  locally.
 
 ---
 

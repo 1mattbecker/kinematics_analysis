@@ -4,6 +4,29 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-11
 
+### Repo reorganization — Phase 2 planning (HOLD notebook port plan)
+- Audited all five HOLD notebooks cell-by-cell (`tongue_latency`, `tongue_kinematics`,
+  `tongue_kinematics_cueresponse`, `tongue_kinematics_ephys_intertrialmovs`,
+  `spatial_axis_comparison_rt_encoding_update`) against the current `kin_*`/`eph_*` series to
+  determine what is genuinely unreplicated.
+- Found the leftover content clusters into five scientific questions that cut *across* notebooks
+  rather than mapping one-notebook-to-one-port; rewrote the plan around question-oriented target
+  notebooks: `kin_02` §8–§10 (RT + IMI decomposition), `kin_05_nonlick_movements`,
+  `kin_06_lick_geometry_choice`, `kin_07_value_encoding`, `eph_07_bout_encoding`,
+  `eph_09_structural_axes`, plus modules `bout_utils.py` and `spatial_axes.py`.
+- Two findings that changed the previous plan: (1) kinematics × behavioral-model latents
+  (Q values, RPE) is a topic no `kin_*`/`eph_*` notebook covers, present in *two* HOLD notebooks,
+  so it gates two archivals; (2) `tongue_kinematics_cueresponse` is a choice-prediction analysis,
+  not only "spatial geometry". Also confirmed `eph_08` never fits the RT spatial axis itself, and
+  that `spatial_encoding.py` has no axis-fitting machinery.
+- Recorded known cross-notebook duplication (port-once cases), content already covered by
+  `tongue_lickometer.ipynb` (do not port), orphan code needing a home
+  (`annotate_movement_bouts` — verified absent from the library on all three branches;
+  `plot_standard_lick_landmarks`), pooled-parquet column availability (drives local vs Code
+  Ocean-only sections), a recommended work order, and per-notebook archiving gates.
+- Rewrote `TODO.md` (overview section + six work items) and updated `REORG.md` (planned
+  additions, audited HOLD table, execution plan). No code changed.
+
 ### Repo reorganization — Phase 1 (archive superseded notebooks)
 - Reviewed every notebook/script in `code/` against the refactored `eph_*`/`kin_*`/`fip_*` series
   and shared modules; recorded the full classification in `REORG.md`.

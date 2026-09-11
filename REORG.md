@@ -24,6 +24,24 @@ current-state map only.
   - `per_unit_stats_registry.py`: distinct results-store + FDR + cross-analysis `compare`
     (used by `eph_01/02/03/04/06`); not superseded by `ephys_utils`/`encoding_methods`.
   - `ccf_utils.py`: imported by `eph_08` + `spatial_encoding.py`.
+  - `spatial_encoding.py`: `SpatialEncoder` — CCF maps, subgroup maps, spatial-dependence
+    permutation tests. Contains **no axis-fitting machinery**; that is `spatial_axes.py`'s
+    job (planned, see `TODO.md`).
+
+### Planned additions (from the HOLD ports — see `TODO.md`)
+
+Not yet written. Listed here so the target layout is legible before the ports land.
+
+| Planned | Kind | Gates archiving of |
+|---|---|---|
+| `kin_02_latency` §8–§10 | extension | `tongue_latency` (with `kin_05`) |
+| `kin_05_nonlick_movements.ipynb` | new | `tongue_latency`, `tongue_kinematics` |
+| `kin_06_lick_geometry_choice.ipynb` | new | `tongue_kinematics_cueresponse` |
+| `kin_07_value_encoding.ipynb` | new | `tongue_kinematics`, `tongue_kinematics_cueresponse` |
+| `eph_07_bout_encoding.ipynb` | new | `tongue_kinematics_ephys_intertrialmovs` |
+| `eph_09_structural_axes.ipynb` | new | `spatial_axis_comparison_rt_encoding_update` |
+| `bout_utils.py` | new module | — (home for orphan `annotate_movement_bouts`) |
+| `spatial_axes.py` | new module | — (`eph_08` refactors onto it) |
 
 ## KEEP — pipeline / data generation
 
@@ -48,16 +66,33 @@ current-state map only.
 
 ## HOLD — port unreplicated content before archiving (see `TODO.md`)
 
-| File | Unreplicated content |
-|---|---|
-| `tongue_latency.ipynb` | RT+IMI decomposition; single-trial example fig; covert-preparatory narrative |
-| `tongue_kinematics_ephys_intertrialmovs.ipynb` | within-trial vs ITI bout-aligned ephys encoding |
-| `spatial_axis_comparison_rt_encoding_update.ipynb` | MERFISH (CCA) + retrograde (LDA) axis comparison + confidence cones (`eph_08` has waveform only) |
-| `tongue_kinematics.ipynb` | lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick) |
-| `tongue_kinematics_cueresponse.ipynb` | cue-response spatial geometry (jaw/spout landmarks, endpoints by event) |
+Audited cell-by-cell on 2026-09-11. The unreplicated content does **not** map one-notebook-to-one-port:
+it clusters into five questions that cut across these files, with duplication between them. Read
+the "Port plan for the five HOLD notebooks" overview at the top of `TODO.md` before starting any
+of them.
+
+| File | Unreplicated content | Ports into |
+|---|---|---|
+| `tongue_latency.ipynb` | RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal | `kin_02` §8–§10 **+** `kin_05` |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts` | `eph_07` **+** `bout_utils.py` |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones | `eph_09` **+** `spatial_axes.py` |
+| `tongue_kinematics.ipynb` | lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure; **kinematics vs behavioral-model latents** (Spearman/MI/RidgeCV/RF, prev-trial RPE) | `kin_05` **+** `kin_07` |
+| `tongue_kinematics_cueresponse.ipynb` | jaw/spout landmark geometry + endpoints by event; **choice prediction from pre-lick kinematics** (ridge-logistic, AUC, binned P(right lick)); Q-value encoding | `kin_06` **+** `kin_07` |
+
+Two corrections to the earlier reading of this table:
+
+- **`cueresponse` is not just "spatial geometry."** The landmark figures are the setup for a
+  choice-prediction analysis (cells 43–56) that is the actual result.
+- **Kinematics × behavioral-model latents is an untracked topic**, present in *two* of these
+  notebooks and in no `kin_*`/`eph_*` notebook. It gates two archivals, so neither
+  `tongue_kinematics` nor `tongue_kinematics_cueresponse` can be retired without `kin_07`.
+
+Already covered elsewhere — do **not** port: `tongue_kinematics` cells 78–79 (lick-detection
+FP/FN parameter sweep) duplicate `tongue_lickometer.ipynb`, which is KEEP.
 
 Also tracked in `TODO.md`: consolidate the duplicated `compute_outbound_metrics`
-(`add_outbound` + `tongue_movements_all`) into the library.
+(`add_outbound` + `tongue_movements_all`) into the library. `annotate_movement_bouts` is the
+same orphan-code pattern and is a candidate for the same treatment once `bout_utils.py` settles.
 
 ## ARCHIVE — ready to move to `code/archive/`
 
@@ -79,7 +114,21 @@ Reference (→ `code/archive/reference/`):
 
 ## Execution plan
 
-1. `git tag wild-prereorg` — restore point.
-2. Create `code/archive/` (+ `code/archive/reference/`).
-3. `git mv` the ARCHIVE files (history preserved; nothing imports them).
+1. `git tag wild-prereorg` — restore point. — **done**
+2. Create `code/archive/` (+ `code/archive/reference/`). — **done**
+3. `git mv` the ARCHIVE files (history preserved; nothing imports them). — **done**
 4. HOLD files stay until their `TODO.md` ports land, then archive.
+
+Step 4 is the remaining work. Recommended order, by value ÷ risk (full rationale and
+per-notebook section outlines are in `TODO.md`):
+
+1. `kin_02` §8–§10 — pooled parquet only, no new dependencies, fully local-testable.
+2. `kin_05_nonlick_movements` — mostly pooled; one Code Ocean-only section.
+3. `eph_07_bout_encoding` + `bout_utils.py` — reuses `eph_00`'s raster/PETH helpers.
+4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
+   Confirm the MERFISH / retrograde assets are reachable on Code Ocean **first**.
+5. `kin_06_lick_geometry_choice`.
+6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
+
+Archive a HOLD notebook only when **every** gate in the HOLD table above is met — three of the
+five wait on two ports each.
