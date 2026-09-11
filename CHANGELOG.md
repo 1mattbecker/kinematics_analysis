@@ -2,6 +2,26 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-11
+
+### Repo reorganization — Phase 1 (archive superseded notebooks)
+- Reviewed every notebook/script in `code/` against the refactored `eph_*`/`kin_*`/`fip_*` series
+  and shared modules; recorded the full classification in `REORG.md`.
+- Created `code/archive/` (+ `code/archive/reference/`) and `git mv`'d 15 files there (renames,
+  history preserved): superseded pipelines/notebooks (`rt_ols_registry_pipeline`,
+  `registry_usage_example.py`, `umap`, `tongue_kinematics_ephys`, `tongue_kinematics_ephys_figures`,
+  `spatial_axis_comparison_rt_encoding` old dup), library-promoted/dev scratch
+  (`old_functions_tongue_kinematics`, `cue_response_lick_processing_example`,
+  `tongue_segmentation_test`, `batch_clips`, `create_labeled_clip`, `example`,
+  `extract_tongue_kinematics`, `event_timeline`), and a collaborator reference notebook
+  (`F_ephys_behavior_action&outcome` → `archive/reference/`).
+- Tagged `wild-prereorg` as a restore point before moving anything.
+- Kept in place: active analysis + shared modules, data-generation/pipeline infra, model-quality
+  evaluation notebooks, and 5 notebooks with not-yet-replicated content held for porting.
+- `TODO.md`: logged the outstanding ports (RT+IMI latency story, ITI bout ephys, MERFISH/retrograde
+  spatial axes, lick↔movement correspondence, cue-response geometry) and the outbound-metrics
+  library consolidation.
+
 ## 2026-09-07
 
 ### Repo housekeeping
