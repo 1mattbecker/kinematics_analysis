@@ -2,6 +2,27 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (4)
+
+### `fip_00_explore`: drop the `video_alignment`-branch workaround, use `read_video_csv`
+- **Cleanup, no behavior change on the current dataset.** `aind-dynamic-foraging-behavior-
+  video-analysis`'s `video_alignment` module (previously only on a `video_alignment` branch)
+  is now merged to `main`, and the Dockerfile already installs `@main` (`environment/
+  Dockerfile:48`). Section 8b's import cell no longer needs to git-fetch/checkout the
+  `video_alignment` branch inside the editable install at `/src` — replaced with a plain
+  `import ... as va`, falling back to a pip install from `@main` only for a from-scratch env.
+- **Use the package's own CSV reader.** `video_alignment` now ships `read_video_csv` (auto-
+  detects the Old/flat headerless camera CSV vs. the New/AIND headered layout, which names the
+  behavior-time column `ReferenceTime` instead of `Behav_Time`) plus the `DEFAULT_COLUMNS` /
+  `TIME_COLUMN_ALIASES` constants. `motion_energy_to_session` now calls `va.read_video_csv`
+  and resolves the behavior-time column from `va.TIME_COLUMN_ALIASES` instead of hand-rolling
+  `pd.read_csv(..., header=None, names=CAM_COLUMNS)` with a hardcoded `cam["Behav_Time"]`
+  lookup — so it no longer silently mis-reads a New/AIND-layout CSV as headerless data.
+- Verified `video_alignment.py`'s public function signatures (`compute_video_session_offset`,
+  `get_first_frame_behavior_time`, `behavior_time_to_video_time`, `video_time_to_session_time`)
+  are unchanged from what the notebook already called. Not executed locally (needs Code Ocean
+  data assets); validated via `nbformat` read-back and `ast.parse` on the converted script.
+
 ## 2026-09-14 (3)
 
 ### `kin_02_latency` §11: fix raster rendering artifact and illegible legends
