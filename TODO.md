@@ -19,7 +19,7 @@ series.
 
 | Target | Question it answers | Source material |
 |---|---|---|
-| `kin_02_latency` *(extend)* | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26 |
+| `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26 |
 | `kin_05_nonlick_movements` *(new)* | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; `tongue_latency` 3, 5, 8, 9 |
 | `kin_06_lick_geometry_choice` *(new)* | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
 | `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
@@ -112,7 +112,7 @@ Archive only when **all** gates for a notebook are met:
 
 | HOLD notebook | Archive after |
 |---|---|
-| `tongue_latency.ipynb` | `kin_02` ext **+** `kin_05` |
+| `tongue_latency.ipynb` | `kin_02` ext (done) **+** `kin_05` |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` |
 | `tongue_kinematics.ipynb` | `kin_05` **+** `kin_07` |
@@ -122,7 +122,18 @@ Archive only when **all** gates for a notebook are met:
 
 ## Extend `kin_02_latency` with the RT + IMI decomposition
 
-_Logged 2026-09-11._
+_Logged 2026-09-11. Done 2026-09-14 — landed as `kin_02_latency.ipynb` §8–§10, executed
+end-to-end locally against `data/for_local/all_tongue_movements_04022026.parquet`
+(44 sessions, k=1..4). Nothing deferred; `kin_02` no longer gates on this item —
+`tongue_latency.ipynb` archiving still waits on `kin_05_nonlick_movements`._
+
+**Flag from the port:** §10's `std_aligned` and `std_raw` (source `tongue_latency`
+cell 17 §6) are mathematically identical, not just empirically close — de-shifting a
+k group by its own constant `(k−1)·Δt` cannot change that group's standard deviation.
+The source notebook's "raw vs aligned" framing for this comparison doesn't test what
+it appears to test. Ported both columns for continuity but added a note in the
+notebook explaining the identity, and dropped the redundant duplicate line from the
+plot itself.
 
 ### Why
 

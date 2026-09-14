@@ -2,6 +2,38 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14
+
+### `kin_02_latency`: RT + IMI decomposition (Phase 2 port, item 1 of 6)
+- Appended §8–§10 to `kin_02_latency.ipynb`, porting the "nice story" left behind in
+  `tongue_latency.ipynb` (cells 15, 17, 18, 26): reaction time modeled as a first-movement
+  latency plus a sequence of inter-movement intervals, RT ≈ RT₁ + (k−1)·Δt.
+  - §8 estimates Δt as the median within-trial inter-movement interval, then de-shifts
+    `lick_latency` by `(k−1)·Δt` per cue-response movement ordinal k and shows the
+    distributions partially collapse onto k=1 (hist + KDE overlay).
+  - §9 runs KS tests of each de-shifted k against de-shifted k=1.
+  - §10 checks whether the spread of `lick_latency` grows with k (bootstrap 95% CI on SD),
+    then the cross-session population version (grand mean ± SEM by k, session as the
+    sampling unit).
+  - Carried over the source notebook's caveat as closing markdown: the residual mismatch at
+    k=1/k=2 is attributed to further covert preparatory movements, stated as an open question
+    that `kin_05_nonlick_movements` (not yet built) is meant to test.
+- Made the `lick_latency` (conditioned on `cue_response_movement_number`) vs
+  `movement_latency_from_go` (what §4–§7 already plot) distinction explicit in prose, per
+  `TODO.md`'s note — these are different quantities on different event streams.
+- Flagged and fixed a latent issue in the source: `tongue_latency` cell 17's "raw vs aligned SD"
+  comparison compares a quantity to itself (shifting a group by its own constant offset cannot
+  change that group's SD) — kept both columns in the results table for continuity but dropped
+  the redundant duplicate line from the plot and added an explanatory note.
+- Fully local-testable; executed end-to-end against
+  `data/for_local/all_tongue_movements_04022026.parquet` (44 sessions) with no new dependencies.
+  Δt ≈ 0.172 s; KS tests reject full collapse at k=2/3/4 (p ≪ 0.001), consistent with the
+  carried-over caveat.
+- Updated `TODO.md` (item marked done, archive-gate table) and `REORG.md` (moved the entry out
+  of "Planned additions" into the `kin_02_latency` KEEP note, updated the HOLD table and
+  execution-plan checklist). `tongue_latency.ipynb` archiving still waits on
+  `kin_05_nonlick_movements`.
+
 ## 2026-09-11
 
 ### Repo reorganization — Phase 2 planning (HOLD notebook port plan)
