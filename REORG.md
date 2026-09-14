@@ -19,9 +19,12 @@ current-state map only.
 ## KEEP — active analysis (flat)
 
 - `eph_00`–`eph_06`, `eph_08` · `kin_00`–`kin_04` · `fip_00_explore`
-  - `kin_02_latency`: §8–§10 now carry the RT + IMI decomposition ported from
+  - `kin_02_latency`: §8–§10 carry the RT + IMI decomposition ported from
     `tongue_latency` (Δt de-shift, KS collapse test, noise propagation w/ bootstrap
-    CI, cross-session grand mean). See `TODO.md`.
+    CI, cross-session grand mean); §11 carries that notebook's single-session
+    illustration (example trial, rasters, colored histograms) — reassigned here
+    from the `kin_05` plan since it was already ported. `tongue_latency.ipynb` has
+    no remaining port gate. See `TODO.md`.
 - Modules: `data_loading.py`, `ephys_utils.py`, `encoding_methods.py`, `encoding_plots.py`,
   `per_unit_stats_registry.py`, `spatial_encoding.py`, `plotstyle.py`, `ccf_utils.py`
   - `per_unit_stats_registry.py`: distinct results-store + FDR + cross-analysis `compare`
@@ -38,7 +41,7 @@ before the remaining ports land.
 
 | Planned | Kind | Gates archiving of |
 |---|---|---|
-| `kin_05_nonlick_movements.ipynb` | new | `tongue_latency`, `tongue_kinematics` |
+| `kin_05_nonlick_movements.ipynb` | new | `tongue_kinematics` |
 | `kin_06_lick_geometry_choice.ipynb` | new | `tongue_kinematics_cueresponse` |
 | `kin_07_value_encoding.ipynb` | new | `tongue_kinematics`, `tongue_kinematics_cueresponse` |
 | `eph_07_bout_encoding.ipynb` | new | `tongue_kinematics_ephys_intertrialmovs` |
@@ -76,7 +79,7 @@ of them.
 
 | File | Unreplicated content | Ports into |
 |---|---|---|
-| `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI)~~ **done, in `kin_02` §8–§10**; single-trial example fig; trial rasters by movement type / ordinal | `kin_02` §8–§10 (done) **+** `kin_05` |
+| `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal~~ **all done, in `kin_02` §8–§11** | `kin_02` §8–§11 (done) — **no remaining gate; ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts` | `eph_07` **+** `bout_utils.py` |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones | `eph_09` **+** `spatial_axes.py` |
 | `tongue_kinematics.ipynb` | lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure; **kinematics vs behavioral-model latents** (Spearman/MI/RidgeCV/RF, prev-trial RPE) | `kin_05` **+** `kin_07` |

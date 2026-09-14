@@ -19,8 +19,8 @@ series.
 
 | Target | Question it answers | Source material |
 |---|---|---|
-| `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26 |
-| `kin_05_nonlick_movements` *(new)* | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; `tongue_latency` 3, 5, 8, 9 |
+| `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26; also 5, 8, 9, 14 (§11, single-session illustration — reassigned from `kin_05` below on 2026-09-14) |
+| `kin_05_nonlick_movements` *(new)* | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
 | `kin_06_lick_geometry_choice` *(new)* | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
 | `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
 | `eph_07_bout_encoding` *(new)* | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
@@ -112,7 +112,7 @@ Archive only when **all** gates for a notebook are met:
 
 | HOLD notebook | Archive after |
 |---|---|
-| `tongue_latency.ipynb` | `kin_02` ext (done) **+** `kin_05` |
+| `tongue_latency.ipynb` | `kin_02` §8–§11 (done) — **no remaining gate, ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` |
 | `tongue_kinematics.ipynb` | `kin_05` **+** `kin_07` |
@@ -134,6 +134,27 @@ The source notebook's "raw vs aligned" framing for this comparison doesn't test 
 it appears to test. Ported both columns for continuity but added a note in the
 notebook explaining the identity, and dropped the redundant duplicate line from the
 plot itself.
+
+**Correctness fix, same day.** §3's original filter (`dropna` on `cue_response_movement_number`
++ `movement_latency_from_go` only) never restricted to `movement_number_in_trial ==
+cue_response_movement_number`. Since `cue_response_movement_number` is a trial-level constant,
+grouping by k pooled in *every* movement from a k-labeled trial, not just the k-th one — only
+~11% of the rows plotted in §4–§7 were actually the cue-response movement (checked directly:
+6,958 / 57,925 at k=1, similarly ~11% at k=2–4). Fixed by splitting §3 into `movements_valid`
+(all movements in trials with a valid k, unrestricted — needed by §8's Δt estimate, which
+requires the whole up-to-cue-response movement sequence) and `df` (only the actual cue-response
+movement, one row per trial — what §4–§7 use). §8's `lat_df` was re-pointed at `movements_valid`
+accordingly. Re-executed end-to-end; §4–§7's numbers changed substantively (e.g. k=1 log-normality
+n dropped from 57,925 to 6,958), §8–§10 were unaffected (Δt and per-trial counts already matched,
+since §8 had its own independent restriction). Also added a second section, **§11 — single-session
+illustration**, porting the example-trial and raster/colored-histogram figures from `tongue_latency`
+cells 5, 8, 9, 14 (one example session, `behavior_716325_2024-05-31_10-31-14`, matching the
+source's own choice) — checked `kin_00`/`kin_01`/`kin_03` first for duplicates (none: `kin_00`'s
+rasters are unrelated QC/spatial-radius figures, `kin_01`/`kin_03`'s "raster" hits were the
+`rasterized=True` matplotlib flag, not raster plots). The example-trial tongue-position trace
+(cell 5) needs per-frame `tongue_kins.parquet`, not in the pooled parquet — Code Ocean only,
+written but unexecuted; the two rasters and the colored-histogram panel run locally on the pooled
+parquet filtered to the example session.
 
 ### Why
 
@@ -218,16 +239,17 @@ One linear arc, roughly:
 - **§8 — Preparatory timing** (`tongue_kinematics` cells 69, 70; `cueresponse` cell 43):
   prevalence of ≥1 and ≥2 non-lick movements *before* the cue-response lick, via the pooled
   `movement_before_cue_response` column, plus the donut of trials by pre-lick movement count.
-- **§9 — Illustrative single-trial and raster figures** (`tongue_latency` cells 3/5, 8, 9):
-  one trial's tongue position coloured by `has_lick`; the trial raster coloured by movement
-  type; the raster coloured by movement ordinal. Good explanatory figures, and the visual
-  payoff for the whole notebook.
+- ~~§9 — Illustrative single-trial and raster figures~~ **already ported, 2026-09-14** —
+  landed as `kin_02_latency` §11 instead (one example trial's tongue position coloured by
+  `has_lick`, CO-only; the trial raster coloured by movement type and by movement ordinal,
+  both local). Don't re-port here.
 
 ### Notes
 
 - `tongue_latency` cells 6/8 carry a `coerce_bool` helper written because `astype(bool)` on a
-  string column turns any non-empty string True. Keep it if the pooled dtypes need it; check
-  first rather than porting reflexively.
+  string column turns any non-empty string True. `kin_02` §11 needed it (`cue_response` is
+  object-dtype with `True`/`False`/`None`); check the pooled dtypes here too rather than
+  porting reflexively.
 - Sections §3–§8 are pooled and therefore locally testable; only §4 is CO-only.
 
 ---

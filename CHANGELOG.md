@@ -2,6 +2,43 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (2)
+
+### `kin_02_latency`: fix §3–§7 ordinal filter; add §11 single-session illustration
+- **Correctness fix.** §3's filter never restricted to `movement_number_in_trial ==
+  cue_response_movement_number` — since `cue_response_movement_number` is a trial-level
+  constant, grouping by k pooled in every movement from a k-labeled trial, not just the k-th
+  one. Only ~11% of the rows plotted in §4 (and consumed by §5–§7) were actually the
+  cue-response movement (verified: 6,958 / 57,925 at k=1). Split §3 into `movements_valid`
+  (all movements in a trial with a valid k — what §8's Δt estimate needs) and `df` (only the
+  cue-response movement itself, one row per trial — what §4–§7 use); re-pointed §8's `lat_df`
+  at `movements_valid`. Re-executed end-to-end: §4–§7's numbers changed substantively (e.g.
+  k=1 log-normality n: 57,925 → 6,958; medians now cleanly spaced ~0.13–0.66 s across k=1–4),
+  §8–§10 were unaffected since they already carried their own independent restriction.
+- **New: §11, single-session illustration.** Ported the example-trial and raster/histogram
+  figures from `tongue_latency.ipynb` cells 5, 8, 9, 14 (one example session,
+  `behavior_716325_2024-05-31_10-31-14` — the session the source notebook itself used):
+  a trial raster colored by movement type (cue-response lick / other lick / non-lick), a
+  raster colored by movement ordinal (viridis, cue-response movement outlined), and a
+  colored-histogram panel (lick vs. 1st/2nd-move latency, and lick latency by k reusing §8's
+  `k_colors` so the same k means the same color throughout the notebook). The single-trial
+  tongue y-position trace (source cell 5) needs per-frame `tongue_kins.parquet`, not in the
+  pooled parquet — written with the `ENV`/`kin_00`-style guard but Code Ocean only, unexecuted.
+  Checked `kin_00`/`kin_01`/`kin_03` first for duplicates: none (`kin_00`'s rasters are
+  unrelated QC/spatial-radius figures; `kin_01`/`kin_03`'s "raster" hits were the
+  `rasterized=True` matplotlib flag, not raster plots).
+  - This content was previously slated for `kin_05_nonlick_movements` (not yet built);
+    reassigned here since it fit naturally as `kin_02`'s closing illustration and the user
+    asked for it directly. Added a `coerce_bool` helper (`tongue_latency` cells 6/8) since
+    `cue_response` is object-dtype with `True`/`False`/`None` in the pooled parquet.
+  - **Consequence:** `tongue_latency.ipynb`'s entire audited unreplicated-content list (RT +
+    IMI decomposition, single-trial example, both rasters) is now ported. Its archive gate no
+    longer includes `kin_05` — it has no remaining port gate. Not archived this session (out
+    of scope); `TODO.md`/`REORG.md` updated to reflect this so a future session (or the user)
+    can `git mv` it directly.
+- Updated `TODO.md` (item body, overview table, archive-gate table) and `REORG.md` (HOLD table,
+  `kin_02` KEEP note, planned-additions table) to match.
+
 ## 2026-09-14
 
 ### `kin_02_latency`: RT + IMI decomposition (Phase 2 port, item 1 of 6)
