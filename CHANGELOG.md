@@ -2,6 +2,43 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (6)
+
+### Create `fip_01_movement_value_coding.ipynb` — movement × RPE/value coding
+- New notebook, built on the example session `fip_00_explore.ipynb` loads (`SESSION_IDX=0`,
+  subject 808054). Extends the analysis used for the FIP-only phasic/tonic-DA poster figure
+  (baseline AUC by consecutive-reward streak, outcome traces by RPE bin) to motion energy (ME)
+  and to the "NE" channel (this dataset's curation has no nLight sensor; PL-GCaMP stands in for
+  NE per project convention). Three figures: (1) session-averaged movement per RPE bin, via
+  `aind_dynamic_foraging_basic_analysis.plot.plot_fip.plot_fip_psth_compare_alignments` on an
+  ME pseudo-channel, aligned to choice and split by `RPE-binned3` — same function/window/color
+  convention as the reference pipeline's `PAC_2026.ipynb` recipe; (2) z-scored AUC per
+  consecutive R-/R+, via `aind_dynamic_foraging_data_utils.enrich_dfs.enrich_fip_in_df_trials`
+  + `remove_tonic_df_fip` (Rachel's actual baseline/tonic-normalization functions — not a
+  reimplementation), paired with `num_reward_past` shifted by one trial (the exact pairing
+  convention traced from `power_analysis.ipynb`/`foraging_summary_plots.py::plot_baseline_corr`,
+  easy to get backwards); (3) "NE"-only onsets aligned to movement — no analog in Rachel's
+  pipeline (she never analyzed motion energy), reuses `fip_00_explore.ipynb`'s own
+  `threshold_onsets`/`peri_event` machinery restricted to the PL-GCaMP channel.
+- Traced the recipe through `rachel-analysis-utils`, `aind-dynamic-foraging-basic-analysis`,
+  `aind-dynamic-foraging-data-utils`, and (for plotting conventions only, not a dependency)
+  `AllenNeuralDynamics/DA_phasic_tonic`. Full trace, function-by-function, and a dedicated
+  review of deviations from Rachel's actual pipeline (what was fixed vs. inherent since ME was
+  never part of her analysis) are in the implementation plan for this notebook.
+- Incidental finding while tracing this: `rachel_analysis_utils.analysis_utils`'s
+  Python-3.9-incompatible nested-quote f-string (cited in `TODO.md`'s Python-3.11-upgrade
+  section) appears fixed upstream — a fresh clone of `main` compiles cleanly under
+  `python3.9 -m py_compile`. Not yet verified on Code Ocean; logged in the new `fip_todo.md`
+  (see below) rather than acted on.
+- **New file `fip_todo.md`**: a short to-do list scoped to the `fip_*` series, separate from
+  `TODO.md`/`REORG.md`'s `kin_*`/`eph_*` port-plan tracking. Seeded with the `fip_utils.py`
+  extraction (this notebook currently duplicates `fip_00_explore.ipynb`'s setup cells rather
+  than sharing a module), the `analysis_utils` Python-3.9 re-verification above, and the
+  "anticipatory movement during CS+Delay" figure that was requested alongside these three but
+  deferred (no literal CS+/delay epoch exists in this dynamic-foraging task).
+- Not executed — needs the same Code Ocean-only data assets `fip_00_explore.ipynb` does.
+  Validated via `nbformat` read-back and `ast.parse`/`py_compile` on the converted script only.
+
 ## 2026-09-14 (5)
 
 ### Create `kin_05_nonlick_movements.ipynb` (Phase 2 port, item 2/6)
