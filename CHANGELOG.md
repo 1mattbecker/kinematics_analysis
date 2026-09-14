@@ -2,6 +2,27 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (8)
+
+### `fip_02_ne_only_events`: add raw-trace and cross-correlation views ahead of onset analysis
+- Two new sections inserted right after the z-scored NE/DA/ME traces are built, **before**
+  onset detection — a qualitative continuous-signal look precedes the discrete-event analysis
+  that follows it:
+  - **NE/DA raw traces over a window** (`TRACE_WINDOW_DUR`, default 10s, plus a
+    `plot_ne_da_window(t_start, duration)` helper to scan other parts of the session) — overlay
+    the two z-scored traces to get a visual sense of how correlated they look before
+    quantifying anything.
+  - **NE↔DA cross-correlation**: resample both onto a common 20 Hz grid over their time overlap
+    (same recipe `fip_00_explore.ipynb` uses for motion energy × FIP) and run `norm_xcorr`
+    (added to the Helpers cell, same function `fip_00` defines). Sign convention deliberately
+    set to match the onset-lag distribution further down the notebook (positive = NE leads DA).
+- No changes to the onset-detection/classification/quantitative sections below — this is a
+  qualitative + continuous-signal complement to the existing analyses, placed to build the
+  notebook's narrative forward (raw look → continuous relationship → discrete events →
+  event classification → event-level quantification → behavioral comparison).
+- Not executed — needs the same Code Ocean-only data assets the rest of the `fip_*` series does.
+  Validated via `nbformat` read-back and `ast.parse`/`py_compile` on the converted script.
+
 ## 2026-09-14 (7)
 
 ### Remove Figure 3 from `fip_01`; new `fip_02_ne_only_events` — NE/DA transient dissociation
