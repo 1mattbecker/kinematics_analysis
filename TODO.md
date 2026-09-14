@@ -20,7 +20,7 @@ series.
 | Target | Question it answers | Source material |
 |---|---|---|
 | `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26; also 5, 8, 9, 14 (§11, single-session illustration — reassigned from `kin_05` below on 2026-09-14) |
-| `kin_05_nonlick_movements` *(new)* | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
+| `kin_05_nonlick_movements` *(new)* — **done** | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
 | `kin_06_lick_geometry_choice` *(new)* | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
 | `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
 | `eph_07_bout_encoding` *(new)* | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
@@ -100,8 +100,9 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
 
 ### Recommended order (value ÷ risk) and archiving gates
 
-1. `kin_02` extension — pure pooled parquet, no new dependencies, fully local-testable.
-2. `kin_05_nonlick_movements` — mostly pooled, one CO-only section.
+1. `kin_02` extension — pure pooled parquet, no new dependencies, fully local-testable. — **done**
+2. `kin_05_nonlick_movements` — mostly pooled, one CO-only section (turned out to be two
+   partial CO-only splits, within §3 and §5 — see the item below). — **done**
 3. `eph_07_bout_encoding` + `bout_utils.py` — clear spec, reuses `eph_00`'s helpers.
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
    **Confirm the MERFISH / retrograde assets are reachable on Code Ocean before starting.**
@@ -115,7 +116,7 @@ Archive only when **all** gates for a notebook are met:
 | `tongue_latency.ipynb` | `kin_02` §8–§11 (done) — **no remaining gate, ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` |
-| `tongue_kinematics.ipynb` | `kin_05` **+** `kin_07` |
+| `tongue_kinematics.ipynb` | `kin_05` (done) **+** `kin_07` |
 | `tongue_kinematics_cueresponse.ipynb` | `kin_06` **+** `kin_07` |
 
 ---
@@ -200,7 +201,39 @@ that claim gets tested.
 
 ## Create `kin_05_nonlick_movements.ipynb`
 
-_Logged 2026-09-11._
+_Logged 2026-09-11. Done 2026-09-14 — landed as `kin_05_nonlick_movements.ipynb` §3–§8,
+executed end-to-end locally (§4 excepted) against
+`data/for_local/all_tongue_movements_04022026.parquet` (246,359 movements, 44 sessions).
+`tongue_kinematics.ipynb` archiving now gates on `kin_07` alone._
+
+**Correction from the port: §3 needed a partial CO-only split, not just §4.** The
+"§3–§8 pooled, only §4 CO-only" reading below undercounted the CO-only surface by one.
+Checked directly against the source (`tongue_kinematics` cell 35, not just its
+data-availability summary): part (a) of §3, "licks without movement," computes
+`nwb.df_licks['nearest_movement_id'].isna().sum()` — needs the per-session column, which
+is confirmed absent from the pooled parquet's 49 columns. Parts (b) and (c) use
+`tongue_movements['lick_count']`/`['has_lick']`, genuinely pooled. Landed §3 split
+accordingly: (b)/(c) run and print locally (8,585/151,404 = 5.67% movements with >1
+lick; 94,955/246,359 = 38.54% movements without licks); (a) sits under the same
+Code-Ocean guard as §4, written but unexecuted, with the expected
+`nwb_df_licks.parquet` schema documented in the notebook.
+
+**Same finding recurs at §5.** Cell 43 (the `lick_count > 1` tally) is pooled, but cell
+44 (the multi-lick example-trace figure) needs per-frame `tongue_segmented` plus
+per-session `nwb.df_licks` — also CO-only, which the "§5 — cells 43, 44 — pooled" line
+below doesn't distinguish. Landed §5 as the pooled `lick_count` distribution + per-session
+rate (cell 43's tally is already covered by §3b, not re-run) rather than adding a third
+CO-only guarded block for a qualitative single-session aside on an already-rare event.
+
+**Bug fix in the port, not present in the source.** The per-trial structure (cells
+64–68) grouped by `trial` alone in the source, which is only correct because that
+notebook runs on a single session — `trial` numbers repeat across sessions in the pooled
+parquet. §7 groups by `(session, trial)` instead; the naive group-by would have silently
+pooled movement counts from unrelated trials that happen to share a number.
+
+§8 uses the pooled `movement_before_cue_response` column directly rather than
+reconstructing it from `nearest_movement_id` per-session, as the source did — the
+reconstruction is unnecessary once the flag is already in the pooled parquet.
 
 ### Why
 
@@ -250,7 +283,10 @@ One linear arc, roughly:
   string column turns any non-empty string True. `kin_02` §11 needed it (`cue_response` is
   object-dtype with `True`/`False`/`None`); check the pooled dtypes here too rather than
   porting reflexively.
-- Sections §3–§8 are pooled and therefore locally testable; only §4 is CO-only.
+- ~~Sections §3–§8 are pooled and therefore locally testable; only §4 is CO-only.~~
+  **Wrong, see the Done note above** — §3's "licks without movement" tally and §5's
+  example-trace figure are also CO-only (both need per-session `nwb.df_licks` /
+  `nearest_movement_id`); everything else in §3, §5–§8 is pooled.
 
 ---
 

@@ -2,6 +2,53 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (5)
+
+### Create `kin_05_nonlick_movements.ipynb` (Phase 2 port, item 2/6)
+- New notebook: do the lickometer and video-derived movement streams describe the same
+  events, and what are the movements that aren't licks? Framed as a definitional
+  question, not a QC filter — lickometer agreement, confidence, and duration are not
+  valid noise criteria (that's `kin_00`'s job). §3 three-way correspondence tally
+  (licks w/o movements, movements w/ >1 lick, movements w/o licks), §4 licks without
+  movements, §5 movements with multiple licks, §6 kinematic profile of non-lick
+  movements (extends `kin_01` §5 to `duration`/`total_distance`, not a duplicate of its
+  `out_peak_velocity`/`out_duration`), §7 per-trial lick vs. non-lick structure, §8
+  preparatory timing (prevalence of non-lick movements before the cue-response lick +
+  donut of trials by pre-lick movement count). §9 (illustrative single-trial/raster
+  figures) already landed in `kin_02` §11 last session — not re-ported.
+- **Correction to the port plan: §3 needed a partial Code-Ocean-only split, not just
+  §4.** `TODO.md` labeled §3 "pooled and locally testable" with only §4 flagged
+  Code-Ocean-only. Checked directly against the source (`tongue_kinematics` cell 35):
+  part (a), "licks without movement," computes
+  `nwb.df_licks['nearest_movement_id'].isna().sum()` — a per-session column, confirmed
+  absent from all 49 columns of `all_tongue_movements_04022026.parquet`. Parts (b) and
+  (c) use `tongue_movements['lick_count']`/`['has_lick']`, both pooled. Split §3
+  accordingly: (b)/(c) compute and print locally (verified: 8,585/151,404 = 5.67%
+  movements with >1 lick; 94,955/246,359 = 38.54% movements without licks); (a) moved
+  under the existing §4 Code-Ocean guard (written, unexecuted, with the expected
+  `nwb_df_licks.parquet` schema documented).
+- **Second plan gap, same category:** `TODO.md`'s §5 spec ("cells 43, 44 ... pooled")
+  is only true of cell 43 (the `lick_count > 1` tally, already covered by §3b — not
+  re-run). Cell 44, the multi-lick example-trace figure, needs per-frame `tongue_segmented`
+  and per-session `nwb.df_licks` — Code-Ocean-only, same as §4. Given the tally is
+  already the pooled result and the per-session example is a qualitative aside on an
+  already-rare event (~0.03–32% by session, median ~2.9%), didn't port it as a second
+  CO-only guarded block; ported a pooled `lick_count` distribution + per-session rate
+  instead, which is the actual population-level finding cell 44 can't provide from a
+  single session.
+- **Bug fix in the port, not present in the source:** the source's per-trial structure
+  (cells 64-68) grouped by `trial` alone, correct only because that notebook runs on one
+  session. `trial` numbers repeat across sessions in the pooled parquet, so §7 groups by
+  `(session, trial)` instead — silent cross-session pooling would have inflated the
+  per-trial movement counts.
+- §8 uses the pooled `movement_before_cue_response` column directly rather than
+  reconstructing it from `nearest_movement_id` (what the source did) — the reconstruction
+  needs the per-session lick table and is unnecessary since the flag is already pooled.
+- Verified end-to-end locally against `data/for_local/all_tongue_movements_04022026.parquet`
+  (246,359 movements, 44 sessions) via `jupyter nbconvert --execute`; 0 errors, 6 figures
+  rendered. Only §4 (licks without movements) is unexecuted, Code-Ocean-only.
+- `tongue_kinematics.ipynb` archiving now gates on `kin_07` alone (`kin_05` gate met).
+
 ## 2026-09-14 (4)
 
 ### `fip_00_explore`: drop the `video_alignment`-branch workaround, use `read_video_csv`
