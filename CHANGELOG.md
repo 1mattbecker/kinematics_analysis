@@ -2,6 +2,26 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (3)
+
+### `kin_02_latency` §11: fix raster rendering artifact and illegible legends
+- **Rendering bug.** Both §11 raster figures (movement type, movement ordinal) showed
+  spurious horizontal gaps — bands of trials with no visible ticks. Root cause: at the
+  notebook's default `figure.dpi` (110, from `plotstyle.apply_style()`), a 6×6 in raster
+  with ~570 trial rows renders at ~649×649 px, under 1.2 px/trial; matplotlib's
+  anti-aliasing drops some trial rows unevenly at that density. Confirmed directly —
+  extracted the actual embedded PNG bytes from the executed notebook, reproduced the
+  identical banding at 649×649 px, and confirmed it disappears entirely by ~1180×1180 px
+  (dpi 200). Fixed by passing `dpi=220` explicitly to `plt.subplots()` in both raster
+  cells (scoped to just those two cells, not a `plotstyle.py`-wide change — the other
+  figures in this notebook aren't dense enough to need it).
+- **Illegible legend.** Both raster legends sat directly over dense scatter data with no
+  background (`plotstyle`'s global `legend.frameon=False` convention), making them
+  unreadable. Added `frameon=True, facecolor="white", edgecolor="none", framealpha=0.9`
+  to both legend calls — a scoped exception to the frameless convention for these two
+  data-dense figures specifically.
+- Re-executed end-to-end; both figures confirmed banding-free with readable legends.
+
 ## 2026-09-14 (2)
 
 ### `kin_02_latency`: fix §3–§7 ordinal filter; add §11 single-session illustration
