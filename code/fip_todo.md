@@ -1,12 +1,26 @@
 # fip_* to-do
 
 Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
-`fip_01_movement_value_coding.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
-`kin_*`/`eph_*` port plan. Newest first, dated `YYYY-MM-DD`.
+`fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`). Kept separate from
+`TODO.md`/`REORG.md`, which track the `kin_*`/`eph_*` port plan. Newest first, dated
+`YYYY-MM-DD`.
 
 ---
 
-## 2026-09-14
+## 2026-09-14 (2)
+
+- **`fip_utils.py` extraction is now overdue.** A 3rd notebook (`fip_02_ne_only_events.ipynb`)
+  duplicates the same setup cells (data loading, curation + memory fix, session select,
+  `pick_example`/`EXAMPLE_SPECS`, motion-energy-on-the-FIP-clock, `zscore`/`threshold_onsets`/
+  `peri_event`) already duplicated once between `fip_00` and `fip_01`. Do the extraction logged
+  below before a 4th notebook makes it worse.
+- `fip_02_ne_only_events.ipynb` deliberately does **not** run the `enrich_fip_in_df_trials`/
+  `remove_tonic_df_fip` per-trial baseline pipeline `fip_01` uses — it only needs continuous-time
+  `data_z` (from `zscore_fip` directly), since its analysis is onset-based, not per-trial. Worth
+  keeping in mind when `fip_utils.py` is extracted: the shared module should expose the
+  z-scoring/attach step and the per-trial pipeline as separable pieces, not one bundled function.
+
+## 2026-09-14 (1)
 
 - **Extract shared setup into `code/fip_utils.py`.** `fip_00_explore.ipynb` and
   `fip_01_movement_value_coding.ipynb` currently duplicate ~150 lines of setup (session load,

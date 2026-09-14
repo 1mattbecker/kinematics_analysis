@@ -2,6 +2,38 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (7)
+
+### Remove Figure 3 from `fip_01`; new `fip_02_ne_only_events` — NE/DA transient dissociation
+- **`fip_01_movement_value_coding.ipynb`**: removed Figure 3 ("NE"-only onsets aligned to
+  movement) — it treated every PL-GCaMP ("NE") onset alike, which is now a distinct notebook's
+  question. Also removed the now-unused `NE_EVENT` selection and trimmed the title/example-
+  signals markdown accordingly. `fip_01` is left with its original two figures (movement per
+  RPE bin; z-scored AUC per consecutive R-/R+), both still looped over all example FIP channels.
+- **New `code/fip_02_ne_only_events.ipynb`**: which NE (PL-GCaMP) transients happen *without* a
+  concurrent DA (NAc dLight) transient ("NE-only") versus with one ("NE+DA"), and does movement
+  (motion energy) look different around the two kinds of NE event. Classification: independent
+  `threshold_onsets()` on NE and DA (same parameters used throughout this notebook family), an
+  NE onset counts as NE+DA if a DA onset falls within ±0.5 s of it, otherwise NE-only — reuses
+  the existing onset-detection machinery symmetrically rather than a separate DA-magnitude rule.
+  Four analyses quantify the relationship beyond that binary split: DA z-score peak distribution
+  around every NE onset (with `z_thresh` marked, to show whether the split is a real dichotomy
+  or a continuum); a circular-shift shuffle control for the coincidence rate (empirical p-value
+  against each signal's own baseline event rate); lag distribution for coincident pairs (does DA
+  lead/lag NE); and NE-vs-DA peak-amplitude correlation (Pearson + Spearman) for coincident
+  pairs. A QC figure (example NE-only vs. NE+DA traces) sits before those. Main figure: ME
+  aligned to each onset group, mean ± SEM overlaid.
+  - Only needs continuous-time `data_z` (via `aind_dynamic_foraging_data_utils.enrich_dfs.
+    zscore_fip`, same as `fip_01`) — deliberately skips `fip_01`'s per-trial
+    `enrich_fip_in_df_trials`/`remove_tonic_df_fip` pipeline, since this analysis is onset-based,
+    not per-trial. Setup cells (data load, curation + memory fix, session select, `pick_example`,
+    motion-energy alignment) copied from `fip_01`, same as `fip_01` copied from `fip_00` — now a
+    3rd notebook duplicating this setup; `fip_todo.md` updated to flag the shared-module
+    extraction as overdue.
+- Not executed — needs the same Code Ocean-only data assets the rest of the `fip_*` series does.
+  Validated via `nbformat` read-back and `ast.parse`/`py_compile` on both notebooks; confirmed
+  no leftover `NE_EVENT`/Figure-3 references remain in `fip_01`.
+
 ## 2026-09-14 (6)
 
 ### Create `fip_01_movement_value_coding.ipynb` — movement × RPE/value coding
