@@ -2,6 +2,68 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-15 (3)
+
+### Extract shared `fip_*` setup into `code/fip_utils.py` (Pass 1 of 2)
+
+- **New `code/fip_utils.py`.** `fip_00_explore.ipynb`, `fip_01_movement_value_coding.ipynb` and
+  `fip_02_ne_only_events.ipynb` each carried their own copy of the same load -> curate ->
+  session-setup preamble (283/248/241 non-blank lines, ~490 of them pure duplication). Every bug
+  fix this cycle had to be applied 2-3 times by hand; the `regex=False` substring fix alone
+  touched 7 call sites. The module follows the existing `plotstyle.py`/`ephys_utils.py`
+  convention (flat module in `code/`, bare import, no `sys.path` juggling) and carries the
+  loading/curation, session select, `parse_event`/`get_trace`/`build_meta`/`pick_example`,
+  trial enrichment, motion-energy-on-the-FIP-clock, signal helpers, and the multi-session
+  `process_session` pipeline. Notebook code drops 1657 -> 893 lines (-764).
+- **Memory fix is now structural.** `load_curated_sessions` holds the pre-curation `nwb_list_raw`
+  and the unused second curated list as function locals, so both are released on return. The
+  `del nwb_list_raw, _nwb_list_curated_unused; gc.collect()` incantation is no longer something
+  each notebook has to remember.
+- **Two switches onto upstream functions** (everything else is a move, not a change):
+  - `fu.enrich_trials` calls `rachel_analysis_utils.analysis_utils.enrich_df_trials`, with a
+    local two-column reimplementation only as a fallback. This replaces *two* separate
+    reimplementations — `fip_00`'s `enrich_streaks` (which never tried upstream) and `fip_01`'s
+    `_enrich_streaks_and_rpe_bins_fallback`. The reason `fip_00` avoided upstream ("won't parse
+    on Python 3.9, nested-quote f-string at `analysis_utils.py:294`") is stale: that file is 177
+    lines and `python3.9 -m py_compile` clean. The fallback keeps `fip_00`'s `ses_idx` grouping,
+    which `fip_01`'s bare `.shift(1)` lacked and which multi-session needs so streaks don't run
+    across session boundaries.
+  - Onset detection consumes the upstream `data_z` column
+    (`fu.threshold_onsets(..., already_z=True)`) instead of z-scoring internally, so one
+    normalization convention runs throughout. `fu.zscore` switches to `ddof=1` to match
+    `enrich_dfs.zscore_fip` exactly — verified equal to
+    `scipy.stats.zscore(x, ddof=1, nan_policy="omit")` to 4e-16, and the `ddof` change moves zero
+    samples across threshold at n=100k, so onset times are unaffected.
+- **`attach_me_to_df_fip` convention reconciled to raw ME.** `fip_00`'s multi-session copy stored
+  `me_z` while `fip_01`/`fip_02` stored raw. Raw is correct: `fip_psth_inner_compute` takes a
+  `data_column` argument (default `"data"`) and never z-scores internally, so raw-in-`data` plus
+  `data_column="data_z"` is the composable form, and the `enrich_dfs` functions z-score `data`
+  themselves. Only affects `fip_00`'s `BUILD_NWB_LIST_ME=False` cell, which prints guidance.
+- **`fip_00`'s internal duplication resolved** — `build_meta`, `locate_me_assets` and
+  `attach_me_to_df_fip` were each defined twice, once in the single-session cells and again in
+  the multi-session helpers cell. The multi-session cell keeps only the four functions Pass 2
+  will replace (`session_etr_mean`, `aggregate_series`, `collect_region_etr`, `plot_by_subject`)
+  and imports the rest by name, leaving the four analysis cells and results table untouched.
+- **`fip_01` sheds a dead helper cell** — `zscore`/`threshold_onsets`/`peri_event` became unused
+  there when Figure 3 moved to `fip_02`.
+- Each notebook's imports cell gains `%load_ext autoreload` / `%autoreload 2`: a session load is
+  tens of GB and minutes, so without it every `fip_utils.py` edit would cost a kernel restart
+  and a full reload.
+- **Upstream curation API has been rewritten — Dockerfile pin needed.** At
+  `rachel-analysis-utils` main (`b7b7487`, "CSV-based data curation inputs"),
+  `apply_curation_nwb_list` no longer exists; `data_curation_helpers.py` is now
+  `load_curation` + `apply_curation_df_fip`, reading CSVs from a new dependency
+  (`aind_bwnm_fiber_data_curation_utils`), overwriting `df_fip['event']` with target names, and
+  dropping `intended_measurement` entirely. `environment/Dockerfile:60` installs `@main`
+  unpinned; the cached image still has the old API, so the next rebuild would break the curation
+  cell and then `parse_event`/`build_meta`/`pick_example`. Recommended pin
+  (`864550d55356ecb4906d05801cdae694bd000fde`) is written up in `code/fip_todo.md` — not applied
+  here, since CLAUDE.md puts `/environment` off limits.
+- Verification is static only (CO-only data assets): `python3.9 -m py_compile` on the module,
+  `nbformat` validate + `nbconvert --to script` + `compile()` + `pyflakes` (no undefined names,
+  no shadowed module functions) on all three notebooks. Pass 1 has **not** been run on Code
+  Ocean yet.
+
 ## 2026-09-15 (2)
 
 ### Create `eph_07_bout_encoding.ipynb` — bout helpers consolidated into `ephys_utils.py`
