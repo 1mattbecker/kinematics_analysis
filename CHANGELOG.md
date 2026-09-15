@@ -2,6 +2,25 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-14 (9)
+
+### `fip_02_ne_only_events`: add a z-threshold sensitivity sweep
+- New closing section: reruns onset detection and all four quantitative NE-DA
+  analyses (shuffle control, lag distribution, peak-amplitude correlation, ME
+  alignment) across `Z_SWEEP = [1.0, 1.5, 2.0, 2.5, 3.0]`, one four-panel summary
+  figure per threshold, to check how much of the main analysis depends on the
+  choice of detection threshold. Ends with a small per-threshold summary table
+  (onset counts, coincidence rate + p-value, median lag, Pearson r).
+- Refactored as `analyze_at_zthresh(z_thresh)` returning a dict, rather than five
+  copies of the module-level analysis cells — reuses the existing `threshold_onsets`,
+  `peak_in_window`, `peri_event`, and `coincidence_rate` helpers unchanged; only
+  `z_thresh` varies across the sweep, `REFRACTORY`/`MIN_RUN`/`WINDOW` stay fixed at
+  the notebook's main values. Shuffle count reduced to 500 (from 1000) per sweep
+  point since the whole pipeline reruns five times.
+- Not executed — same Code-Ocean-only data assets as the rest of the `fip_*` series.
+  Validated via `nbformat.validate` read-back and `ast.parse`/`py_compile` on the
+  converted script.
+
 ## 2026-09-14 (8)
 
 ### `fip_02_ne_only_events`: add raw-trace and cross-correlation views ahead of onset analysis
