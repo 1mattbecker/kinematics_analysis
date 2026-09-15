@@ -57,7 +57,7 @@ RUN pip install -U --no-cache-dir \
 # no deps. Install it in isolation with --ignore-requires-python so the flag does NOT leak
 # into the block above (which would let pip pull a too-new numpy and break the build).
 RUN pip install --no-cache-dir --ignore-requires-python \
-    -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@main#egg=rachel-analysis-utils
+    -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@864550d55356ecb4906d05801cdae694bd000fde#egg=rachel-analysis-utils
 
 # scanpy, for eph_09_structural_axes' MERFISH axis (reads adata_mer_subset_2_2k.h5ad).
 # 1.10.3 is the LAST scanpy supporting python 3.9 (1.10.4+ require >=3.10) — do not bump
