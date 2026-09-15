@@ -50,7 +50,7 @@ runs.
 Provenance
 ----------
 Ported from ``spatial_axis_comparison_rt_encoding_update.ipynb`` cells 14, 15
-and 31, which adapted Han Yu's ``F_spatial-axis-comparison.ipynb``. Function
+and 31, which adapted the upstream ``F_spatial-axis-comparison.ipynb``. Function
 bodies are unchanged from that source; ``eph_08_waveform_axis.ipynb`` previously
 carried private inline copies of the two CCA functions and now imports them
 from here.

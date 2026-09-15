@@ -377,7 +377,7 @@ cannot simply be dropped even though it is the largest new dependency.
 ### Notes
 
 - **Code Ocean only** and the heaviest new dependency of the six items — `get_mle_model_fitting`
-  hits Han's pipeline. Confirm it still resolves before committing to the port.
+  hits the upstream pipeline. Confirm it still resolves before committing to the port.
 - Both source copies are single-session. Decide early whether to pool; if pooling, model fits
   must be fetched per session, which is the main cost driver here.
 - Scope risk is real. If the port stalls, land §3–§5 (which is all `cueresponse` needs) and
@@ -542,7 +542,7 @@ Both notebooks execute clean locally through their skip paths.
   sensitivity check — **worth running once**, since the two conventions could give
   different axes and only one can be the headline number.
 - **Okabe-Ito colors** (via `plotstyle`) instead of the source's palette. The source used
-  Han's red/orange/green/purple/peach to match his figures; swap `COLORS` back in §1 if you
+  the upstream red/orange/green/purple/peach to match his figures; swap `COLORS` back in §1 if you
   need a side-by-side with those.
 - **Axis labels** on the three-plane figure say `ML/AP/DV (mm)` rather than the source's
   `dim 0` / `dim 1`.
@@ -575,7 +575,7 @@ Build cost: `build_all_counts_df` loops every session × unit, so `eph_08` and `
 pay it. If that becomes annoying, cache it once to `SCRATCH` and read-if-present — but do it
 in `ephys_utils`, for all the `eph_*` notebooks at once, not ad hoc in these two.
 
-### Fixed 2026-09-15 (third pass): waveform CSV path pointed at Han's layout, not this capsule
+### Fixed 2026-09-15 (third pass): waveform CSV path pointed at the upstream layout, not this capsule
 
 Second Code Ocean failure, in the waveform block:
 `FileNotFoundError: /root/capsule/data/LC-NE_scratch_data_1/combined/waveforms_np/combined_features.csv`
@@ -584,11 +584,11 @@ Second Code Ocean failure, in the waveform block:
 `LC-NE_scratch_data_1`. The archived predecessor
 (`code/archive/spatial_axis_comparison_rt_encoding.ipynb` cell 23) hardcodes the real path:
 `/root/capsule/data/results-59472bbb-4c3a-40f9-a1f5-b0c5113e4ab9-waveforms_np/combined_features.csv`.
-The `_update` source rewrote it to `FIG_PREP_DIR/waveforms_np/` — Han's own capsule layout —
+The `_update` source rewrote it to `FIG_PREP_DIR/waveforms_np/` — the upstream capsule's own layout —
 and `eph_08` / `eph_09` inherited that. `combined_unit_tbl.pkl` is unaffected; it really does
 live under `FIG_PREP_DIR/combine_unit_tbl/`.
 
-**Fix:** both notebooks now call a `find_wf_features_csv(DATA)` resolver — tries Han's layout,
+**Fix:** both notebooks now call a `find_wf_features_csv(DATA)` resolver — tries the upstream layout,
 then the known asset id, then `*waveforms_np*/combined_features.csv`, then any
 `**/combined_features.csv`, and raises listing everything it tried. Globbing means a
 re-attached asset with a new id still resolves. Tested locally against five synthetic layouts.
@@ -680,7 +680,7 @@ already archived. `_update` is the source for this port.)
 - ~~Confirm the external assets are reachable on Code Ocean before starting this item~~ —
   **done 2026-09-15: the user confirmed both are still mounted**
   (`merfish_data/adata/adata_mer_subset_2_2k.h5ad` and
-  `LC_retro/manual_proofread_ccf_18brains.csv`, under `/root/capsule/data`, from Han's
+  `LC_retro/manual_proofread_ccf_18brains.csv`, under `/root/capsule/data`, from the upstream
   capsule), so the degraded fallback was not needed and all three structural axes are
   written. `scanpy` was indeed absent from the pip block and is now added — see the status
   section above.
