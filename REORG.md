@@ -18,7 +18,19 @@ current-state map only.
 
 ## KEEP — active analysis (flat)
 
-- `eph_00`–`eph_06`, `eph_08` · `kin_00`–`kin_05` · `fip_00_explore`
+- `eph_00`–`eph_08` · `kin_00`–`kin_05` · `fip_00_explore`
+  - `eph_07_bout_encoding`: within-trial (go-responsive) vs ITI LC-unit encoding of
+    tongue-movement bouts, ported from `tongue_kinematics_ephys_intertrialmovs.ipynb`.
+    Movement-bout-derived (`annotate_movement_bouts` + `classify_bout_times` /
+    `get_session_bout_times`, now in `ephys_utils.py`) is primary; lick-bout-derived
+    (`licks["bout_start"]`) is a lighter-weight robustness check (§9). Population PETH
+    (heatmap, mean±SEM overlay, waterfall, go-cue reference) reuses `eph_00`'s
+    `make_rp_and_events`/`compute_psth` raster path; per-unit go-responsive-vs-ITI Δhz
+    is registered through `encoding_methods`/`per_unit_stats_registry` so it composes
+    with `eph_01`–`eph_04`. Only the bout-helper verification (§4) has actually run,
+    locally against the pooled parquet — everything needing spike times is Code Ocean
+    only and unexecuted. `tongue_kinematics_ephys_intertrialmovs.ipynb` now has no
+    remaining port gate. See `TODO.md`.
   - `kin_02_latency`: §8–§10 carry the RT + IMI decomposition ported from
     `tongue_latency` (Δt de-shift, KS collapse test, noise propagation w/ bootstrap
     CI, cross-session grand mean); §11 carries that notebook's single-session
@@ -43,7 +55,8 @@ current-state map only.
     job (planned, see `TODO.md`).
   - `ephys_utils.py`: spike counting, session bundles, `all_counts_df` — **and** behavior-derived
     per-trial features (`build_trial_features`) that exist to serve ephys alignment. Bout
-    segmentation lands here for the same reason (planned, see `TODO.md`).
+    segmentation (`annotate_movement_bouts`, `classify_bout_times`, `get_session_bout_times`)
+    lands here for the same reason — landed 2026-09-15 with `eph_07`, see `TODO.md`.
 - The split between these modules and the library's `tongue_kinematics_utils` / `tongue_ephys`
   is currently ad hoc — both sides carry "kinematics utils" and "ephys utils", and the library
   also ships plot functions that ignore `plotstyle.py`. Defining that boundary is its own
@@ -58,14 +71,14 @@ before the remaining ports land.
 |---|---|---|
 | `kin_06_lick_geometry_choice.ipynb` | new | `tongue_kinematics_cueresponse` |
 | `kin_07_value_encoding.ipynb` | new | `tongue_kinematics`, `tongue_kinematics_cueresponse` |
-| `eph_07_bout_encoding.ipynb` | new | `tongue_kinematics_ephys_intertrialmovs` |
 | `eph_09_structural_axes.ipynb` | new | `spatial_axis_comparison_rt_encoding_update` |
 | `spatial_axes.py` | new module | — (`eph_08` refactors onto it) |
 
-`spatial_axes.py` is the only new module. The orphan `annotate_movement_bouts` and the
-within-trial/ITI classifier fold into the existing **`ephys_utils.py`**, matching the
-`build_trial_features` precedent there (behavior-derived features that serve ephys alignment);
-a module with one consumer isn't worth the file. Rationale in `TODO.md`'s `eph_07` item.
+`spatial_axes.py` is the only new module still planned. `eph_07_bout_encoding.ipynb` is done
+(see the KEEP list above) — its orphan `annotate_movement_bouts` and the within-trial/ITI
+classifier folded into the existing **`ephys_utils.py`**, matching the `build_trial_features`
+precedent there (behavior-derived features that serve ephys alignment); a module with one
+consumer isn't worth the file. Rationale in `TODO.md`'s `eph_07` item.
 
 ## KEEP — pipeline / data generation
 
@@ -98,7 +111,7 @@ of them.
 | File | Unreplicated content | Ports into |
 |---|---|---|
 | `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal~~ **all done, in `kin_02` §8–§11** | `kin_02` §8–§11 (done) — **no remaining gate; ready to archive** |
-| `tongue_kinematics_ephys_intertrialmovs.ipynb` | within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts` | `eph_07` (+ bout helpers into `ephys_utils.py`) |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | ~~within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts`~~ **done, in `eph_07`** | `eph_07` (done) — **no remaining gate; ready to archive** |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones | `eph_09` **+** `spatial_axes.py` |
 | `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; **kinematics vs behavioral-model latents** (Spearman/MI/RidgeCV/RF, prev-trial RPE) still open | `kin_05` (done) **+** `kin_07` |
 | `tongue_kinematics_cueresponse.ipynb` | jaw/spout landmark geometry + endpoints by event; **choice prediction from pre-lick kinematics** (ridge-logistic, AUC, binned P(right lick)); Q-value encoding | `kin_06` **+** `kin_07` |
@@ -151,7 +164,7 @@ per-notebook section outlines are in `TODO.md`):
 2. `kin_05_nonlick_movements` — mostly pooled; two partial Code Ocean-only sections
    (§3's licks-without-movement tally, §4's/§5's example figures). — **done**
 3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — reuses `eph_00`'s
-   raster/PETH helpers.
+   raster/PETH helpers. — **done**
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
    Confirm the MERFISH / retrograde assets are reachable on Code Ocean **first**.
 5. `kin_06_lick_geometry_choice`.

@@ -2,6 +2,50 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-15 (2)
+
+### Create `eph_07_bout_encoding.ipynb` — bout helpers consolidated into `ephys_utils.py`
+- **Bout helpers ported into `ephys_utils.py`.** `annotate_movement_bouts` (previously the sole
+  copy, living only in `tongue_kinematics_ephys_intertrialmovs.ipynb` cell 10) is relocated
+  unchanged. The within-trial/ITI classifier — copy-pasted across four near-identical
+  `get_session_bout_times` cells in the source, with drifting thresholds (`2.0/2.0/1.0` at cell
+  12 vs `1.0/2.0/0.5` at cell 29) — is consolidated into two functions: `classify_bout_times`
+  (the shared dt-to-nearest-go-cue logic, generalized to take arbitrary bout onset times) and
+  `get_session_bout_times` (wraps it with `annotate_movement_bouts` for the movement-bout
+  definition), both with the thresholds as explicit parameters rather than hardcoded. Verified
+  locally against `data/for_local/all_tongue_movements_04022026.parquet` (44 sessions, 246,359
+  movements → 31,081 bouts; median bout size 5, row-weighted mean 17.9; pinned thresholds
+  `GAP_THRESHOLD_S=0.5, GO_RESPONSE_WINDOW_S=2.0, ITI_MIN_POST_CUE_S=2.0,
+  ITI_MIN_PRE_NEXT_S=1.0` give 14,368 go-responsive and 9,297 ITI bouts pooled across sessions).
+- **`eph_07_bout_encoding.ipynb`** ports the movement-bout-derived within-trial vs ITI ephys
+  comparison from `tongue_kinematics_ephys_intertrialmovs.ipynb`, following `TODO.md`'s port
+  plan: movement-derived bouts as primary (doesn't inherit the lickometer's blind spot for
+  non-lick movements, per `kin_05`'s finding), lick-bout-derived (`licks["bout_start"]`) as a
+  lighter-weight robustness check in §9. Consolidated the four near-identical population-PETH
+  cells (source 14/15/19/22) into one pass, keeping the session-wide z-scoring normalization
+  (source cell 15). Per-unit go-responsive-vs-ITI Δ firing rate comparison (source cells 29–31)
+  registered through `encoding_methods.fit_encoding` + `per_unit_stats_registry` (binary `is_iti`
+  predictor, OLS) so it composes with `eph_01`–`eph_04` rather than standing alone as a one-off
+  Wilcoxon test. Dropped source cell 37 (video-clip extraction — a one-off, and the clip helpers
+  are library-owned).
+- Reused `eph_00`'s `make_rp_and_events`/`compute_psth`/`smooth_vector`/`plot_psth` raster/PSTH
+  path throughout (single-unit example in §5 and the population loop in §6), rather than the
+  source's hand-rolled `peth_for_unit` — the population loop still builds a `RasterPlotter` per
+  unit × condition, at a coarser 20 ms bin size to keep the loop over hundreds of units cheap
+  (matching the source's own reason for that bin-size choice, not a reason to avoid the shared
+  path).
+- **Only §4 (the bout-helper verification) executed this session** — everything from §5 onward
+  needs per-session spike times and intermediate data that exist only on Code Ocean. Written and
+  reasoned through, syntax-verified (the notebook was actually executed end-to-end locally; every
+  Code-Ocean-only cell took its `ENV == "local"` skip branch without error, which at minimum
+  confirms every such cell parses), but not run — none of it should be treated as a finding until
+  it runs there.
+- **Flag, not acted on:** `CHANGELOG.md` already had a `## 2026-09-15` section (now below,
+  unnumbered) placed *after* the `## 2026-09-14 (9)`…`(2)` block instead of above it — out of the
+  file's stated newest-first order. Left as found; worth a cleanup pass if noticed independently.
+- Not archived this session: `eph_07` is `tongue_kinematics_ephys_intertrialmovs.ipynb`'s sole
+  remaining port gate (see `TODO.md`/`REORG.md`), but archiving is a separate step after review.
+
 ## 2026-09-14 (9)
 
 ### `fip_02_ne_only_events`: add a z-threshold sensitivity sweep

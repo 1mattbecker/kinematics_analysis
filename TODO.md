@@ -23,7 +23,7 @@ series.
 | `kin_05_nonlick_movements` *(new)* — **done** | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
 | `kin_06_lick_geometry_choice` *(new)* | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
 | `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
-| `eph_07_bout_encoding` *(new)* | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
+| `eph_07_bout_encoding` *(new)* — **done** | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
 | `eph_09_structural_axes` *(new)* | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
 
 Plus one new flat module, `spatial_axes.py` (see the items below). The bout-segmentation
@@ -106,7 +106,7 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
 2. `kin_05_nonlick_movements` — mostly pooled, one CO-only section (turned out to be two
    partial CO-only splits, within §3 and §5 — see the item below). — **done**
 3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — clear spec, reuses
-   `eph_00`'s helpers.
+   `eph_00`'s helpers. — **done**
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
    **Confirm the MERFISH / retrograde assets are reachable on Code Ocean before starting.**
 5. `kin_06_lick_geometry_choice`.
@@ -117,7 +117,7 @@ Archive only when **all** gates for a notebook are met:
 | HOLD notebook | Archive after |
 |---|---|
 | `tongue_latency.ipynb` | `kin_02` §8–§11 (done) — **no remaining gate, ready to archive** |
-| `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` (done) — **no remaining gate, ready to archive** |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` |
 | `tongue_kinematics.ipynb` | `kin_05` (done) **+** `kin_07` |
 | `tongue_kinematics_cueresponse.ipynb` | `kin_06` **+** `kin_07` |
@@ -386,7 +386,22 @@ cannot simply be dropped even though it is the largest new dependency.
 
 ## Create `eph_07_bout_encoding.ipynb`
 
-_Logged 2026-09-11._
+_Logged 2026-09-11. Landed 2026-09-15 as `eph_07_bout_encoding.ipynb` — bout helpers
+(`annotate_movement_bouts`, `classify_bout_times`, `get_session_bout_times`) in
+`ephys_utils.py`, thresholds pinned and parameterized as specified below. Only the
+bout-helper verification (§4) executed, against
+`data/for_local/all_tongue_movements_04022026.parquet` (44 sessions, 246,359
+movements → 31,081 bouts; pinned thresholds give 14,368 go-responsive / 9,297 ITI
+bouts pooled). Everything from §5 on (single-unit raster, population PETH, per-unit
+encoding comparison, qualitative figures, lick-bout robustness check) is Code Ocean
+only — written and reasoned through, not executed. `eph_07` is now the sole remaining
+gate on archiving `tongue_kinematics_ephys_intertrialmovs.ipynb`; archiving itself
+was deliberately left for a separate step, after review of this port. See
+`CHANGELOG.md` for the full list of design decisions (why the per-unit go-responsive
+class was rebuilt on the primary movement-bout definition rather than porting source
+cell 29's hybrid definition verbatim; why the lick-derived robustness check
+reclassifies lick-bout starts the same way as movement-bout starts rather than
+reproducing cell 26's mixed definition)._
 
 ### Why
 
