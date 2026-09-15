@@ -514,6 +514,9 @@ Both notebooks execute clean locally through their skip paths.
    printed waveform axis and the figure's r / p / n against the previous run.
 2. **Everything in `eph_09` past §1.** No cell touching real data has run. Expect to debug
    column names on first contact, in particular:
+   - ~~`all_counts_df` must carry `baseline_spike_count`~~ — superseded: see the
+     `all_counts_df` fix below; it is now built locally with `baseline_window_s=(-1.0, 0.0)`,
+     so the column is guaranteed present.
    - `all_counts_df` must carry `baseline_spike_count` for the `T_rt_bl` axis.
    - The `(session_prefix, unit_str)` merge in §2 — confirm the join is not silently empty
      (§2 prints the surviving unit counts; if they are 0, the unit-key canonicalization is
@@ -543,6 +546,34 @@ Both notebooks execute clean locally through their skip paths.
   need a side-by-side with those.
 - **Axis labels** on the three-plane figure say `ML/AP/DV (mm)` rather than the source's
   `dim 0` / `dim 1`.
+
+### Fixed 2026-09-15 (second pass): `all_counts_df` was read from a path that does not exist
+
+First Code Ocean run of `eph_08` failed at its §2 with
+`FileNotFoundError: /root/capsule/scratch/all_counts_df.parquet`.
+
+**Root cause, and it predates this port.** `eph_08` and (by inheritance) `eph_09` were the
+only two notebooks that *read* `all_counts_df.parquet` from a path; `eph_01`–`eph_06` all
+**build** it via `ephys_utils.build_all_counts_df`. The read came from source notebook
+`spatial_axis_..._update`, where that very line is **commented out** (cell 7) next to a NOTE
+saying the pipeline functions had to be pasted in — i.e. it was a placeholder that was
+probably never executed as written. `/root/capsule/scratch` is also not persistent on Code
+Ocean, so even a file that once existed there is gone.
+
+**Fix:** both notebooks now follow the `eph_02` pattern —
+`load_units_with_spike_times` → `build_all_counts_df(units_with_spikes, cfg, base_dirs)` with
+the project-wide `AnalysisConfig(align_key="goCue", count_window_s=(0.0, 0.2),
+baseline_window_s=(-1.0, 0.0), min_trials_per_group=20)`, which is what `eph_01`–`eph_06` use
+and what `eph_08`'s own markdown documents.
+
+**Assumption to check on the next run:** that this cfg matches whatever produced the
+now-missing cached parquet. If `eph_08`'s poster figure comes out numerically different from
+the published version, **the count/baseline windows are the first thing to suspect** — not the
+`spatial_axes.py` refactor, which is separately verified bit-identical.
+
+Build cost: `build_all_counts_df` loops every session × unit, so `eph_08` and `eph_09` each
+pay it. If that becomes annoying, cache it once to `SCRATCH` and read-if-present — but do it
+in `ephys_utils`, for all the `eph_*` notebooks at once, not ad hoc in these two.
 
 ### Follow-ups this port surfaced (not blocking)
 
