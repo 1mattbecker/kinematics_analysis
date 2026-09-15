@@ -323,15 +323,26 @@ they are the *absolute* pixel coordinates of the point farthest from the jaw; th
 distances are `max_x_distance` / `max_y_distance`. Neither those nor `endpoint_x/y` are
 pooled-safe raw, since each session carries its own camera/jaw offset.
 
-**But the jaw is recoverable from the pooled parquet**, so the conclusion survives with a
-better mechanism than the one assumed. `estimate_jaw_position()` (§2.1 of the notebook)
-solves for each session's jaw from the absolute/distance column pairs —
-`jaw_x = median(max_x_from_jaw - max_x_distance)` (the tongue protrudes in +x, so the
-minus branch is correct: within-session SD ~4 px vs ~20 px for the plus branch), and
-`jaw_y` by a 1-D search over the two per-row candidates `max_y_from_jaw ± max_y_distance`.
-Worst-session residual 0.25 px over all 44 sessions. §5–§9 run in the resulting
-jaw-centered frame. The **spouts** stay Code Ocean-only, which is why §3–§4 do — the split
-is jaw-vs-spout, not jaw-relative-vs-absolute as assumed below.
+**The jaw is plausibly recoverable from the pooled parquet without Code Ocean** —
+`estimate_jaw_position()` (§2.1 of the notebook) solves for each session's jaw from the
+absolute/distance column pairs: `jaw_x = median(max_x_from_jaw - max_x_distance)` is exact
+up to tracking noise (the tongue protrudes in one fixed x-direction, so there's only one
+candidate per row); `jaw_y` has no fixed sign (excursions go to either spout), so each row
+gives *two* candidates, `max_y_from_jaw ± max_y_distance`, and a 1-D grid search finds the
+value minimizing the median distance to the nearer one.
+
+**Caveat: this has not been externally validated.** The 0.25 px worst-session residual
+quoted for the fit is an *internal* self-consistency check — how tightly each row's two
+candidates cluster around the fitted point — not a comparison to the true jaw keypoint. It
+cannot catch a systematic bias (e.g. `jaw_y` pulled toward whichever spout draws more
+excursions). The actual check — comparing the reconstruction to `kps_raw['jaw'].mean()` —
+is written into §3, but **has not run**: no `kps_raw_*.parquet` exists in
+`data/for_local/`, so this needs Code Ocean to confirm. Until then, treat `jaw_x` as
+reliable (it's an algebraic identity) and `jaw_y` as unverified.
+
+§5–§9 run in the resulting jaw-centered frame regardless. The **spouts** stay Code
+Ocean-only, which is why §3–§4 do — the split is jaw-vs-spout, not
+jaw-relative-vs-absolute as assumed below.
 
 **Statistics: the source's evaluation could not be ported as-is.** `cueresponse` cell 47
 calls `train_test_split(random_state=42)` on one session's trials; on pooled data that
