@@ -28,10 +28,17 @@ needed. New `estimate_jaw_position()` (§2.1) solves for each session's jaw keyp
 the absolute/distance column pairs: `jaw_x = median(max_x_from_jaw - max_x_distance)`
 (the tongue protrudes in +x, so the minus branch is correct — within-session SD ~4 px vs
 ~20 px for the plus branch), and `jaw_y` by a 1-D search over the two per-row candidates
-`max_y_from_jaw ± max_y_distance`. Worst-session residual 0.25 px across all 44 sessions.
+`max_y_from_jaw ± max_y_distance`. Worst-session residual 0.25 px across all 44 sessions —
+**but that residual is an internal self-consistency check, not external validation.** It
+measures how tightly each row's two candidates cluster around the fitted point; it cannot
+detect a systematic offset (e.g. `jaw_y` skewed toward whichever spout draws more excursions).
+The real check — comparing against the actual `kps_raw['jaw']` keypoint mean — is written into
+§3 but has **not executed**, since no `kps_raw_*.parquet` exists in `data/for_local/`. Treat
+the reconstructed `jaw_y` as unverified until that cell runs on Code Ocean.
 Everything from §5 on works in the resulting jaw-centered `*_rel` frame. This is what lets
-§5-§9 pool honestly while §3-§4 stay Code Ocean-only: the **spouts** still need per-session
-keypoint means (`kps_raw_*.parquet`), only the jaw is recoverable.
+§5-§9 pool at all while §3-§4 stay Code Ocean-only: the **spouts** still need per-session
+keypoint means (`kps_raw_*.parquet`); the jaw is the only landmark recoverable without them,
+and even that recovery is pending confirmation.
 
 - **§3-§4 (Code Ocean only, unexecuted)** — `plot_standard_lick_landmarks` (source cell 19,
   the only copy in the repo) brought in here and restyled onto `plotstyle`; **not**
@@ -224,9 +231,11 @@ equivalence — has been confirmed. See `TODO.md`.
 - **Upstream curation API has been rewritten — Dockerfile pin needed.** At
   `rachel-analysis-utils` main (`b7b7487`, "CSV-based data curation inputs"),
   `apply_curation_nwb_list` no longer exists; `data_curation_helpers.py` is now
-  `load_curation` + `apply_curation_df_fip`, reading CSVs from a new dependency
-  (`aind_bwnm_fiber_data_curation_utils`), overwriting `df_fip['event']` with target names, and
-  dropping `intended_measurement` entirely. `environment/Dockerfile:60` installs `@main`
+  `load_curation` + `apply_curation_df_fip`, reading CSVs via
+  `aind_bwnm_fiber_data_curation_utils` — imported at module top level but declared in no
+  packaging metadata (`dependencies = []` at main as well as at the pin), so pip installs
+  nothing for it and the import raises `ModuleNotFoundError` — while overwriting
+  `df_fip['event']` with target names and dropping `intended_measurement` entirely. `environment/Dockerfile:60` installs `@main`
   unpinned; the cached image still has the old API, so the next rebuild would break the curation
   cell and then `parse_event`/`build_meta`/`pick_example`. Recommended pin
   (`864550d55356ecb4906d05801cdae694bd000fde`) is written up in `code/fip_todo.md` — not applied
