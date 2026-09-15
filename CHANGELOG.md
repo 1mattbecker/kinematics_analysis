@@ -268,6 +268,25 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   execution-plan checklist). `tongue_latency.ipynb` archiving still waits on
   `kin_05_nonlick_movements`.
 
+## 2026-09-15
+
+### Reorg planning refinements
+- Dropped the planned `bout_utils.py`. `annotate_movement_bouts` and the within-trial/ITI
+  classifier now fold into the existing `ephys_utils.py` — which already holds behavior-derived
+  features that serve ephys alignment (`build_trial_features` takes movs/licks/trials and touches
+  no spikes), so bout segmentation is the same category. `eph_07` already imports from
+  `ephys_utils`, and a module with one consumer isn't worth the file. `spatial_axes.py` remains
+  the only new module planned. Rationale recorded in `TODO.md`'s `eph_07` item.
+- Added a `TODO.md` item: **define the boundary between the library and this repo's `code/`
+  modules.** Both sides carry "kinematics utils" and "ephys utils" with no stated rule, which
+  causes: duplicate definitions inside the library (`tongue_lickometer_utils` and
+  `tongue_kinematics_utils` share six identically-named functions); no home rule for plotting
+  (the library ships ~10 plot functions that predate and ignore `plotstyle.py`, so every port
+  restyles by hand); undocumented layering between `tongue_ephys.py` and `ephys_utils.py`; and
+  an undeclared cross-boundary contract on `tongue_quality_stats.json`. Item proposes criteria
+  to agree and record in `CLAUDE.md`, and should be batched with the outbound-metrics
+  consolidation since both need a library PR + pin bump.
+
 ## 2026-09-11
 
 ### Repo reorganization — Phase 2 planning (HOLD notebook port plan)

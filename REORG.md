@@ -41,6 +41,13 @@ current-state map only.
   - `spatial_encoding.py`: `SpatialEncoder` — CCF maps, subgroup maps, spatial-dependence
     permutation tests. Contains **no axis-fitting machinery**; that is `spatial_axes.py`'s
     job (planned, see `TODO.md`).
+  - `ephys_utils.py`: spike counting, session bundles, `all_counts_df` — **and** behavior-derived
+    per-trial features (`build_trial_features`) that exist to serve ephys alignment. Bout
+    segmentation lands here for the same reason (planned, see `TODO.md`).
+- The split between these modules and the library's `tongue_kinematics_utils` / `tongue_ephys`
+  is currently ad hoc — both sides carry "kinematics utils" and "ephys utils", and the library
+  also ships plot functions that ignore `plotstyle.py`. Defining that boundary is its own
+  `TODO.md` item; read it before adding a module or promoting anything to the library.
 
 ### Planned additions (from the HOLD ports — see `TODO.md`)
 
@@ -53,8 +60,12 @@ before the remaining ports land.
 | `kin_07_value_encoding.ipynb` | new | `tongue_kinematics`, `tongue_kinematics_cueresponse` |
 | `eph_07_bout_encoding.ipynb` | new | `tongue_kinematics_ephys_intertrialmovs` |
 | `eph_09_structural_axes.ipynb` | new | `spatial_axis_comparison_rt_encoding_update` |
-| `bout_utils.py` | new module | — (home for orphan `annotate_movement_bouts`) |
 | `spatial_axes.py` | new module | — (`eph_08` refactors onto it) |
+
+`spatial_axes.py` is the only new module. The orphan `annotate_movement_bouts` and the
+within-trial/ITI classifier fold into the existing **`ephys_utils.py`**, matching the
+`build_trial_features` precedent there (behavior-derived features that serve ephys alignment);
+a module with one consumer isn't worth the file. Rationale in `TODO.md`'s `eph_07` item.
 
 ## KEEP — pipeline / data generation
 
@@ -87,7 +98,7 @@ of them.
 | File | Unreplicated content | Ports into |
 |---|---|---|
 | `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal~~ **all done, in `kin_02` §8–§11** | `kin_02` §8–§11 (done) — **no remaining gate; ready to archive** |
-| `tongue_kinematics_ephys_intertrialmovs.ipynb` | within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts` | `eph_07` **+** `bout_utils.py` |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts` | `eph_07` (+ bout helpers into `ephys_utils.py`) |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones | `eph_09` **+** `spatial_axes.py` |
 | `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; **kinematics vs behavioral-model latents** (Spearman/MI/RidgeCV/RF, prev-trial RPE) still open | `kin_05` (done) **+** `kin_07` |
 | `tongue_kinematics_cueresponse.ipynb` | jaw/spout landmark geometry + endpoints by event; **choice prediction from pre-lick kinematics** (ridge-logistic, AUC, binned P(right lick)); Q-value encoding | `kin_06` **+** `kin_07` |
@@ -105,7 +116,8 @@ FP/FN parameter sweep) duplicate `tongue_lickometer.ipynb`, which is KEEP.
 
 Also tracked in `TODO.md`: consolidate the duplicated `compute_outbound_metrics`
 (`add_outbound` + `tongue_movements_all`) into the library. `annotate_movement_bouts` is the
-same orphan-code pattern and is a candidate for the same treatment once `bout_utils.py` settles.
+same orphan-code pattern — it lands in `ephys_utils.py` with `eph_07`, and becomes a library
+candidate once `eph_07` has exercised it and the library/repo boundary criteria exist.
 
 ## ARCHIVE — ready to move to `code/archive/`
 
@@ -138,7 +150,8 @@ per-notebook section outlines are in `TODO.md`):
 1. `kin_02` §8–§10 — pooled parquet only, no new dependencies, fully local-testable. — **done**
 2. `kin_05_nonlick_movements` — mostly pooled; two partial Code Ocean-only sections
    (§3's licks-without-movement tally, §4's/§5's example figures). — **done**
-3. `eph_07_bout_encoding` + `bout_utils.py` — reuses `eph_00`'s raster/PETH helpers.
+3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — reuses `eph_00`'s
+   raster/PETH helpers.
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
    Confirm the MERFISH / retrograde assets are reachable on Code Ocean **first**.
 5. `kin_06_lick_geometry_choice`.

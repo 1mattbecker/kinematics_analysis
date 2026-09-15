@@ -26,7 +26,9 @@ series.
 | `eph_07_bout_encoding` *(new)* | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
 | `eph_09_structural_axes` *(new)* | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
 
-Plus two new flat modules, `bout_utils.py` and `spatial_axes.py` (see the items below).
+Plus one new flat module, `spatial_axes.py` (see the items below). The bout-segmentation
+helpers fold into the existing `ephys_utils.py` rather than getting a module of their own —
+see the `eph_07` item for why.
 
 ### Two findings that change the previous plan
 
@@ -77,7 +79,7 @@ there is exactly one copy, and it is inside a notebook slated for archiving.
 - `annotate_movement_bouts` — defined only at `intertrialmovs` cell 10; called 6× in that
   same notebook and referenced nowhere else in the repo. Verified **absent from the library
   on all three branches** (`main`, `LC_manuscript`, `video_alignment`), searching both the
-  function name and the `mov_bout_*` columns it emits. → `bout_utils.py`.
+  function name and the `mov_bout_*` columns it emits. → `ephys_utils.py`.
 - `plot_standard_lick_landmarks` — defined only at `cueresponse` cell 19. → `kin_06`, or
   `plotstyle.py` if a second consumer appears.
 
@@ -103,7 +105,8 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
 1. `kin_02` extension — pure pooled parquet, no new dependencies, fully local-testable. — **done**
 2. `kin_05_nonlick_movements` — mostly pooled, one CO-only section (turned out to be two
    partial CO-only splits, within §3 and §5 — see the item below). — **done**
-3. `eph_07_bout_encoding` + `bout_utils.py` — clear spec, reuses `eph_00`'s helpers.
+3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — clear spec, reuses
+   `eph_00`'s helpers.
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
    **Confirm the MERFISH / retrograde assets are reachable on Code Ocean before starting.**
 5. `kin_06_lick_geometry_choice`.
@@ -381,7 +384,7 @@ cannot simply be dropped even though it is the largest new dependency.
 
 ---
 
-## Create `eph_07_bout_encoding.ipynb` and `bout_utils.py`
+## Create `eph_07_bout_encoding.ipynb`
 
 _Logged 2026-09-11._
 
@@ -414,13 +417,24 @@ movements (which is exactly what `kin_05` establishes).
 
 ### What to do
 
-- **`bout_utils.py`** (new flat module): `annotate_movement_bouts` (from `intertrialmovs`
-  cell 10, the only copy in the repo — see the orphan-code note in the overview) plus the
-  within-trial / ITI classifier that is currently copy-pasted into four `get_session_bout_times`
-  variants. Parameterize the thresholds rather than hardcoding: `GAP_THRESHOLD_S=0.5`,
-  `GO_RESPONSE_WINDOW_S`, `ITI_MIN_POST_CUE_S`, `ITI_MIN_PRE_NEXT_S` — the source uses
-  **different values** in different cells (2.0/2.0/1.0 at cell 12 vs 1.0/2.0/0.5 at cell 29),
-  so pin one set in the notebook and state it.
+- **Bout helpers → `ephys_utils.py`** (do this first): `annotate_movement_bouts` (from
+  `intertrialmovs` cell 10, the only copy in the repo — see the orphan-code note in the
+  overview) plus the within-trial / ITI classifier currently copy-pasted into four
+  `get_session_bout_times` variants. Parameterize the thresholds rather than hardcoding:
+  `GAP_THRESHOLD_S=0.5`, `GO_RESPONSE_WINDOW_S`, `ITI_MIN_POST_CUE_S`, `ITI_MIN_PRE_NEXT_S` —
+  the source uses **different values** in different cells (2.0/2.0/1.0 at cell 12 vs
+  1.0/2.0/0.5 at cell 29), so pin one set in the notebook and state it.
+
+  *Why `ephys_utils.py` and not a new `bout_utils.py`:* an earlier draft of this file
+  proposed a separate module on the grounds that bout segmentation is behavioral (it touches
+  `start_time` and go cues, never spikes) and so doesn't belong in an ephys module. That
+  contradicts what `ephys_utils.py` already does — `build_trial_features(movs, licks,
+  df_trials)` is also pure behavior, deriving per-trial RTs and `first_move_*` /
+  `cue_response_*` columns with no spikes involved. The established convention here is that
+  **behavior-derived features existing to serve ephys alignment live in `ephys_utils.py`**,
+  and bout segmentation is the same category. `eph_07` already imports from `ephys_utils`,
+  so this adds no new import surface. A module with one consumer is overhead: the smallest
+  existing module, `ccf_utils.py` at 58 lines, earns its place with two consumers.
 - **`eph_07`**: bout segmentation → within-trial vs ITI event times → reuse `eph_00`'s
   `make_rp_and_events` / `compute_psth` / `smooth_vector` / `plot_psth` helpers for the
   single-unit raster + PETH pair (cell 12), then the population heatmap, mean±SEM overlay
@@ -443,8 +457,15 @@ movements (which is exactly what `kin_05` establishes).
 - Bout event times can come from the pooled `all_tongue_movements` parquet — it carries
   `start_time`, `trial`, `session` and `goCue_start_time_in_session`. Align to spikes via the
   cached `filtered_ephys.pkl`.
-- Consider promoting `annotate_movement_bouts` to the library once it settles, alongside the
-  outbound-metrics consolidation below. Both are the same orphan-code pattern.
+- `annotate_movement_bouts` is a long-term **library** candidate — it is general movement
+  segmentation, sibling to `annotate_movement_timing` and `add_lick_metadata_to_movements`
+  which already live in `tongue_kinematics_utils.py`. Premature now: the definition is not
+  settled (two bout definitions, thresholds varying across cells). Let `eph_07` exercise it
+  first. Same staging as the outbound-metrics item; the placement criteria are the subject of
+  the module-boundary item below.
+- If a `kin_*` notebook later wants bouts, note that importing them from `ephys_utils` drags
+  in `tongue_ephys` at module level to do pure behavior. That works, but it is the signal to
+  revisit placement — fold it into the module-boundary item rather than splitting reflexively.
 
 ---
 
@@ -512,6 +533,89 @@ already archived. `_update` is the source for this port.)
 
 ---
 
+## Define the boundary between the library and this repo's `code/` modules
+
+_Logged 2026-09-15. Do this before the next round of "should this go in the library?" decisions —
+it is currently answered ad hoc, and at least three open items depend on the answer._
+
+### Why
+
+Both `aind-dynamic-foraging-behavior-video-analysis` and this repo's `code/` carry "kinematics
+utils" and "ephys utils", with no stated rule for what belongs where. The result is duplication,
+inconsistent figure styling, and a recurring per-function argument.
+
+Current state, for reference:
+
+**Library** (`aind_dynamic_foraging_behavior_video_analysis`)
+- `kinematics/tongue_kinematics_utils.py` (1437 lines) — segmentation, aggregation, annotation,
+  lick detection, keypoint masking/filtering, video/CSV discovery, **and 5 plot functions**
+- `kinematics/tongue_analysis.py` (563) — batch runner, QC stats, intermediate generation
+- `kinematics/tongue_lickometer_utils.py` (275), `video_clip_utils.py` (218),
+  `kinematics_nwb_utils.py` (88)
+- `ephys/tongue_ephys.py` (516) — session dir/intermediate loading, event construction,
+  raster/PSTH primitives, `RasterPlotter`, **and 5 plot functions**
+
+**This repo** (`code/`, flat — notebooks import by bare name)
+- `data_loading.py` (187), `ephys_utils.py` (323), `encoding_methods.py` (558),
+  `encoding_plots.py` (895), `per_unit_stats_registry.py` (442), `spatial_encoding.py` (629),
+  `plotstyle.py` (190), `ccf_utils.py` (58), + planned `spatial_axes.py`
+
+### Concrete problems this causes
+
+1. **Duplication inside the library.** `tongue_lickometer_utils.py` and
+   `tongue_kinematics_utils.py` define the same six functions by the same names:
+   `filter_timestamps_refractory`, `calculate_metrics`, `calculate_metrics_witheventkeys`,
+   `detect_licks`, `mask_keypoint_data`, `load_keypoints_from_csv`. Which one a notebook gets
+   depends on which module it imported.
+2. **Plotting has no home rule.** The library owns ~10 plot functions (movement tiles, processing
+   steps, keypoint confidence, raster/PSTH, unit panels); this repo owns `plotstyle.py` +
+   `encoding_plots.py`. The library's plotters predate and ignore `plotstyle.py`, which is why
+   every port has to restyle figures by hand.
+3. **"Ephys utils" in both.** `tongue_ephys.py` (primitives) vs `ephys_utils.py` (analysis config,
+   spike counting, session bundles, `all_counts_df`). The layering is actually reasonable —
+   repo-on-top-of-library — but nothing states it, so new code lands in whichever was opened last.
+4. **Silent cross-boundary coupling.** `data_loading.load_session_quality_filter` reads
+   `tongue_quality_stats.json`, which the library's `analyze_tongue_movement_quality` writes.
+   Neither side declares the contract; a library-side field rename breaks this repo quietly.
+
+### Proposed criteria (starting point — decide, then write it into CLAUDE.md)
+
+One test: **would another AIND project doing tongue kinematics want this?**
+
+- **Library** — produces or annotates the per-session intermediates; runs in the batch pipeline;
+  generic to tongue-kinematics work; must stay stable because other capsules depend on it.
+  *Segmentation, aggregation, annotation, QC stats, lick detection, video/NWB I/O.*
+- **This repo** — analysis built *on top of* those intermediates, specific to the LC-NE RT-encoding
+  question; fast-moving; free to churn. *Encoding models, per-unit registries, spatial topography
+  and axes, manuscript figure style.*
+
+Sorting the open cases under that test: `compute_outbound_metrics` → library (already the plan);
+`annotate_movement_bouts` → library, once settled; `encoding_methods`, `per_unit_stats_registry`,
+`spatial_encoding`, `spatial_axes`, `encoding_plots`, `plotstyle` → repo.
+`ephys_utils.build_trial_features` is the genuinely ambiguous one — it derives generic per-trial
+kinematic features, but its column set (`kcols`) is chosen for this project's encoding models.
+
+### What to do
+
+- Agree the criteria, then record them in `CLAUDE.md` so the rule is enforced at the point new
+  code gets written, not rediscovered per function.
+- Resolve the library-internal duplication in (1) — one definition, one import path.
+- Decide the plotting rule in (2): either the library's plotters adopt `plotstyle.py`, or the
+  library stops shipping plot functions and this repo owns presentation entirely.
+- State the layering in (3) explicitly in both modules' docstrings.
+- Give (4) a declared contract — a documented schema for `tongue_quality_stats.json`, or a
+  library-side accessor this repo calls instead of reading the JSON directly.
+
+### Notes
+
+- Library changes need their own branch/PR + a pin bump here, so batch them: do this alongside
+  the outbound-metrics consolidation below rather than as a separate round trip.
+- Blocks nothing immediately, but every deferred "promote to the library?" note in this file
+  (`compute_outbound_metrics`, `annotate_movement_bouts`, the `kin_06` landmark helper) resolves
+  faster once the criteria exist.
+
+---
+
 ## Fold outbound metrics into the library's movement aggregation step
 
 _Logged 2026-09-11._
@@ -550,7 +654,9 @@ Every downstream consumer already depends on these columns: `ephys_utils.py` (`k
 
 ### Notes
 
-- Do this in the library repo (its own branch/PR), then bump the pin here.
+- Do this in the library repo (its own branch/PR), then bump the pin here. Batch it with the
+  library-vs-repo module-boundary item above — both touch the library and both need a pin bump,
+  so one round trip is cheaper than two.
 - Unblocks archiving `add_outbound.ipynb` and simplifies `tongue_movements_all.ipynb`
   (see REORG.md).
 
