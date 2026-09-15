@@ -575,6 +575,37 @@ Build cost: `build_all_counts_df` loops every session × unit, so `eph_08` and `
 pay it. If that becomes annoying, cache it once to `SCRATCH` and read-if-present — but do it
 in `ephys_utils`, for all the `eph_*` notebooks at once, not ad hoc in these two.
 
+### Fixed 2026-09-15 (third pass): waveform CSV path pointed at Han's layout, not this capsule
+
+Second Code Ocean failure, in the waveform block:
+`FileNotFoundError: /root/capsule/data/LC-NE_scratch_data_1/combined/waveforms_np/combined_features.csv`
+
+**Root cause.** The CSV is a **separately attached Code Ocean data asset**, not part of
+`LC-NE_scratch_data_1`. The archived predecessor
+(`code/archive/spatial_axis_comparison_rt_encoding.ipynb` cell 23) hardcodes the real path:
+`/root/capsule/data/results-59472bbb-4c3a-40f9-a1f5-b0c5113e4ab9-waveforms_np/combined_features.csv`.
+The `_update` source rewrote it to `FIG_PREP_DIR/waveforms_np/` — Han's own capsule layout —
+and `eph_08` / `eph_09` inherited that. `combined_unit_tbl.pkl` is unaffected; it really does
+live under `FIG_PREP_DIR/combine_unit_tbl/`.
+
+**Fix:** both notebooks now call a `find_wf_features_csv(DATA)` resolver — tries Han's layout,
+then the known asset id, then `*waveforms_np*/combined_features.csv`, then any
+`**/combined_features.csv`, and raises listing everything it tried. Globbing means a
+re-attached asset with a new id still resolves. Tested locally against five synthetic layouts.
+
+**Note this was masked in `_update` and would have been masked in `eph_09`.** The source's
+waveform block is wrapped in `try/except`, so it printed "Could not load waveform data" and set
+`HAS_WAVEFORM = False` — meaning **the `_update` notebook very likely never fitted the waveform
+axis either**, and its comparison table would have silently omitted it. `eph_09` has the same
+guard by design, so watch the `HAS_*` flags and the "OMITTED (asset unavailable)" line in §6
+rather than assuming all five axes are present. `eph_08` has no such guard, which is why it
+raised and surfaced the problem at all.
+
+**Still unconfirmed:** whether the asset id above is current in this capsule. A diagnostic that
+lists the data mounts, globs for the CSV, and checks whether `combined_unit_tbl.pkl` already
+carries the seven `wf_feature_cols` (in which case the CSV is unnecessary) was handed to the
+user; the answer has not come back yet.
+
 ### Follow-ups this port surfaced (not blocking)
 
 - **`eph_08` still duplicates two things it need not.** Its §2 reimplements the session-QC
