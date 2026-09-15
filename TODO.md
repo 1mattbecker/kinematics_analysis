@@ -21,7 +21,7 @@ series.
 |---|---|---|
 | `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26; also 5, 8, 9, 14 (§11, single-session illustration — reassigned from `kin_05` below on 2026-09-14) |
 | `kin_05_nonlick_movements` *(new)* — **done** | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
-| `kin_06_lick_geometry_choice` *(new)* | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
+| `kin_06_lick_geometry_choice` *(new)* — **done** | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
 | `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
 | `eph_07_bout_encoding` *(new)* — **done** | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
 | `eph_09_structural_axes` *(new)* — **written, unrun** | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
@@ -80,8 +80,10 @@ there is exactly one copy, and it is inside a notebook slated for archiving.
   same notebook and referenced nowhere else in the repo. Verified **absent from the library
   on all three branches** (`main`, `LC_manuscript`, `video_alignment`), searching both the
   function name and the `mov_bout_*` columns it emits. → `ephys_utils.py`.
-- `plot_standard_lick_landmarks` — defined only at `cueresponse` cell 19. → `kin_06`, or
-  `plotstyle.py` if a second consumer appears.
+- ~~`plot_standard_lick_landmarks` — defined only at `cueresponse` cell 19.~~ **done
+  2026-09-15** — landed in `kin_06` §3, restyled onto `plotstyle`'s palette. Left in the
+  notebook, not promoted to `plotstyle.py`: still exactly one consumer, and `plotstyle.py`
+  holds style, not domain plotting.
 
 ### Data-availability constraints (drives what is local-testable vs Code Ocean-only)
 
@@ -91,10 +93,19 @@ there is exactly one copy, and it is inside a notebook slated for archiving.
   `movement_before_cue_response`, `cue_response`, `cue_response_movement_number`,
   `movement_number_in_trial`, `movement_latency_from_go`, `start_time`, `end_time`, `trial`,
   `session`, `goCue_start_time_in_session`, `endpoint_x/y`, `excursion_angle_deg`,
-  `max_x_from_jaw`, `max_y_from_jaw`, `max_x_from_jaw_y`, `out_*`.
+  `max_x_from_jaw`, `max_y_from_jaw`, `max_x_from_jaw_y`, `out_*`. **Caveat, found during the
+  `kin_06` port:** `endpoint_x/y` and the `max_*_from_jaw` columns are *absolute pixel
+  positions*, not jaw-relative — the jaw-relative distances are `max_x_distance` /
+  `max_y_distance`. Being in the parquet does not make them pooled-safe: each session carries
+  its own camera/jaw offset (per-session mean `endpoint_y` spans ~80 px across the 44
+  sessions, against a ~51 px within-session SD). `kin_06` §2.1 recovers each session's jaw
+  position from the absolute/distance column pairs and works in a jaw-centered frame — reuse
+  `estimate_jaw_position()` from there rather than pooling these columns raw.
 - **Absent:** `nearest_movement_id` (licks-without-movements needs per-session
-  `nwb_df_licks.parquet`), spout/jaw **absolute** landmark positions (per-session keypoint
-  means — note the `max_*_from_jaw` columns are jaw-*relative* and therefore pooled-safe),
+  `nwb_df_licks.parquet`), **spout** landmark positions (per-session keypoint means — an
+  earlier revision of this line called the `max_*_from_jaw` columns jaw-relative and therefore
+  pooled-safe; they are not, see the caveat above. The *jaw* is recoverable from the pooled
+  parquet, the spouts are not),
   and any behavioral-model latent (`q_*`, `chosen_prob`, `rpe`).
 
 Consequence: `kin_02` ext is fully local-testable; `kin_05` and `kin_06` are mostly pooled with
@@ -111,7 +122,9 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
    **written 2026-09-15, not yet run on Code Ocean.** Assets confirmed mounted; `scanpy`
    added to the Dockerfile (image rebuild required). See the item below for what is
    still unverified.
-5. `kin_06_lick_geometry_choice`.
+5. `kin_06_lick_geometry_choice` — mostly pooled; two Code Ocean-only sections (§3–§4,
+   which need per-session **spout** keypoints — the jaw turned out to be recoverable from
+   the pooled parquet, see the item below). — **done**
 6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
 
 Archive only when **all** gates for a notebook are met:
@@ -122,7 +135,7 @@ Archive only when **all** gates for a notebook are met:
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` (done) — **no remaining gate, ready to archive** |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` — written, **gate open until it runs on Code Ocean** |
 | `tongue_kinematics.ipynb` | `kin_05` (done) **+** `kin_07` |
-| `tongue_kinematics_cueresponse.ipynb` | `kin_06` **+** `kin_07` |
+| `tongue_kinematics_cueresponse.ipynb` | ~~`kin_06`~~ (done) **+** `kin_07` — **only the `kin_07` gate remains** |
 
 ---
 
@@ -297,7 +310,47 @@ One linear arc, roughly:
 
 ## Create `kin_06_lick_geometry_choice.ipynb`
 
-_Logged 2026-09-11._
+_Logged 2026-09-11. Done 2026-09-15 — landed as `kin_06_lick_geometry_choice.ipynb` §3–§9
+(35 cells), executed end-to-end locally against
+`data/for_local/all_tongue_movements_04022026.parquet` (246,359 movements, 44 sessions).
+§3–§4 are Code Ocean-only, written but unexecuted. `tongue_kinematics_cueresponse.ipynb`
+now gates on `kin_07` alone; **not** archived this session._
+
+**Correction from the port: `max_*_from_jaw` is not jaw-relative.** The "What to do"
+list below (and the overview's data-availability note, now fixed) treats §5 as
+pooled-safe because `max_x_from_jaw` / `max_y_from_jaw` are jaw-relative. They are not —
+they are the *absolute* pixel coordinates of the point farthest from the jaw; the
+distances are `max_x_distance` / `max_y_distance`. Neither those nor `endpoint_x/y` are
+pooled-safe raw, since each session carries its own camera/jaw offset.
+
+**But the jaw is recoverable from the pooled parquet**, so the conclusion survives with a
+better mechanism than the one assumed. `estimate_jaw_position()` (§2.1 of the notebook)
+solves for each session's jaw from the absolute/distance column pairs —
+`jaw_x = median(max_x_from_jaw - max_x_distance)` (the tongue protrudes in +x, so the
+minus branch is correct: within-session SD ~4 px vs ~20 px for the plus branch), and
+`jaw_y` by a 1-D search over the two per-row candidates `max_y_from_jaw ± max_y_distance`.
+Worst-session residual 0.25 px over all 44 sessions. §5–§9 run in the resulting
+jaw-centered frame. The **spouts** stay Code Ocean-only, which is why §3–§4 do — the split
+is jaw-vs-spout, not jaw-relative-vs-absolute as assumed below.
+
+**Statistics: the source's evaluation could not be ported as-is.** `cueresponse` cell 47
+calls `train_test_split(random_state=42)` on one session's trials; on pooled data that
+leaks session identity across the split. §8 reports two evaluations instead —
+`GroupKFold` with session as the group (held-out-session AUC **0.835 ± 0.100**) and
+per-session fits (median AUC **0.943** over 39 qualifying sessions) — plus a
+within-session shuffled-label null (mean 0.530, observed p = 0.005 at 200 permutations).
+Class balance is 57.9% left / 42.1% right. Permutation importance puts `last_angle`
+(ΔAUC 0.168), `mean_distance` (0.098) and `mean_angle` (0.070) on top, with both
+peak-velocity terms and `session_time` at ~0.
+
+**Block-structure caveat quantified, not just recorded** (§8.4–§8.5). P(stay) = 0.910 and
+**previous choice alone reaches AUC 0.907** — better than kinematics. Kinematics still
+reads AUC 0.815 / 0.772 *within* each previous-choice stratum, so it is not simply
+re-encoding choice history, but the two are not separated here. Separating them needs
+block-aware regressors → `kin_07`.
+
+**`plot_standard_lick_landmarks` landed in `kin_06`, not `plotstyle.py`** — restyled onto
+the project palette, still one consumer, so not pre-promoted per the note below.
 
 ### Why
 
@@ -317,8 +370,10 @@ undersells it — the geometry is the setup, the choice prediction is the result
 - **§4 — Endpoints by event type** (`cueresponse` cell 93): cue-response movement endpoints
   coloured by left/right lick event, over the landmarks.
 - **§5 — Lick vs non-lick excursion geometry** (`tongue_kinematics` cell 60 == `cueresponse`
-  cell 95 — port once): max excursion from jaw, with and without licks. Jaw-relative, so
-  **poolable across sessions** even though §3–§4 are not.
+  cell 95 — port once): max excursion from jaw, with and without licks. ~~Jaw-relative, so~~
+  **poolable across sessions** even though §3–§4 are not — but *not* because the columns are
+  jaw-relative (they aren't; see the Done note above). Poolable because the notebook
+  reconstructs the per-session jaw origin first.
 - **§6 — Non-lick endpoints by movement ordinal** (`cueresponse` cells 54, 56).
 - **§7 — Does pre-lick direction predict choice?** (`cueresponse` cells 49, 55): violins of
   last-pre-lick `excursion_angle_deg` by subsequent lick direction; binned P(right lick) vs

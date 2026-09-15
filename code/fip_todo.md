@@ -28,8 +28,11 @@ Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
   drop_borderline=False)` with the signature we call; all five private helpers in `nwb_utils`
   (so `fu.patch_curation_helpers` resolves); `DA_NE_4channel_datacuration_firstpass.json`; and
   `analysis_utils.py` at 177 lines, 3.9-compile-clean, with `enrich_df_trials`. The adjacent
-  Dockerfile comment claiming the package "has no deps" is also only true at this pin — main
-  adds `aind_bwnm_fiber_data_curation_utils`.
+  Dockerfile comment ("no deps", hence the isolated `--ignore-requires-python` layer) stays
+  accurate: `dependencies = []` at the pin *and* at main. Note the failure mode at main is not a
+  resolution conflict but an undeclared import — `data_curation_helpers.py` does
+  `from aind_bwnm_fiber_data_curation_utils import data` at module top level while declaring it
+  nowhere, so pip installs nothing for it and the import raises `ModuleNotFoundError`.
 
 - **Migrate curation to the CSV API and unpin.** A real migration, not a swap: the new
   `apply_curation_df_fip` overwrites `df_fip['event']` with target names, needs a `patch_cord`
