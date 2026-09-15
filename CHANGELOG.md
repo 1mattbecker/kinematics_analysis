@@ -2,6 +2,75 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-15 (4)
+
+### New `code/spatial_axes.py` + `eph_09_structural_axes.ipynb`; `eph_08` refactored onto the module
+
+Phase 2 of the repo reorg: the fourth of the six HOLD-notebook ports. Source is
+`spatial_axis_comparison_rt_encoding_update.ipynb` cells 13-38, which is now fully
+replicated and (pending a Code Ocean run) becomes archivable.
+
+- **New `code/spatial_axes.py` (~700 lines).** Fitting and comparing 3-D spatial *axes* —
+  the direction along which a feature varies fastest. `fit_spatial_axis_linear` / `_cca` /
+  `_LDA` (scalar / multivariate / categorical features) with bootstrap wrappers,
+  `compare_bootstrap_directions` (tangent-plane Wald test), `cone_half_angle`,
+  `vectors_to_az_el`, `plot_projected_arrow_with_cone`, `get_regression_CI` and
+  `plot_projection_scatter`. Ported from source cells 14, 15, 31 with function bodies
+  unchanged. Kept separate from `spatial_encoding.py` deliberately: that module asks
+  *where* a statistic is large (CCF maps, permutation tests) and has no axis-fitting
+  machinery; this one asks *in which direction* it changes.
+- **`eph_08_waveform_axis.ipynb` refactored onto it** — its two private inline copies of
+  `fit_spatial_axis_cca` / `bootstrap_spatial_axis_cca` (51 lines) deleted in favor of
+  `from spatial_axes import bootstrap_spatial_axis_cca`. Structured as a pure move: no
+  other change, because its projection figure is the poster figure
+  `rt_response_projection_abs`. **Not verified against real data** — `eph_08` is Code
+  Ocean only and skips locally. What *was* verified: the module and the deleted inline
+  copies produce bit-identical axes, bootstrap clouds, cone half-angles and downstream
+  projections on synthetic waveform-shaped input (same seed, same RNG draw sequence).
+- **New `code/eph_09_structural_axes.ipynb` (34 cells).** Asks whether the RT-encoding
+  spatial gradient is the *same* gradient as LC's structural ones.
+  - Fits the RT-encoding axis (`T_rt`) and its baseline control (`T_rt_bl`) —
+    **the step `eph_08` skipped**; `eph_08` projects onto the waveform axis but never
+    fits the RT axis, so there was previously nothing to compare against.
+  - Three structural axes, each behind its own `HAS_WAVEFORM` / `HAS_MERFISH` /
+    `HAS_RETRO` guard so a missing asset drops that axis from every downstream
+    comparison rather than failing or being substituted.
+  - Pairwise direction comparison (angle, Wald W, chi2 p, bootstrap p) + summary table,
+    three-plane arrow-and-cone figure, azimuth-elevation bootstrap scatter, and
+    projection scatters of `T_rt` / `T_rt_bl` onto each structural axis.
+  - Carries over the source's interpretation guide, extended with the two failure modes
+    the summary table hides (small angle + significant p; large angle + wide cone).
+  - Source cell 40 (a commented-out registry sketch) dropped. Instead the RT statistics
+    are computed through the real machinery — `AnalysisSpec` / `fit_encoding` /
+    `PerUnitStatsRegistry`, as `eph_01` does — so `T_rt` is the same quantity
+    `eph_01`-`eph_04` report and no third inline copy of `build_rt_encoding_stats` was
+    created. Session/unit QC likewise goes through `data_loading` rather than being
+    reimplemented inline as `eph_08` does.
+  - **One deliberate departure from `eph_01`:** no RT trial window (`trial_query=""`,
+    `min_trials=50`), matching the source notebook and `eph_08` so the fitted axes
+    describe the same units the poster figure projects. `RT_QUERY` is left in place for
+    a sensitivity check.
+- **Retrograde LDA sign convention preserved** — an LDA axis sign is arbitrary, so it is
+  pinned to the waveform axis as the source does, and the notebook says so explicitly
+  (and warns when no waveform axis is available to pin against).
+- **`environment/Dockerfile`: added `scanpy==1.10.3`** in its own layer, following the
+  `rachel-analysis-utils` precedent. The MERFISH axis cannot run without it, and it was
+  absent from the pip block. 1.10.3 is the last scanpy supporting python 3.9 (1.10.4+
+  require >=3.10); `scipy==1.13.0` is re-asserted alongside it as a tripwire so a future
+  scanpy bump fails the build loudly instead of silently moving numpy/scipy under the
+  other pins. **This triggers a Code Ocean image rebuild.**
+
+**Verification status.** `spatial_axes.py` is pure numpy/sklearn math and was tested
+locally against synthetic data (30 checks, all passing): `fit_spatial_axis_linear`
+recovers a planted gradient to 0.00 deg noise-free and 3.4 deg at heavy noise;
+`_cca` and `_LDA` recover planted axes to ~1-4 deg; `compare_bootstrap_directions`
+gives 0.00 deg / p=1.0 for identical axes, 0.25 deg / p=0.98 for two samples of the same
+axis, and 89.7 deg / p<0.002 for orthogonal ones; `cone_half_angle` widens monotonically
+with noise (0.46 -> 2.49 -> 6.43 -> 20.26 deg) and as n falls (5.3 -> 13.2 deg).
+`eph_08` and `eph_09` both execute clean locally through their skip paths, but **neither
+has been run on Code Ocean**, so no real-data output — including `eph_08`'s poster-figure
+equivalence — has been confirmed. See `TODO.md`.
+
 ## 2026-09-15 (3)
 
 ### Extract shared `fip_*` setup into `code/fip_utils.py` (Pass 1 of 2)

@@ -59,5 +59,15 @@ RUN pip install -U --no-cache-dir \
 RUN pip install --no-cache-dir --ignore-requires-python \
     -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@main#egg=rachel-analysis-utils
 
+# scanpy, for eph_09_structural_axes' MERFISH axis (reads adata_mer_subset_2_2k.h5ad).
+# 1.10.3 is the LAST scanpy supporting python 3.9 (1.10.4+ require >=3.10) — do not bump
+# without moving the base image first. Its own layer, like rachel-analysis-utils above,
+# so its resolution is separate from the pinned block; scipy is re-asserted here as a
+# tripwire, so if scanpy ever wants to move it the build fails loudly instead of
+# silently upgrading numpy/scipy underneath the rest of the pins.
+RUN pip install --no-cache-dir \
+    scanpy==1.10.3 \
+    scipy==1.13.0
+
 COPY postInstall /
 RUN /postInstall

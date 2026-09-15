@@ -18,7 +18,7 @@ current-state map only.
 
 ## KEEP — active analysis (flat)
 
-- `eph_00`–`eph_08` · `kin_00`–`kin_05` · `fip_00_explore`
+- `eph_00`–`eph_09` · `kin_00`–`kin_05` · `fip_00_explore`
   - `eph_07_bout_encoding`: within-trial (go-responsive) vs ITI LC-unit encoding of
     tongue-movement bouts, ported from `tongue_kinematics_ephys_intertrialmovs.ipynb`.
     Movement-bout-derived (`annotate_movement_bouts` + `classify_bout_times` /
@@ -45,14 +45,39 @@ current-state map only.
     example figures are Code-Ocean-only (need per-session `nwb_df_licks.parquet`);
     everything else runs on the pooled parquet. `tongue_kinematics.ipynb` now gates
     on `kin_07` alone. See `TODO.md`.
+  - `eph_09_structural_axes`: does the RT-encoding spatial gradient align with LC's
+    structural organization? Fits the RT-encoding axis (`T_rt`) and its baseline control
+    (`T_rt_bl`) — the step `eph_08` skipped — plus three structural axes: waveform
+    features (CCA), MERFISH transcriptomics (CCA), retrograde tracing (LDA). Pairwise
+    direction comparison (angle, Wald W, χ² p, bootstrap p), three-plane arrow-and-cone
+    figure, azimuth-elevation bootstrap scatter, and projection scatters onto each
+    structural axis. All axis math is `spatial_axes.py`; RT stats go through
+    `AnalysisSpec`/`fit_encoding`/`per_unit_stats_registry` (as `eph_01`) and unit QC
+    through `data_loading`, so no inline copies were added. Each structural axis sits
+    behind `HAS_WAVEFORM`/`HAS_MERFISH`/`HAS_RETRO`, so a missing asset drops that axis
+    rather than failing. **Code Ocean only and entirely unexecuted** — written 2026-09-15,
+    skip path verified locally only. MERFISH additionally needs the `scanpy` Dockerfile
+    layer added the same day, i.e. an image rebuild. `spatial_axis_comparison_rt_encoding_
+    update.ipynb` is fully replicated but its archive gate stays open until this runs.
+    See `TODO.md`.
 - Modules: `data_loading.py`, `ephys_utils.py`, `encoding_methods.py`, `encoding_plots.py`,
-  `per_unit_stats_registry.py`, `spatial_encoding.py`, `plotstyle.py`, `ccf_utils.py`
+  `per_unit_stats_registry.py`, `spatial_encoding.py`, `spatial_axes.py`, `plotstyle.py`,
+  `ccf_utils.py`
   - `per_unit_stats_registry.py`: distinct results-store + FDR + cross-analysis `compare`
     (used by `eph_01/02/03/04/06`); not superseded by `ephys_utils`/`encoding_methods`.
-  - `ccf_utils.py`: imported by `eph_08` + `spatial_encoding.py`.
+  - `ccf_utils.py`: imported by `eph_08`, `eph_09` (`pir_to_lps`, `project_to_plane`,
+    `ccf_pts_convert_to_mm`) + `spatial_encoding.py`. **Not** imported by
+    `spatial_axes.py` — that module is coordinate-frame agnostic and takes coords as
+    plain Nx3 arrays, so the CCF conversion stays in the notebooks.
   - `spatial_encoding.py`: `SpatialEncoder` — CCF maps, subgroup maps, spatial-dependence
     permutation tests. Contains **no axis-fitting machinery**; that is `spatial_axes.py`'s
-    job (planned, see `TODO.md`).
+    job (landed 2026-09-15).
+  - `spatial_axes.py`: fitting and comparing 3-D gradient *directions* —
+    `fit_spatial_axis_linear`/`_cca`/`_LDA` + bootstrap wrappers,
+    `compare_bootstrap_directions`, `cone_half_angle`, `vectors_to_az_el`, and the two
+    plot helpers. Consumers: `eph_08` (waveform axis) and `eph_09`. Deliberately separate
+    from `spatial_encoding.py`: *where* a statistic is large vs. *in which direction* it
+    changes are different questions with different inputs.
   - `ephys_utils.py`: spike counting, session bundles, `all_counts_df` — **and** behavior-derived
     per-trial features (`build_trial_features`) that exist to serve ephys alignment. Bout
     segmentation (`annotate_movement_bouts`, `classify_bout_times`, `get_session_bout_times`)
@@ -71,14 +96,14 @@ before the remaining ports land.
 |---|---|---|
 | `kin_06_lick_geometry_choice.ipynb` | new | `tongue_kinematics_cueresponse` |
 | `kin_07_value_encoding.ipynb` | new | `tongue_kinematics`, `tongue_kinematics_cueresponse` |
-| `eph_09_structural_axes.ipynb` | new | `spatial_axis_comparison_rt_encoding_update` |
-| `spatial_axes.py` | new module | — (`eph_08` refactors onto it) |
 
-`spatial_axes.py` is the only new module still planned. `eph_07_bout_encoding.ipynb` is done
-(see the KEEP list above) — its orphan `annotate_movement_bouts` and the within-trial/ITI
-classifier folded into the existing **`ephys_utils.py`**, matching the `build_trial_features`
-precedent there (behavior-derived features that serve ephys alignment); a module with one
-consumer isn't worth the file. Rationale in `TODO.md`'s `eph_07` item.
+**No new modules remain planned.** `spatial_axes.py` landed 2026-09-15 with
+`eph_09_structural_axes.ipynb` (both now in KEEP above), and `eph_08` was refactored onto it,
+deleting its two private inline copies of the CCA fit/bootstrap. `eph_07_bout_encoding.ipynb`
+is done too — its orphan `annotate_movement_bouts` and the within-trial/ITI classifier folded
+into the existing **`ephys_utils.py`**, matching the `build_trial_features` precedent there
+(behavior-derived features that serve ephys alignment); a module with one consumer isn't worth
+the file. Rationale in `TODO.md`'s `eph_07` item.
 
 ## KEEP — pipeline / data generation
 
@@ -112,7 +137,7 @@ of them.
 |---|---|---|
 | `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal~~ **all done, in `kin_02` §8–§11** | `kin_02` §8–§11 (done) — **no remaining gate; ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | ~~within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts`~~ **done, in `eph_07`** | `eph_07` (done) — **no remaining gate; ready to archive** |
-| `spatial_axis_comparison_rt_encoding_update.ipynb` | RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones | `eph_09` **+** `spatial_axes.py` |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | ~~RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones~~ **all written, in `eph_09` + `spatial_axes.py`** | `eph_09` (done, **unrun**) — gate open until `eph_09` executes on Code Ocean |
 | `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; **kinematics vs behavioral-model latents** (Spearman/MI/RidgeCV/RF, prev-trial RPE) still open | `kin_05` (done) **+** `kin_07` |
 | `tongue_kinematics_cueresponse.ipynb` | jaw/spout landmark geometry + endpoints by event; **choice prediction from pre-lick kinematics** (ridge-logistic, AUC, binned P(right lick)); Q-value encoding | `kin_06` **+** `kin_07` |
 
@@ -165,8 +190,10 @@ per-notebook section outlines are in `TODO.md`):
    (§3's licks-without-movement tally, §4's/§5's example figures). — **done**
 3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — reuses `eph_00`'s
    raster/PETH helpers. — **done**
-4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
-   Confirm the MERFISH / retrograde assets are reachable on Code Ocean **first**.
+4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module. —
+   **written 2026-09-15; assets confirmed mounted, `scanpy` added to the Dockerfile.**
+   Not yet run on Code Ocean, so `eph_08`'s poster-figure output is unconfirmed and the
+   source notebook's archive gate stays open. See `TODO.md`.
 5. `kin_06_lick_geometry_choice`.
 6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
 

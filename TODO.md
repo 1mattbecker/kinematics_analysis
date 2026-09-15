@@ -24,7 +24,7 @@ series.
 | `kin_06_lick_geometry_choice` *(new)* | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
 | `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
 | `eph_07_bout_encoding` *(new)* — **done** | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
-| `eph_09_structural_axes` *(new)* | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
+| `eph_09_structural_axes` *(new)* — **written, unrun** | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
 
 Plus one new flat module, `spatial_axes.py` (see the items below). The bout-segmentation
 helpers fold into the existing `ephys_utils.py` rather than getting a module of their own —
@@ -107,8 +107,10 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
    partial CO-only splits, within §3 and §5 — see the item below). — **done**
 3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — clear spec, reuses
    `eph_00`'s helpers. — **done**
-4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module.
-   **Confirm the MERFISH / retrograde assets are reachable on Code Ocean before starting.**
+4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module. —
+   **written 2026-09-15, not yet run on Code Ocean.** Assets confirmed mounted; `scanpy`
+   added to the Dockerfile (image rebuild required). See the item below for what is
+   still unverified.
 5. `kin_06_lick_geometry_choice`.
 6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
 
@@ -118,7 +120,7 @@ Archive only when **all** gates for a notebook are met:
 |---|---|
 | `tongue_latency.ipynb` | `kin_02` §8–§11 (done) — **no remaining gate, ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` (done) — **no remaining gate, ready to archive** |
-| `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` — written, **gate open until it runs on Code Ocean** |
 | `tongue_kinematics.ipynb` | `kin_05` (done) **+** `kin_07` |
 | `tongue_kinematics_cueresponse.ipynb` | `kin_06` **+** `kin_07` |
 
@@ -486,7 +488,84 @@ movements (which is exactly what `kin_05` establishes).
 
 ## Create `spatial_axes.py` and `eph_09_structural_axes.ipynb`
 
-_Logged 2026-09-11._
+_Logged 2026-09-11. **Written 2026-09-15 — code complete, NOT yet executed on Code Ocean.**
+Both external assets confirmed mounted by the user before starting; `scanpy==1.10.3` added to
+`environment/Dockerfile` in its own layer, so **the capsule image must be rebuilt** before the
+MERFISH block can run._
+
+### Status: what landed, and what is still unverified
+
+Landed: `code/spatial_axes.py`; `code/eph_09_structural_axes.ipynb` (34 cells); `eph_08`
+refactored onto the module; `scanpy` in the Dockerfile.
+
+**Verified locally** — `spatial_axes.py` is pure numpy/sklearn and was checked against
+synthetic data with known planted axes (30 assertions, all passing): linear/CCA/LDA all
+recover a planted direction, `compare_bootstrap_directions` returns ~0° for identical axes
+and ~90° for orthogonal ones, `cone_half_angle` widens monotonically with noise and as n
+falls, and the module's CCA pair is **bit-identical** to the inline copies deleted from
+`eph_08` (same axis, same bootstrap cloud, same cone, same projections, same seed).
+Both notebooks execute clean locally through their skip paths.
+
+**NOT verified — needs a Code Ocean run:**
+
+1. **`eph_08` output equivalence on real data.** The refactor is a pure move and was shown
+   bit-identical on synthetic input, but `eph_08` skips locally, so the poster figure
+   `rt_response_projection_abs` has **not** been regenerated. Check it first — compare the
+   printed waveform axis and the figure's r / p / n against the previous run.
+2. **Everything in `eph_09` past §1.** No cell touching real data has run. Expect to debug
+   column names on first contact, in particular:
+   - `all_counts_df` must carry `baseline_spike_count` for the `T_rt_bl` axis.
+   - The `(session_prefix, unit_str)` merge in §2 — confirm the join is not silently empty
+     (§2 prints the surviving unit counts; if they are 0, the unit-key canonicalization is
+     the suspect).
+   - `retro_ccf` must have `injection_region`, `x`, `y`, `z`.
+3. **The MERFISH block specifically** needs the rebuilt image. Until then it will print
+   `Could not load MERFISH data: No module named 'scanpy'` and set `HAS_MERFISH = False` —
+   which is the guard working, not a bug. Re-run after the rebuild.
+4. **`scanpy==1.10.3` against the pinned block.** Isolated `RUN` layers separate pip's
+   *resolution*, not the environment — scanpy can still move shared packages. `scipy==1.13.0`
+   is re-asserted in that layer as a tripwire. If the build fails there, that is the tripwire
+   firing: resolve it rather than dropping the pin.
+
+### Decisions taken during the port (revisit if you disagree)
+
+- **RT stats go through `AnalysisSpec` / `fit_encoding` / `PerUnitStatsRegistry`**, not a
+  third inline copy of `build_rt_encoding_stats`. This answers source cell 40's
+  commented-out registry sketch properly, and makes `eph_09`'s `T_rt` the same quantity
+  `eph_01`–`eph_04` use. Session/unit QC likewise goes through `data_loading`.
+- **No RT trial window** (`trial_query=""`, `min_trials=50`), matching the source and
+  `eph_08` rather than `eph_01`'s `RT_QUERY` (0.05–1.0 s). The axes therefore describe the
+  same units `eph_08`'s poster figure projects. `RT_QUERY` is defined in §2 for a
+  sensitivity check — **worth running once**, since the two conventions could give
+  different axes and only one can be the headline number.
+- **Okabe-Ito colors** (via `plotstyle`) instead of the source's palette. The source used
+  Han's red/orange/green/purple/peach to match his figures; swap `COLORS` back in §1 if you
+  need a side-by-side with those.
+- **Axis labels** on the three-plane figure say `ML/AP/DV (mm)` rather than the source's
+  `dim 0` / `dim 1`.
+
+### Follow-ups this port surfaced (not blocking)
+
+- **`eph_08` still duplicates two things it need not.** Its §2 reimplements the session-QC
+  and unit-QC filter inline although `data_loading.load_session_quality_filter` /
+  `filter_ephys_units` already do exactly that, and it carries its own
+  `build_rt_encoding_stats` and `get_regression_CI`. Left alone deliberately this session —
+  `eph_08` is a poster-figure path and the brief was a pure move. Fold it in once `eph_08`
+  has been re-run and confirmed unchanged.
+- **`build_rt_encoding_stats` is orphan code** in the same sense as `annotate_movement_bouts`
+  was: defined only in `eph_08` §2 and source cell 8. `eph_09` avoids adding a third copy by
+  using `fit_encoding`; `eph_08`'s copy should follow once it is safe to touch.
+- **`get_regression_CI` now exists twice** — in `spatial_axes.py` and inline in `eph_08` §5.
+  Same fix, same gating.
+- The source's `get_regression_CI` computed `se` twice, the first immediately overwritten by
+  the second. The dead line is dropped in the module (`eph_08`'s copy had already dropped
+  it); no numerical change.
+- **`compare_bootstrap_directions` no longer mutates its inputs.** The source did
+  `np.asarray(b_x_boot, float)` and then flipped signs in place, so passing a float64 array
+  (or a *slice* of one, as source cell 24 does) rewrote the caller's bootstrap cloud. In
+  this pipeline the flip mask is always empty — the clouds arrive already hemisphere-aligned
+  — so this changes no result, but the module copies defensively now.
+
 
 ### Why
 
@@ -536,11 +615,13 @@ already archived. `_update` is the source for this port.)
 
 ### Notes
 
-- **Confirm the external assets are reachable on Code Ocean before starting this item** —
-  `merfish_data/adata/adata_mer_subset_2_2k.h5ad` and
-  `LC_retro/manual_proofread_ccf_18brains.csv`, both under `/root/capsule/data`, both from
-  Han's capsule. The MERFISH path also needs `scanpy`, which is not in the current pip block.
-  If either is gone, land the RT-axis fit + waveform comparison and record the gap.
+- ~~Confirm the external assets are reachable on Code Ocean before starting this item~~ —
+  **done 2026-09-15: the user confirmed both are still mounted**
+  (`merfish_data/adata/adata_mer_subset_2_2k.h5ad` and
+  `LC_retro/manual_proofread_ccf_18brains.csv`, under `/root/capsule/data`, from Han's
+  capsule), so the degraded fallback was not needed and all three structural axes are
+  written. `scanpy` was indeed absent from the pip block and is now added — see the status
+  section above.
 - Retrograde LDA sign is arbitrary; the source aligns it to the waveform axis (cell 22). Keep
   that convention or the cone figure flips between runs.
 - Code Ocean only, like `eph_08`. Use the same `IS_CO` skip-guard structure so it runs clean
