@@ -2,6 +2,109 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-15 (5)
+
+### New `code/kin_06_lick_geometry_choice.ipynb` — does pre-lick tongue direction predict choice?
+
+Phase 2 of the repo reorg: the fifth of the six HOLD-notebook ports. Source is
+`tongue_kinematics_cueresponse.ipynb` cells 19, 49-56, 93-95 plus `tongue_kinematics`
+cell 60. `tongue_kinematics_cueresponse.ipynb` now gates on `kin_07` alone.
+
+**35 cells, §1-§9.** Structured so the landmark figures read as the setup (§3-§4) and the
+choice decode as the result (§7-§8), per the `TODO.md` outline. Executed end-to-end
+locally against `data/for_local/all_tongue_movements_04022026.parquet` (246,359 movements,
+44 sessions); §3-§4 print skip messages and are unexecuted.
+
+**Correction to `TODO.md`'s data-availability note: `max_*_from_jaw` is NOT jaw-relative.**
+`max_x_from_jaw` / `max_y_from_jaw` are the *absolute* pixel coordinates of the point
+farthest from the jaw; the jaw-relative distances are `max_x_distance` / `max_y_distance`
+(pooled means ~368 px vs ~25 px). So those columns are **not** pooled-safe as written, and
+neither are `endpoint_x/y` — per-session mean `endpoint_y` spans ~80 px across the 44
+sessions against a ~51 px within-session SD. Pooling them raw would have smeared the
+anatomical frame the whole notebook rests on.
+
+**The jaw origin turns out to be recoverable from the pooled parquet** — no Code Ocean
+needed. New `estimate_jaw_position()` (§2.1) solves for each session's jaw keypoint from
+the absolute/distance column pairs: `jaw_x = median(max_x_from_jaw - max_x_distance)`
+(the tongue protrudes in +x, so the minus branch is correct — within-session SD ~4 px vs
+~20 px for the plus branch), and `jaw_y` by a 1-D search over the two per-row candidates
+`max_y_from_jaw ± max_y_distance`. Worst-session residual 0.25 px across all 44 sessions.
+Everything from §5 on works in the resulting jaw-centered `*_rel` frame. This is what lets
+§5-§9 pool honestly while §3-§4 stay Code Ocean-only: the **spouts** still need per-session
+keypoint means (`kps_raw_*.parquet`), only the jaw is recoverable.
+
+- **§3-§4 (Code Ocean only, unexecuted)** — `plot_standard_lick_landmarks` (source cell 19,
+  the only copy in the repo) brought in here and restyled onto `plotstyle`; **not**
+  promoted to `plotstyle.py`, which is style-only and has no second consumer. Plus the
+  jaw↔spout scale printout (cell 94), a cross-check of the §2.1 reconstruction against the
+  true keypoint mean, and cue-response endpoints coloured by lick side over the landmarks
+  (cell 93). The source's mirrored spout naming (`spout_l` is the animal's *right* spout —
+  the bottom camera flips left/right) is preserved and documented.
+- **§5 — lick vs non-lick excursion geometry.** `tongue_kinematics` cell 60 **==**
+  `cueresponse` cell 95; **ported once**, here, as `TODO.md` specifies. Pooled and
+  jaw-centered, as 2-D density rather than the source's alpha scatter (246k points
+  saturate where the source's ~7k did not). With lick 65.3 ± 10.9 px from the jaw vs
+  40.8 ± 15.8 px without; per-session paired medians 66.2 vs 39.3 px, Wilcoxon p = 1.1e-13
+  (n = 44 sessions).
+- **§6 — non-lick endpoints by movement ordinal** (cells 54, 56). The source referenced two
+  names (`nonlick`, `licks`) it never defined — leftovers from another notebook;
+  reconstructed here as the obvious `has_lick` split.
+- **§7 — does pre-lick direction predict choice?** (cells 49, 55). 7,138 trials, 44
+  sessions; class balance **57.9% left / 42.1% right** (majority-class accuracy 0.579).
+  Last pre-lick excursion angle: median -60.0° before a left lick vs +38.5° before a right
+  lick (session-paired Wilcoxon p = 1e-11, n = 44). Binned P(right lick) rises monotonically
+  from 0.08 to 0.94 across `endpoint_y_rel`, crossing the base rate within one bin of the
+  jaw midline, and 0.09 → 0.88 across `excursion_angle_deg`.
+- **§8 — ridge-logistic decode** (cells 44, 47, 48). **The source's evaluation could not be
+  reused.** It calls `train_test_split(random_state=42)` on one session's trials; applied
+  to pooled data that leaks session identity across the split. Replaced with two
+  evaluations, reported side by side because they answer different questions:
+  - **`GroupKFold`, session as the group (primary)** — held-out-session AUC
+    **0.835 ± 0.100** (SD over 5 folds), pooled out-of-fold AUC 0.836, accuracy 0.808.
+    Asks whether *one* geometry→choice mapping generalizes across animals and rigs.
+  - **Per-session fits (secondary)** — median AUC **0.943** over the 39 sessions with
+    n ≥ 40 and ≥ 10 per class; 97% above 0.5, Wilcoxon p = 7.3e-12. Higher than the shared
+    decoder, which is what session-specific camera geometry predicts — the reason both are
+    reported.
+  - **Shuffled-label null**, labels permuted *within* session over 200 permutations: mean
+    0.530, 95th pct 0.545, observed 0.835, p = 0.005 (the permutation resolution floor).
+    The null sits above 0.5 because within-session shuffling preserves session base rates,
+    which a pooled evaluation can exploit; that offset, not 0.5, is the right reference.
+  - **Permutation importance** (on held-out sessions, not held-out trials): `last_angle`
+    0.168, `mean_distance` 0.098, `mean_angle` 0.070, `mean_duration` 0.035 ΔAUC; both
+    peak-velocity terms and `session_time` ≈ 0. Direction carries the decode, not vigor.
+- **§8.4-§8.5 — the block-structure caveat, quantified rather than asserted.** Left/right
+  choice in this task is block-driven, so a lick-side decoder may be reading recent choice.
+  Measured: **P(stay) = 0.910** and **previous choice alone reaches AUC 0.907** — *better*
+  than kinematics. But kinematics still reads AUC 0.815 / 0.772 *within* each
+  previous-choice stratum, so it is not simply re-encoding choice history. Not resolved
+  here; separating them needs block-aware regressors, which is `kin_07`'s dependency.
+- **§9 — pre-lick → cue-response displacement** (cells 50-52). Pre-lick and cue-response
+  endpoints land on the same side of the jaw midline in **84.0% ± 2.2%** of trials (SEM,
+  session as the sampling unit), with the cue-response lick carrying the tongue 15-23 px
+  *further* from the midline (Wilcoxon p < 1e-300 both sides). Per-session
+  r(pre-lick y, cue-response y) median 0.776.
+
+Other port decisions:
+
+- **Every grouping is on `(session, trial)`**, not `trial` — trial numbers repeat across
+  sessions in the pooled parquet. Same class of bug as the one fixed in `kin_05` §7.
+- **Session is the sampling unit for every population claim** — §5's paired excursion
+  medians, §7's violin panel and binned curves (binned *within* session on pooled quantile
+  edges, then mean ± SEM *across* sessions), §8's grouping, §9's same-side fraction.
+- Dropped from the source throughout: hardcoded hex colors, seaborn violin/`palette`
+  defaults, `plt.grid(True)`, and the absolute `/root/capsule/scratch/figures` save paths.
+  All 8 figures end with `save_fig(..., fig_dir=FIG_DIR, save=SAVE_FIG)`.
+- Label joins use merges rather than `pd.MultiIndex.from_frame(...).map(...)`, and §7's
+  binning uses integer bin labels rather than Interval categoricals — both to keep pandas
+  off its object-hashing path, which emitted a `RuntimeWarning` on the NaN-bearing `trial`
+  column. Notebook now executes warning-free.
+- `fmt_p()` reports SciPy p-value underflow as `< 1e-300` rather than printing `0`.
+
+Deliberately **not** done: no `git mv` of `tongue_kinematics_cueresponse.ipynb`. Unlike
+`eph_07` / `eph_09`, `kin_06` does not clear its source on its own — that notebook is gated
+on `kin_06` **and** `kin_07` (the value-encoding port), so it stays in `code/`.
+
 ## 2026-09-15 (4)
 
 ### New `code/spatial_axes.py` + `eph_09_structural_axes.ipynb`; `eph_08` refactored onto the module

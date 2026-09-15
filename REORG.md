@@ -18,7 +18,7 @@ current-state map only.
 
 ## KEEP — active analysis (flat)
 
-- `eph_00`–`eph_09` · `kin_00`–`kin_05` · `fip_00_explore`
+- `eph_00`–`eph_09` · `kin_00`–`kin_06` · `fip_00_explore`
   - `eph_07_bout_encoding`: within-trial (go-responsive) vs ITI LC-unit encoding of
     tongue-movement bouts, ported from `tongue_kinematics_ephys_intertrialmovs.ipynb`.
     Movement-bout-derived (`annotate_movement_bouts` + `classify_bout_times` /
@@ -45,6 +45,25 @@ current-state map only.
     example figures are Code-Ocean-only (need per-session `nwb_df_licks.parquet`);
     everything else runs on the pooled parquet. `tongue_kinematics.ipynb` now gates
     on `kin_07` alone. See `TODO.md`.
+  - `kin_06_lick_geometry_choice`: does the direction of a preparatory tongue movement
+    predict which spout the animal licks? Landmark frame (§3) and cue-response endpoints
+    over it (§4) are Code-Ocean-only — they need per-session **spout** keypoint means
+    (`kps_raw_*.parquet`). Everything else pools across 44 sessions, because the **jaw**
+    origin *is* recoverable from the pooled parquet: `endpoint_x/y` and `max_*_from_jaw`
+    are absolute pixel positions (not jaw-relative, despite the names — the distances are
+    `max_x_distance` / `max_y_distance`), and §2.1's `estimate_jaw_position` solves each
+    session's jaw out of those column pairs to ~0.25 px. Lick-vs-non-lick excursion
+    geometry (§5, the `tongue_kinematics` 60 == `cueresponse` 95 duplicate, ported once),
+    non-lick endpoints by ordinal (§6), P(right lick) vs pre-lick geometry (§7),
+    ridge-logistic lick-side decode (§8) and pre-lick → cue-response displacement (§9).
+    The decode uses `GroupKFold` on session (held-out-session AUC 0.835 ± 0.100) plus
+    per-session fits (median 0.943) and a within-session shuffled-label null (0.530) —
+    the source's single-session `train_test_split` would leak session identity once
+    pooled. §8.4 quantifies the block-structure confound rather than only noting it
+    (P(stay) = 0.910; previous choice alone AUC 0.907; kinematics 0.77–0.82 within
+    previous-choice strata). `plot_standard_lick_landmarks` lives in the notebook, not
+    `plotstyle.py` — one consumer. Executed end-to-end locally except §3–§4.
+    `tongue_kinematics_cueresponse.ipynb` now gates on `kin_07` alone. See `TODO.md`.
   - `eph_09_structural_axes`: does the RT-encoding spatial gradient align with LC's
     structural organization? Fits the RT-encoding axis (`T_rt`) and its baseline control
     (`T_rt_bl`) — the step `eph_08` skipped — plus three structural axes: waveform
@@ -94,7 +113,6 @@ before the remaining ports land.
 
 | Planned | Kind | Gates archiving of |
 |---|---|---|
-| `kin_06_lick_geometry_choice.ipynb` | new | `tongue_kinematics_cueresponse` |
 | `kin_07_value_encoding.ipynb` | new | `tongue_kinematics`, `tongue_kinematics_cueresponse` |
 
 **No new modules remain planned.** `spatial_axes.py` landed 2026-09-15 with
@@ -139,7 +157,7 @@ of them.
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | ~~within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts`~~ **done, in `eph_07`** | `eph_07` (done) — **no remaining gate; ready to archive** |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | ~~RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones~~ **all written, in `eph_09` + `spatial_axes.py`** | `eph_09` (done, **unrun**) — gate open until `eph_09` executes on Code Ocean |
 | `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; **kinematics vs behavioral-model latents** (Spearman/MI/RidgeCV/RF, prev-trial RPE) still open | `kin_05` (done) **+** `kin_07` |
-| `tongue_kinematics_cueresponse.ipynb` | jaw/spout landmark geometry + endpoints by event; **choice prediction from pre-lick kinematics** (ridge-logistic, AUC, binned P(right lick)); Q-value encoding | `kin_06` **+** `kin_07` |
+| `tongue_kinematics_cueresponse.ipynb` | ~~jaw/spout landmark geometry + endpoints by event; choice prediction from pre-lick kinematics (ridge-logistic, AUC, binned P(right lick))~~ **done, in `kin_06` §3–§9**; **Q-value encoding** still open | ~~`kin_06`~~ (done) **+** `kin_07` — **only the `kin_07` gate remains** |
 
 Two corrections to the earlier reading of this table:
 
@@ -194,7 +212,8 @@ per-notebook section outlines are in `TODO.md`):
    **written 2026-09-15; assets confirmed mounted, `scanpy` added to the Dockerfile.**
    Not yet run on Code Ocean, so `eph_08`'s poster-figure output is unconfirmed and the
    source notebook's archive gate stays open. See `TODO.md`.
-5. `kin_06_lick_geometry_choice`.
+5. `kin_06_lick_geometry_choice` — pooled in a reconstructed jaw-centered frame; two
+   Code Ocean-only sections (§3–§4, per-session spout keypoints). — **done**
 6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
 
 Archive a HOLD notebook only when **every** gate in the HOLD table above is met — three of the
