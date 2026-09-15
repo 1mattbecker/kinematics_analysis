@@ -323,22 +323,36 @@ they are the *absolute* pixel coordinates of the point farthest from the jaw; th
 distances are `max_x_distance` / `max_y_distance`. Neither those nor `endpoint_x/y` are
 pooled-safe raw, since each session carries its own camera/jaw offset.
 
-**The jaw is plausibly recoverable from the pooled parquet without Code Ocean** —
-`estimate_jaw_position()` (§2.1 of the notebook) solves for each session's jaw from the
-absolute/distance column pairs: `jaw_x = median(max_x_from_jaw - max_x_distance)` is exact
-up to tracking noise (the tongue protrudes in one fixed x-direction, so there's only one
-candidate per row); `jaw_y` has no fixed sign (excursions go to either spout), so each row
-gives *two* candidates, `max_y_from_jaw ± max_y_distance`, and a 1-D grid search finds the
-value minimizing the median distance to the nearer one.
+**Revised again: the notebook now prefers the real jaw keypoint over reconstructing it.**
+`get_jaw_positions()` (§2.1) tries `kps_raw_jaw.parquet` for every session first — the same
+asset §3's landmarks use — and only falls back to the algebraic reconstruction
+(`estimate_jaw_position()`) where that file is missing, which locally means **all 44**
+sessions (no `kps_raw_*.parquet` exists in `data/for_local/`). Checked first whether a
+better local proxy existed instead: neither `startpoint_x/y` nor the movement bounding-box
+columns (`min_x/y`, `max_x/y`) sit at a fixed point — all have 11–39 px within-session SD,
+far noisier than the algebraic method's own ~0.1 px internal residual — so there is no
+local column better than the reconstruction; the real keypoint is Code-Ocean-only.
 
-**Caveat: this has not been externally validated.** The 0.25 px worst-session residual
-quoted for the fit is an *internal* self-consistency check — how tightly each row's two
-candidates cluster around the fitted point — not a comparison to the true jaw keypoint. It
-cannot catch a systematic bias (e.g. `jaw_y` pulled toward whichever spout draws more
-excursions). The actual check — comparing the reconstruction to `kps_raw['jaw'].mean()` —
-is written into §3, but **has not run**: no `kps_raw_*.parquet` exists in
-`data/for_local/`, so this needs Code Ocean to confirm. Until then, treat `jaw_x` as
-reliable (it's an algebraic identity) and `jaw_y` as unverified.
+The fallback logic is unchanged from the previous revision: `jaw_x = median(max_x_from_jaw
+- max_x_distance)` is exact up to tracking noise (the tongue protrudes in one fixed
+x-direction, so there's only one candidate per row); `jaw_y` has no fixed sign (excursions
+go to either spout), so each row gives *two* candidates, `max_y_from_jaw ± max_y_distance`,
+and a 1-D grid search finds the value minimizing the median distance to the nearer one.
+
+**What changed: validation is now automatic, not deferred to one example session.** For
+every session where both a keypoint and an algebraic estimate exist, `get_jaw_positions()`
+reports the distance between them directly — this is the real check that §3's old
+single-session cross-check only sampled once. On Code Ocean this should resolve most or
+all of the "jaw_y is unverified" caveat immediately; locally it can't run at all (0 of 44
+sessions have a keypoint file), so `jaw_y` for this run is still the unverified fallback.
+
+**Why this got revisited:** investigating a user-reported anomaly in §9 (a few "wrong-sign"
+cue-response endpoints, changed-mind trials pulling one marginal negative) surfaced that
+**41 of 44 sessions show `|left-lick excursion| > right-lick excursion`** by a median of
+13 px (up to 57 px) in the algebraic frame — plausibly real spout geometry (right spout
+closer to the jaw's rest position for most animals), but only the keypoint-vs-algebraic
+comparison above can rule out a reconstruction artifact instead. Worth checking this
+asymmetry specifically once `get_jaw_positions()` runs on real data.
 
 §5–§9 run in the resulting jaw-centered frame regardless. The **spouts** stay Code
 Ocean-only, which is why §3–§4 do — the split is jaw-vs-spout, not

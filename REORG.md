@@ -49,14 +49,15 @@ current-state map only.
     predict which spout the animal licks? Landmark frame (§3) and cue-response endpoints
     over it (§4) are Code-Ocean-only — they need per-session **spout** keypoint means
     (`kps_raw_*.parquet`). Everything else pools across 44 sessions, because the **jaw**
-    origin *is plausibly* recoverable from the pooled parquet: `endpoint_x/y` and
-    `max_*_from_jaw` are absolute pixel positions (not jaw-relative, despite the names —
-    the distances are `max_x_distance` / `max_y_distance`), and §2.1's
-    `estimate_jaw_position` solves each session's jaw out of those column pairs.
-    **`jaw_x` is exact up to tracking noise; `jaw_y` is unverified** — the internal
-    fit-quality number (~0.25 px) is a self-consistency check, not a comparison to the
-    true keypoint, and the actual check (§3, against `kps_raw['jaw']`) has not run since
-    no keypoint data exists in `data/for_local/`. Lick-vs-non-lick excursion
+    origin comes, per session, from `get_jaw_positions()` (§2.1), which **prefers the real
+    jaw keypoint** (`kps_raw_jaw.parquet`, Code-Ocean-only) and falls back to an algebraic
+    reconstruction — `endpoint_x/y` and `max_*_from_jaw` are absolute pixel positions (not
+    jaw-relative, despite the names; the distances are `max_x_distance` / `max_y_distance`)
+    — only where that file is missing, which locally is all 44 sessions (checked: no other
+    pooled column, e.g. `startpoint_x/y`, sits at a fixed point either — all noisier by
+    10-40x than the fallback's own internal residual). `get_jaw_positions()` reports the
+    keypoint-vs-algebraic gap automatically wherever both exist, replacing the old
+    single-session cross-check in §3. Lick-vs-non-lick excursion
     geometry (§5, the `tongue_kinematics` 60 == `cueresponse` 95 duplicate, ported once),
     non-lick endpoints by ordinal (§6), P(right lick) vs pre-lick geometry (§7),
     ridge-logistic lick-side decode (§8) and pre-lick → cue-response displacement (§9).

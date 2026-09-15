@@ -2,6 +2,51 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-15 (6)
+
+### `kin_06_lick_geometry_choice.ipynb` — jaw position now read from real keypoints, preferentially
+
+Three follow-ups to the `kin_06` port (previous entry), landed interactively after publishing it.
+
+- **Stopped overclaiming validation of the jaw reconstruction.** The notebook's own §2.1
+  prose said its fit residual "confirms the reconstruction" — it doesn't. That residual is
+  an internal self-consistency check (how tightly each row's two `max_y_from_jaw ±
+  max_y_distance` candidates cluster), not a comparison to the true jaw keypoint, and can't
+  catch a systematic offset. Corrected in the notebook (§2.1/§3 prose, docstrings, print
+  statements) and in `TODO.md`/`REORG.md`, which repeated the same overclaim.
+- **§9's example-session panel now reuses `EXAMPLE_SESSION`** (the same session §3/§4 use,
+  and the source `cueresponse` notebook's own session) instead of auto-picking whichever
+  session has the most paired trials, so one example recurs through the notebook.
+- **Investigated a user-flagged anomaly** in §9's pooled scatter (a few cue-response
+  endpoints on the "wrong" side of the midline; the changed-mind marginal shifted
+  negative). Traced both to real, non-bug causes: (1) the marginal shift is exactly the
+  sign-flip definition applied to an already-known asymmetry — right-lick trials flip side
+  25.1% of the time vs left-lick's 10.4%, so changed-mind trials skew toward the
+  "flipped-to-right" case (753 of 1,185); (2) a handful of individual right-lick trials
+  (10 of 3,003, 0.33%) do cross the fitted midline, concentrated in sessions with unusually
+  small right-lick excursion magnitude. That surfaced a bigger, previously unflagged
+  finding: **41 of 44 sessions show `|left-lick excursion| > right-lick excursion`** from
+  the fitted jaw, by a median of 13 px (up to 57 px) — plausibly real spout geometry (right
+  spout closer to the jaw's rest position for most animals), but only checkable against the
+  true keypoint, not from the pooled parquet alone.
+- **Checked whether a better local jaw estimate existed before reaching for Code Ocean.**
+  Neither `startpoint_x/y` nor the movement bounding-box columns (`min_x/y`, `max_x/y`) sit
+  at a fixed point — within-session SD 11-39 px, all far noisier than the algebraic
+  reconstruction's own ~0.1 px internal residual. Confirms the reconstruction was already
+  the best available *local* estimate; the open question was never precision, it was
+  whether that recovered constant is the *same* point Code Ocean's `kps_raw['jaw']` calls
+  the jaw.
+- **New `load_jaw_from_keypoints()` + `get_jaw_positions()`** (§2.1). `get_jaw_positions`
+  now tries every session's real `kps_raw_jaw.parquet` mean first and only falls back to
+  `estimate_jaw_position()`'s algebraic reconstruction where that file is missing — locally,
+  all 44 sessions, since no keypoint data exists in `data/for_local/`. Where both exist, it
+  reports the gap between them directly, so the fallback's accuracy is validated
+  automatically across every available session the first time this runs on Code Ocean,
+  rather than spot-checked on one example the way §3's old cross-check did. `estimate_jaw_
+  position()` itself is unchanged — it's now explicitly documented as the fallback, not the
+  primary path. Re-executed end-to-end locally: prints "0 of 44 sessions from the real
+  keypoint, 44 from the algebraic fallback," all downstream numbers unchanged.
+
 ## 2026-09-15 (5)
 
 ### New `code/kin_06_lick_geometry_choice.ipynb` — does pre-lick tongue direction predict choice?
