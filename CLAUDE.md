@@ -56,11 +56,19 @@ kinematics_analysis/
 - `compute_outbound_metrics()` — core function for kinematic feature extraction
 - UMAP embedding of movement bouts
 - Partial correlation analysis
+- `fip_utils.py` — shared setup for the whole `fip_*` series (all three notebooks import it as
+  `fu`). Owns loading + curation (`load_curated_sessions`, which also frees the pre-curation
+  list), session select, `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment
+  (`enrich_trials`, preferring Rachel's `enrich_df_trials`), motion energy on the FIP clock, the
+  signal helpers (`zscore`/`threshold_onsets`/`peri_event`/`norm_xcorr`), and `process_session`
+  for the multi-session loop. It deliberately does *not* own the choice of FIP normalization —
+  which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md`
+  for the pending Dockerfile pin (the upstream curation API has since been rewritten).
 - `fip_00_explore.ipynb` — fiber photometry access/plotting. Structured as imports →
-  data loading → data processing → data viz. Loads the saved parquet hierarchy via
-  `rachel_analysis_utils.nwb_utils.load_nwb_list`; `USE_CURATION` + `CURATION_FILE`
-  (`DA_NE_4channel_datacuration_firstpass`, which carries `correct_mapping`) annotate
-  `df_fip['intended_measurement']`. Processing picks three example signals (NAc DA/dLight,
+  data loading → data processing → data viz. Loads and curates via
+  `fip_utils.load_curated_sessions`, which wraps `load_nwb_list` + `apply_curation_nwb_list`;
+  the curation file (`DA_NE_4channel_datacuration_firstpass`, which carries `correct_mapping`)
+  annotates `df_fip['intended_measurement']`. Processing picks three example signals (NAc DA/dLight,
   PL/GCaMP, NAc ACh/rAch) and aligns motion energy to the FIP clock; `pearsonR` series are
   excluded (signal-signal correlations, not photometry). Viz: full/60s traces, peri-go-cue
   averages, FIP↔motion-energy onset alignment, and ME×FIP cross-correlation. Runs on Code
