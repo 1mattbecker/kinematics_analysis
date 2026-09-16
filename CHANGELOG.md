@@ -4,6 +4,58 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `tongue_lickometer.ipynb`: repair (A1/A2/A3) and Implementation A
+Implements the first half of the `TODO.md` plan logged earlier today. The notebook now runs;
+before this it could not, because every domain import was a bare name for a module that had
+moved into the library.
+
+- **Imports (A2)** — full dotted library paths, choosing deliberately between the two modules
+  that define the same six names: `detect_licks` / `calculate_metrics` /
+  `calculate_metrics_witheventkeys` / `filter_timestamps_refractory` from
+  `kinematics.tongue_lickometer_utils`, `mask_keypoint_data` /
+  `plot_keypoint_confidence_analysis` from `kinematics.tongue_kinematics_utils`. These are the
+  paths that survive the pending library-side de-duplication, so the notebook does not block on
+  that PR.
+- **Loading (A1)** — re-pointed at the per-session `intermediate_data/` parquets. Deleted the
+  old cells 3-4 entirely: the NWB glob with its always-`False` date comparison, `parseSessionID`,
+  the hand-rolled `trim_kinematics_timebase_to_match`, the raw Lightning-Pose CSV load and the
+  manual time-zeroing. Also drops the dependency on the `matt_test_DLC_LP_results_20240920`
+  asset. Positions come from `kps_raw_*.parquet` rather than `tongue_kins.parquet`, because the
+  latter is post-`kinematics_filter` and its values are interpolation-contaminated at protrusion
+  edges — exactly where a contact threshold is crossed.
+- **Verified the time base rather than assuming it.** `create_df_events(adjust_time=True)` sets
+  the first go cue to t=0 and keeps the unshifted values in `raw_timestamps`, so
+  `time_raw - goCue_start_time[0]` puts tongue frames and `nwb_df_licks['timestamps']` on one
+  base with no offset arithmetic anywhere. The loader asserts that relation and the range
+  overlap, so an upstream change fails loudly instead of yielding plausible, wrong rates.
+- **No fallback when `intermediate_data/` is missing** — the cell raises with the list of files
+  it wanted. `kin_05`/`kin_06` assume this path but neither has been run against it, so its
+  existence is still unconfirmed.
+- **Scoring layer (A3), with directional names.** `score_pose_vs_lickometer` /
+  `classify_pose_vs_lickometer` / `sweep_overlap_window` report
+  `pose_recall_vs_lickometer` and `pose_precision_vs_lickometer`, never a bare
+  `precision`/`recall`. **New §2 self-test** — hand-built events pinning down which output slot
+  of `calculate_metrics` is which; it runs locally and confirms that with pose events passed
+  first (as every call site does), `fn` holds pose-only events and `fp` holds lickometer-only
+  events. This is the mislabelling the old cells 19-20 had backwards. Re-reading the notebook's
+  own stored counts under the checked convention: `pose_recall_vs_lickometer` = 0.926,
+  `pose_precision_vs_lickometer` = 0.968 (180 pose-only, 435 lickometer-only events).
+- **Implementation A ported unchanged** as the baseline, with its three structural properties
+  demonstrated on synthetic traces that run locally. One correction to the plan: A's re-arming
+  failure is **not** unconditional. It collapses to one event per session precisely when the
+  confidence mask is at least as tight as the spatial threshold (measured boundary: at a 30 px
+  threshold, masking at 35 px gives the correct 4 events, masking at 30 px gives 1).
+- **Checked the tracking-confidence premise** that B's asymmetric gate rests on (§3.2): written
+  as a peri-apex confidence measurement with an explicit printed verdict and a stated
+  consequence if it fails. Code Ocean only, so still unmeasured.
+- Conventions brought in line with `kin_00`/`kin_06`/`eph_09`: runtime `pip install` cells
+  removed (both packages are Dockerfile-pinned), `ENV`/`IS_CO`/`FIG_DIR`/`SAVE_FIG` block added,
+  `plotstyle` applied, question-first markdown header, `IS_CO` skip-guards throughout.
+- Filename left as `tongue_lickometer.ipynb`; the `val_02_spout_contact_detection` rename is a
+  repo-wide prefix decision to be taken on its own, and nothing here depends on it.
+
+## 2026-09-16
+
 ### Planning: repair and refocus `tongue_lickometer.ipynb` (plan only, no notebook changes)
 - Audited `code/tongue_lickometer.ipynb` (21 cells). It does not run: every domain import is a
   bare name for a module promoted into `aind-dynamic-foraging-behavior-video-analysis`.
