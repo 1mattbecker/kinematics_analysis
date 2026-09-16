@@ -4,6 +4,51 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer`: name the counts for what they measure; formatting cleanup
+
+`calculate_metrics(a, b, w)` returns `(matched, unmatched-in-b, unmatched-in-a)`. The notebook
+passes pose licks as `a` and lickometer licks as `b`, so the legacy names were the wrong way
+round: `fp` counted unmatched *lickometer* events and `fn` unmatched *pose* events, which made
+`precision` a property of the lickometer list and `recall` a property of the pose list. Renamed
+throughout to say which list each number describes. **No value changes** — verified against the
+legacy formulas over 200 randomized inputs through the real library function, max absolute
+difference 0.
+
+| was | now | is |
+|---|---|---|
+| `tp` | `n_matched` | pose licks matched to a lickometer lick within the window |
+| `fp` | `n_lickometer_only` | lickometer licks with no pose match |
+| `fn` | `n_pose_only` | pose licks with no lickometer match |
+| `recall` | `pose_matched_frac` | of the pose licks, fraction matched |
+| `false_negative_rate` | `pose_only_frac` | of the pose licks, fraction unmatched |
+| `precision` | `lickometer_matched_frac` | of the lickometer licks, fraction matched |
+| `false_discovery_rate` | `lickometer_only_frac` | of the lickometer licks, fraction unmatched |
+| `f1_score` | `f1_score` | symmetric in the two lists; name was already correct |
+| `FP_times` | `lickometer_only_times` | lickometer licks with no pose match |
+| `FN_times` | `pose_only_times` | pose licks with no lickometer match |
+
+`n_matched + n_pose_only` is the pose lick count and `n_matched + n_lickometer_only` the
+lickometer lick count; both identities are asserted in the verification above. The §3 header
+states the convention once; the §8 header records that the `Status` strings in the classified
+tables (`False Positive` / `False Negative`) are the library's own and keep their original
+spelling. §9's output directory is now `labeled_clips/lickometer_only/`, was `false_positive/`.
+Figure titles and axis labels follow the new names.
+
+- **Removed the two missing-image references** in §3 — `threshold_example_image.jpg` and
+  `examples_of_problems.jpg` under `/root/capsule/scratch/figures/`, neither present. The two
+  headings they illustrated are kept as text.
+- **Formatting** — consistent `# ` comment spacing; dead code dropped (`tp_rate`/`fp_rate`/
+  `fn_rate`, computed and never used; an unused `import subprocess`; superseded commented-out
+  plotting calls); the three near-identical interaction-plot blocks in §5 and the two ILI
+  histogram blocks in §6 collapsed into loops over their differing parameter; `.copy()` on the
+  FacetGrid slice in §5 to silence a `SettingWithCopyWarning`; f-strings with no placeholders
+  turned into plain strings; a NumPy-style docstring on `plot_tongue_trajectory`; interpretation
+  cells given consistent `### Interpretation` headers, claims unchanged.
+
+Verified: all 17 code cells parse under Python 3.9, no use-before-definition in execution order,
+and every rewritten analysis and figure cell was executed against stand-in data outside the
+notebook. Setup and the guarded load cell were run locally.
+
 ### `val_02_lickometer`: verification pass on the port
 Checked the ported notebook against the legacy source at `5e0bc8e:code/tongue_lickometer.ipynb`.
 All 17 code cells parse under Python 3.9; imports, the `ENV` block and the guarded load cell
