@@ -4,6 +4,29 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_03_missed_licks`: state the confidence conditioning in §4, plot densities
+
+Both §4 distributions were already measured from the same confidence-filtered arrays —
+`spout_distance` exists only on frames surviving `mask_keypoint_data` at `CONF`, and both the
+lick-time and random-time measurements read those same arrays. The filtering was symmetric. Its
+effect is not.
+
+On a stand-in session, 3.4% of lick windows contain no tracked frame against 56.4% of random
+windows, because the tongue is only visible when protruded. So the comparison distribution is not
+"wherever the tongue happens to be" — it is "wherever a *tracked* tongue happens to be", i.e.
+moments when the tongue was already out of the mouth. That is the conservative null, and the right
+one, but it was described wrongly and its consequences were invisible:
+
+- Both histograms now plot **densities**. They were raw counts at samples differing by more than
+  2x after empty windows are dropped, which made the shapes not comparable.
+- Both carry their **n** in the legend; only the lick distribution did.
+- The **no-tracked-frame rate is printed for both**, next to the session-wide rate of frames
+  passing the confidence floor. Previously only the lick rate was reported.
+- §4 and its takeaways now state the conditioning explicitly, and note that a null drawn over all
+  frames regardless of tracking would look better separated and mean less.
+
+No change to any computed distance or to the threshold sweep.
+
 ### `val_03_missed_licks`: use the library's video alignment instead of a hand-rolled offset
 
 §2 computed the session-to-video offset itself, as the per-row difference between `kps_raw_*`'s
