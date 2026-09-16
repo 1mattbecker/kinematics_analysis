@@ -4,6 +4,41 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_03_missed_licks`: §7 rewritten around `precision(d)`
+
+**Previous version tagged `val_03-fixed-30px-baseline`** — the executed 53-session run at a fixed
+30 px threshold. Return there if the curve version does not work out.
+
+A single threshold sits on the shoulder of the contact-radius distribution. From the executed run,
+the marginal fraction of newly-admitted excursions that the lickometer confirms is 0.97 (10-15 px),
+0.94 (20-25), 0.86 (25-30), 0.65 (30-35), 0.11 (35-40). At 30 px the two populations — real licks
+and non-contact approaches — are mixed, which is why the reported rate tracked `tracked_frac`
+(spearman +0.329).
+
+§7 now reports `precision(d)` = P(lickometer fires | tongue reached within `d`) over
+`DIAG_THRESHOLDS = [10, 15, 20, 25, 30, 40]`, and ranks sessions by the miss rate at `D0 = 10 px`.
+`D0` is 2.7x the `tongue_tip_center` error of 3.67 px (`pixel_error.ipynb`), the tightest distance
+still above the noise floor.
+
+- Purpose stated: **triage**, not prevalence. The output is a ranked review queue.
+- `session_precision_curve` replaces `process_session_dir`; loads each session once and sweeps `d`
+  inside, so the extra thresholds cost no extra I/O.
+- Two panels instead of three. The old panels 2 and 3 plotted the same quantity — `pose_only_frac`
+  is exactly `1 - precision`.
+- The confound check is now printed rather than plotted: `spearman(miss_rate@D0, tracked_frac)`,
+  against the +0.329 the 30 px version gave.
+- `filter_timestamps_refractory`'s per-call print is muted in the loop via `redirect_stdout`; it
+  was emitting ~106 lines and burying the per-session output.
+- §8 metric A and the §10 export follow the new quantities.
+
+On the example session the headline drops from 198 candidates (3.63%, 30 px) to 24 (0.91%, 10 px),
+with a *narrower* confidence interval — [0.61%, 1.35%] vs [3.16%, 4.15%] — because the rate falls
+faster than n does.
+
+**Known limitation, unresolved.** If the lickometer fails on glancing contacts, those licks sit at
+larger `d` and `D0` excludes them, biasing the miss rate low. The shape of each curve carries the
+evidence; only hand-scored video settles it.
+
 ### `REORG.md` retired; `CLAUDE.md` now carries the real map of `code/`
 
 The reorg is finished, so its planning document is gone. Two files nominally held the same
