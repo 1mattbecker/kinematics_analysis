@@ -4,6 +4,34 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_03_missed_licks`: direct prose throughout; §4 and §5 conclusions corrected
+
+Markdown 13,036 -> 7,986 chars. Cut the contrastive framing and the reader-instruction asides:
+"triage, not prevalence", "characterizations, not recommendations", "Panel 2 is the deliverable",
+"the honest QC output is", "The central caveat, stated once up front", and all three
+"What to take from it" headers. Sections named after what they compute.
+
+**Two §4 conclusions were contradicted by the executed run and are now corrected.**
+
+- Was: "the distance at a confirmed lick is a broad distribution, not a value" and "no threshold is
+  correct." Actual: median 11.0 px, 90th percentile 29.9, saturating by 50 px. A 30 px threshold
+  captures 90% of confirmed licks. The distribution is concentrated, not broad.
+- Was: "a fraction of lickometer licks have no tracked tongue at all ... a floor on how well any
+  pose-based QC can do." Actual: **1 of 5,846** (0.0%), against 69.6% of random windows. Tracking
+  is present essentially whenever the lickometer fires. This was written as a weakness; it is a
+  positive result.
+
+§5's takeaway said "nothing in this data picks one for you." It largely does: precision stays
+above 0.95 out to 35 px while recall climbs 0.45 -> 0.94, and the curves cross near 35 px.
+
+Also corrected: the cohort is **53 sessions / 17 subjects**, not the 44 / 15 in the pooled parquet
+(`session_analysis_mlk` holds more). §9 limitation 2 rewritten — the pixel threshold does have a
+measurable contact radius, and the live limitation is the glancing-contact bias at tight `d`;
+limitation 3 replaced with the cross-session scale spread (Euclidean jaw-to-endpoint 53-95 px,
+1.8x).
+
+Unchanged: §2, left as trimmed by hand.
+
 ### `val_03_missed_licks`: §7 rewritten around `precision(d)`
 
 **Previous version tagged `val_03-fixed-30px-baseline`** — the executed 53-session run at a fixed
