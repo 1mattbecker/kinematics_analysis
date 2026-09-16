@@ -188,7 +188,7 @@ of them.
 |---|---|---|
 | `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal~~ **all done, in `kin_02` §8–§11** | `kin_02` §8–§11 (done) — **no remaining gate; ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | ~~within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts`~~ **done, in `eph_07`** | `eph_07` (done) — **no remaining gate; ready to archive** |
-| `spatial_axis_comparison_rt_encoding_update.ipynb` | ~~RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones~~ **all written, in `eph_09` + `spatial_axes.py`** | `eph_09` (done, **unrun**) — gate open until `eph_09` executes on Code Ocean |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | ~~RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones~~ **all written, in `eph_09` + `spatial_axes.py`** | `eph_09` (done, **unrun**) — gate open until `eph_09` executes on Code Ocean. `eph_08` cleared its own check 2026-09-16: reproduces the poster figure at r=0.184, p=0.0681, n=99, after fixing the spike-count windows and the ML fold (see `TODO.md`). |
 | `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; ~~kinematics vs behavioural-model latents (Spearman/MI/RidgeCV/RF, prev-trial RPE)~~ **all written, in `kin_07` §3–§7** | `kin_05` (done) **+** `kin_07` (written, **unrun**) — gate open until `kin_07` executes on Code Ocean |
 | `tongue_kinematics_cueresponse.ipynb` | ~~jaw/spout landmark geometry + endpoints by event; choice prediction from pre-lick kinematics (ridge-logistic, AUC, binned P(right lick))~~ **done, in `kin_06` §3–§9**; ~~Q-value encoding~~ **done, in `kin_07` §3–§6** | ~~`kin_06`~~ (done) **+** `kin_07` (written, **unrun**) — gate open until `kin_07` executes on Code Ocean |
 
@@ -216,7 +216,14 @@ Superseded by the new series / modules / library:
 - `rt_ols_registry_pipeline.ipynb`, `registry_usage_example.py` → `ephys_utils` + `encoding_methods` + registry + `eph_01`
 - `umap.ipynb` → `kin_03`
 - `tongue_kinematics_ephys.ipynb`, `tongue_kinematics_ephys_figures.ipynb` → `eph_*` / `kin_04`
-- `spatial_axis_comparison_rt_encoding.ipynb` (old dup of `_update`)
+- `spatial_axis_comparison_rt_encoding.ipynb` — **not a superseded duplicate; keep its
+  outputs.** It is the notebook that generated the poster figure
+  `rt_response_projection_abs.svg` (cell 42, `execution_count` 37, 2026-05-04, committed
+  in `2f20188`), and its **stored outputs are the only surviving record** of the
+  spike-count windows, waveform axis and unit counts behind that figure — they are what
+  made the 2026-09-16 replication possible. `_update` was created afterwards, with its
+  outputs cleared, and could prove none of it. Archived is the right place for it; do not
+  strip its outputs.
 - `old_functions_tongue_kinematics.ipynb`, `cue_response_lick_processing_example.ipynb`,
   `tongue_segmentation_test.ipynb`, `batch_clips.ipynb`, `create_labeled_clip.ipynb`
   (functions promoted to / owned by the library)
