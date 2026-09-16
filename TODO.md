@@ -10,7 +10,8 @@ _Logged 2026-09-11. Revised 2026-09-11 after a full cell-by-cell audit of all fi
 notebooks against the current `kin_*` / `eph_*` series._
 
 Read this section before picking up any of the six port items below it. The five HOLD
-notebooks in `REORG.md` are **not** five independent ports — their unreplicated content
+notebooks (listed in the archive table in `code/archive/README.md`) are **not** five
+independent ports — their unreplicated content
 clusters into five scientific questions that cut across notebooks, with real duplication
 between them. Porting notebook-by-notebook would reproduce that duplication in the new
 series.
@@ -400,7 +401,7 @@ plots them in the anatomical frame that makes them interpretable (jaw and spout 
 never asks the question that frame sets up: **does the direction of a preparatory tongue
 movement predict which spout the animal goes on to lick?**
 
-This is the content `REORG.md` previously summarized as "cue-response spatial geometry", which
+This is the content the old `REORG.md` summarized as "cue-response spatial geometry", which
 undersells it — the geometry is the setup, the choice prediction is the result.
 
 ### What to do
@@ -1286,17 +1287,18 @@ belongs to a separate repo-wide decision.
 Turned up while auditing `code/` for this plan. Independent of the lickometer notebook; each
 should be decided on its own.
 
-1. **`REORG.md` describes `model_quality.ipynb` wrongly** — listed as "foraging
-   behavioral-model quality"; it is a single-session Lightning-Pose pipeline walkthrough (load
-   → mask `tongue_tip_center` @0.90 → filter → segment → annotate → lick coverage), already on
-   modern library imports. One-line factual correction.
-2. **`test_session_wrapper.ipynb` is filed under methods evaluation but is a batch runner** —
-   19 cells, most commented out, wrapping `run_batch_analysis`. Operations, not evaluation;
-   arguably belongs under "KEEP — pipeline / data generation". One-line reclassification.
+1. ~~**`REORG.md` describes `model_quality.ipynb` wrongly**~~ — **fixed 2026-09-16.**
+   It was listed as "foraging behavioral-model quality"; it is a single-session Lightning-Pose
+   pipeline walkthrough (load → mask `tongue_tip_center` @0.90 → filter → segment → annotate →
+   lick coverage), already on modern library imports. Corrected in `CLAUDE.md`, which replaced
+   `REORG.md` as the map of `code/`.
+2. ~~**`test_session_wrapper.ipynb` is filed under methods evaluation but is a batch runner**~~
+   — **fixed 2026-09-16.** 19 cells, most commented out, wrapping `run_batch_analysis`.
+   Operations, not evaluation; now listed under pipeline / data generation in `CLAUDE.md`.
 3. **`tongue_kinematics.ipynb` cells 103–105 call `detect_licks_multiple`, which exists
    nowhere** — not in library `main`, `fix/video-csv-header`, `code/`, or local library history
    (`LC_manuscript` could not be fetched; "not found", not "does not exist"). This matters to
-   *that* notebook's archive gate: REORG's "already covered elsewhere — do not port" line is
+   *that* notebook's archive gate: the old REORG's "already covered elsewhere — do not port" line is
    true for cells 78–79, but 103–105 are a different, unrunnable analysis (a multi-keypoint
    contact detector). Either it gets re-derived somewhere or it is explicitly dropped, but
    `tongue_kinematics.ipynb` should not be archived under the claim that it is already covered.
@@ -1448,8 +1450,7 @@ Every downstream consumer already depends on these columns: `ephys_utils.py` (`k
 - Do this in the library repo (its own branch/PR), then bump the pin here. Batch it with the
   library-vs-repo module-boundary item above — both touch the library and both need a pin bump,
   so one round trip is cheaper than two.
-- Unblocks archiving `add_outbound.ipynb` and simplifies `tongue_movements_all.ipynb`
-  (see REORG.md).
+- Unblocks archiving `add_outbound.ipynb` and simplifies `tongue_movements_all.ipynb`.
 
 ---
 

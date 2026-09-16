@@ -4,6 +4,45 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `REORG.md` retired; `CLAUDE.md` now carries the real map of `code/`
+
+The reorg is finished, so its planning document is gone. Two files nominally held the same
+job — a map of `code/` — and the one Claude actually reads at session start was the weaker
+one: `CLAUDE.md`'s "Key notebooks and scripts" described `fip_utils`/`fip_00` in detail and
+said nothing about the 19 `eph_*`/`kin_*` notebooks.
+
+**`CLAUDE.md`** gained an accurate map: all 30 notebooks as one-line questions by series
+(`kin_*`, `eph_*`, `fip_*`, `val_*`, model-quality, pipeline), a table of the ten repo modules
+and what each owns, and a "things worth knowing before editing" list (the two cached
+intermediates, the load-bearing `eph_08`/`eph_09` spike-count windows, the absolute-vs-relative
+column-name trap in the pooled parquet, and the QC definition of noise). Also documents the
+flat-module import constraint, which was only recorded in `REORG.md`.
+
+**New section on the library.** `aind-dynamic-foraging-behavior-video-analysis` was never
+described in `CLAUDE.md` at all, despite being where most domain code lives and what the open
+TODO items refer to. It now records the repo and local clone path, that
+`environment/Dockerfile` installs it as an editable checkout pinned to `@main` (so a merge
+upstream reaches the capsule on its next image build, with no version pin to shield against
+it), `requires-python = ">=3.9"`, a table of its eight modules, and that its `README.md` is
+still the unedited AIND template — read the source, not the README. The known
+library-vs-repo boundary problem is stated there with a pointer to the `TODO.md` item.
+
+**Two misclassifications fixed rather than copied forward.** `TODO.md` had flagged both, and
+they would have been inherited verbatim:
+
+- `model_quality.ipynb` is a single-session Lightning-Pose pipeline walkthrough, **not**
+  foraging behavioral-model quality.
+- `test_session_wrapper.ipynb` is a batch runner wrapping `run_batch_analysis` — operations,
+  not methods evaluation. Moved to pipeline / data generation.
+
+**New `code/archive/README.md`** carries the archive rationale that would otherwise have been
+lost: what each archived notebook was superseded by, and — the part that matters — the warning
+not to strip outputs from `spatial_axis_comparison_rt_encoding.ipynb`, whose stored outputs are
+the only surviving record of the poster figure's provenance and are what made the replication
+possible.
+
+`REORG.md` itself is deleted; read it at `git show 52585bf:REORG.md`.
+
 ### `eph_09` MERFISH block ran — the reorg has nothing left waiting on a run
 
 The capsule image rebuild picked up `scanpy==1.10.3` and the MERFISH structural axis ran on
