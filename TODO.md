@@ -22,7 +22,7 @@ series.
 | `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26; also 5, 8, 9, 14 (§11, single-session illustration — reassigned from `kin_05` below on 2026-09-14) |
 | `kin_05_nonlick_movements` *(new)* — **done** | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
 | `kin_06_lick_geometry_choice` *(new)* — **done** | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
-| `kin_07_value_encoding` *(new)* | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
+| `kin_07_value_encoding` *(new)* — **written, unrun** | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
 | `eph_07_bout_encoding` *(new)* — **done** | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
 | `eph_09_structural_axes` *(new)* — **written, unrun** | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
 
@@ -125,7 +125,10 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
 5. `kin_06_lick_geometry_choice` — mostly pooled; two Code Ocean-only sections (§3–§4,
    which need per-session **spout** keypoints — the jaw turned out to be recoverable from
    the pooled parquet, see the item below). — **done**
-6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
+6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`. —
+   **written 2026-09-15; Code Ocean-only sections unrun.** Dependency confirmed live
+   (40 of 44 sessions have a fit; ~48 s for the full sweep), so the notebook pools
+   rather than running single-session as both sources do.
 
 Archive only when **all** gates for a notebook are met:
 
@@ -134,8 +137,8 @@ Archive only when **all** gates for a notebook are met:
 | `tongue_latency.ipynb` | `kin_02` §8–§11 (done) — **no remaining gate, ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` (done) — **no remaining gate, ready to archive** |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` — written, **gate open until it runs on Code Ocean** |
-| `tongue_kinematics.ipynb` | `kin_05` (done) **+** `kin_07` |
-| `tongue_kinematics_cueresponse.ipynb` | ~~`kin_06`~~ (done) **+** `kin_07` — **only the `kin_07` gate remains** |
+| `tongue_kinematics.ipynb` | `kin_05` (done) **+** `kin_07` — written, **gate open until it runs on Code Ocean** |
+| `tongue_kinematics_cueresponse.ipynb` | ~~`kin_06`~~ (done) **+** `kin_07` — written, **gate open until it runs on Code Ocean** |
 
 ---
 
@@ -421,7 +424,56 @@ undersells it — the geometry is the setup, the choice prediction is the result
 
 ## Create `kin_07_value_encoding.ipynb`
 
-_Logged 2026-09-11._
+_Logged 2026-09-11. **Written 2026-09-15** as `kin_07_value_encoding.ipynb` (40 cells,
+§1–§8). All of §3–§7 below landed — nothing was deferred. `tongue_kinematics.ipynb` and
+`tongue_kinematics_cueresponse.ipynb` are now both fully replicated; **neither archive
+gate closes until this notebook actually runs on Code Ocean**, which is the one remaining
+task on this item._
+
+**What ran and what did not.** The notebook was executed end-to-end locally: every
+Code-Ocean gate took its skip path, no errors, 23 code cells. Only **§6.1** (the kinematic
+covariance structure) produced real output — everything from §3.4 on needs per-session
+`nwb_df_trials.parquet`. The §6 screen machinery was verified separately against a
+**synthetic** latent built as a known function of one kinematic column (real kinematics,
+14,039 cue-response trials, 44 sessions; a hard target — the planted driver has
+ρ = 0.92–0.97 twins): all four methods ranked it first at two noise levels, and the
+pure-noise control returned q = 0.99 and held-out R² = −0.001. The screen is wired
+correctly; the real data path is not yet exercised.
+
+**Dependency status (checked before writing anything).** `get_mle_model_fitting` resolves,
+but `han_pipeline.get_mle_model_fitting` — the path both sources import — is now a
+**deprecated shim** forwarding to `df_mle_model_fitting.get_mle_model_fitting`; the
+notebook prefers the new path with a fallback. Coverage measured over all 44 sessions in
+~48 s: **40 have a `QLearning_L2F1_CKfull_softmax` fit**; the four sessions of subject
+**751004** (2024-12-20 … 2024-12-23) have no MLE records at all.
+
+**Flag — the "port once, defined identically" note below is wrong.** The two copies of
+`attach_model_latents_to_trials` differ in the **sign of `q_diff`** (`cueresponse` cell 13:
+`R − L`; `tongue_kinematics` cell 115: `L − R`), which flips every correlation involving
+it, and in where `q_diff_c` is derived. Ported once as `R_value − L_value`, matching
+`kin_06`'s "+y toward the animal's right" convention. See `CHANGELOG.md` 2026-09-15 (7)
+for the full decision list (restored alignment assertions, the two left/right-convention
+checks, `q_sum` added as the vigour control, why no jaw-reconstruction code was duplicated
+from `kin_06`).
+
+**Open follow-ups, in priority order:**
+
+1. **Run it on Code Ocean.** Read §8's ordered checklist first — §3.5's L/R check must
+   print SUPPORTED and §3.4's `latent_index_mode` must be "responded" for every session
+   before anything downstream is worth reading.
+2. **Then archive both HOLD notebooks** (a separate pass; see the gate table above).
+3. **Block-aware regressors are still not done, and this is now the second notebook to
+   defer them.** `kin_06` §8.5 hands the problem here; `kin_07` §6 conditions on nothing
+   either. Value covaries with block structure, choice side and time in session, and
+   `kin_06` §8.4 shows the previous-choice confound is strong in this dataset
+   (P(stay) = 0.910). A partial-correlation or within-choice-stratum version of the §6
+   screen is the obvious next step and deserves its own item once §6 has real output to
+   condition.
+4. `excursion_angle_deg` is circular and is treated linearly throughout, as both sources do.
+5. One agent (`QLearning_L2F1_CKfull_softmax`), taken from the sources with no
+   model-comparison step; that question lives in `model_quality.ipynb`.
+6. Sessions are treated as exchangeable across-session, but come from 13 subjects with 1–4
+   sessions each. A subject-level random effect would be more correct than the Wilcoxon.
 
 ### Why
 

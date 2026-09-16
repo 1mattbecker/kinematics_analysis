@@ -2,6 +2,141 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-15 (7)
+
+### `kin_07_value_encoding.ipynb` — new: do behavioural-model latents explain tongue kinematics?
+
+Sixth and last of the HOLD ports. Merges the kinematics-vs-model-latents analysis that
+existed in two partly-overlapping single-session copies — `tongue_kinematics.ipynb` cells
+111-138 and `tongue_kinematics_cueresponse.ipynb` cells 17-28 — into one pooled notebook.
+No `kin_*` or `eph_*` notebook previously used behavioural-model latents against
+kinematics (`eph_06` uses them against ephys), so this is a topic the refactored series
+did not track at all.
+
+**Status: written, executed locally only to the extent the data allows.** §6.1 (the
+kinematic covariance structure) runs on the pooled parquet and has real output; everything
+from §3.4 on needs per-session `nwb_df_trials.parquet` and is Code Ocean-only, so it is
+written and reasoned through but unexecuted. The notebook was run end-to-end locally to
+confirm every gate takes its skip path cleanly (no errors, 23 code cells).
+
+**Dependency check, done before writing anything.** `get_mle_model_fitting` still resolves,
+and the fetch is fast enough that pooling was never in question:
+
+- The import path both sources use —
+  `aind_analysis_arch_result_access.han_pipeline.get_mle_model_fitting` — is now a
+  **deprecated shim** forwarding to `...df_mle_model_fitting.get_mle_model_fitting`. The
+  notebook prefers the new path and falls back to the shim, so it survives the shim's
+  removal. `environment/Dockerfile` installs the package unpinned, so Code Ocean tracks
+  whatever is current — which is the argument for not importing through the shim. No
+  Dockerfile change needed (and none made).
+- **Coverage, measured over all 44 sessions in ~48 s:** 40 sessions have a
+  `QLearning_L2F1_CKfull_softmax` fit; the four sessions of subject **751004**
+  (2024-12-20 … 2024-12-23) have no MLE records at all and drop out.
+- Latent shapes confirmed: `q_value` and `choice_kernel` are `(2, N+1)`, `choice_prob`
+  `(2, N)`, `rpe` `(N,)`.
+
+**Pooled, not single-session.** Both sources run on one session. At ~1 s/session the fetch
+is not the cost driver, and pooling is what makes **session** available as a sampling unit
+— which is the whole point, given the statistics below. 40 sessions.
+
+### Three statistical problems in the sources, not inherited
+
+- **Pseudo-replication.** Both sources merge trial-level latents onto **movement**-level
+  rows (`tongue_with_q = tongue_movements.merge(...)`), so *n* becomes the movement count
+  while the predictor only varies per trial. Measured inflation in this dataset: 246,359
+  movements against ~14,000 trials. Fixed two ways together — aggregate to one row per
+  trial (`trials_cue`, the cue-response movement; `trials_mean`, the per-trial mean over
+  all movements), **and** make session the unit of inference (statistic computed within
+  session, tested across sessions). The one-cue-response-movement-per-trial assumption is
+  checked rather than assumed: 14,138 trials carry one, 9 carry two (0.06%), and the first
+  is kept.
+- **Multiple comparisons.** §6's grid is 24 kinematics × 11 latents = 264 tests;
+  uncorrected, ~13 would clear p < 0.05 with nothing present. Every p is BH-FDR corrected
+  across the whole grid (`multipletests(method="fdr_bh")`), matching `encoding_methods.py`
+  and `per_unit_stats_registry.py`. Noted in the notebook: a Wilcoxon on ~40 sessions has
+  a p-value **floor** (~8e-13 at n=44), so strong and very strong effects report the same
+  q — rank by |ρ|, not by q.
+- **Correlated features.** Quantified rather than asserted, in §6.1 (which runs): median
+  |ρ| among the 276 kinematic pairs is a mild 0.27, but 21 pairs exceed 0.7 and **five
+  exceed 0.99**. Within-session z-scored, `max_x` / `max_x_from_jaw` / `max_x_distance` are
+  literally the same variable (ρ = 1.000), as are `time_to_endpoint` / `out_duration`;
+  `endpoint_y` / `max_y_from_jaw` sit at 0.996. The prose next to the 2×2 figure says
+  plainly that RF importance splits credit arbitrarily across such blocks and MI
+  double-counts them, and that **only the RidgeCV R² panel is a genuinely predictive
+  measure** — it uses all kinematics jointly and is scored on held-out sessions
+  (`GroupKFold`, the same discipline `kin_06` §8 uses).
+
+### Other decisions worth recording
+
+- **`TODO.md` was wrong that `attach_model_latents_to_trials` is defined identically in the
+  two sources.** They differ in the sign of `q_diff` — `cueresponse` cell 13 computes
+  `R_value − L_value`, `tongue_kinematics` cell 115 computes `L_value − R_value` — which
+  flips the sign of every correlation involving it. Ported once, as **`R_value − L_value`**,
+  so that positive `q_diff` and positive `endpoint_y` in `kin_06`'s jaw-centred frame both
+  mean "toward the animal's right". The second difference: `tongue_kinematics` derives
+  `q_diff_c` from `animal_response` inside the function while `cueresponse` has that block
+  commented out and derives it later from the movement's `event`; the `animal_response`
+  version is used, being defined for every responded trial.
+- **Restored the alignment assertions both sources commented out.** A length mismatch
+  between the latent arrays and the trial table would otherwise shift every latent by an
+  unknown offset without raising. Because the upstream API does not document which trials
+  it fits, the function checks the fit length against *both* candidates (responded trials
+  vs all trials) and records which matched in a `latent_index_mode` column, so a mixture
+  across sessions is visible rather than silent.
+- **Added two checks of the left/right row convention (§3.5), which neither source makes.**
+  Both assume row 0 of each `(2, N)` array is left; a swap would negate `q_diff` and turn
+  `chosen_prob` into 1 − `chosen_prob` without erroring. Check 1 compares mean
+  `chosen_prob` against the fit's own reported `prediction_accuracy` (under a swap it would
+  match 1 − that instead); check 2 asserts mean `q_diff_c` > 0. Both fall out of quantities
+  the fit already reports.
+- **`q_sum` is new, not ported.** `TODO.md` §3 asks for it and neither source has it. It is
+  the natural control for `q_diff`: `q_diff` is about which option is better, `q_sum` about
+  how good the environment is overall — the vigour-like quantity a motor effect would most
+  plausibly track.
+- **§5's four pinned pairs are framed as descriptive, and §6.3 tests them.** The source
+  picked those pairs after looking at the data and attached p-values that ignore the
+  search. §6.3 re-runs the screen with the two jaw-derived columns appended and reports
+  each pinned pair's q and its rank within the full FDR-corrected grid, so "do the pinned
+  pairs fall out of the screen" is answered by the notebook rather than by the reader.
+- **`rpe_prev` is computed on the complete trial table before the merge**, not after.
+  Shifting after a merge that drops trials would make `rpe_prev` the RPE of the previous
+  trial *that had a cue-response movement*, which can be several trials back. The sources
+  happen to get this right; it is made explicit because the ordering is easy to invert.
+  §7 screens both `trials_cue` and `trials_mean`, since "how the animal moves on the next
+  trial" includes the preparatory non-lick movements `kin_05` establishes are real.
+- **No jaw-reconstruction code duplicated from `kin_06`.** `kin_06` §2.1 carries an
+  algebraic fallback because that notebook must run locally. `kin_07` cannot run locally at
+  all, so it reads the real `kps_raw_jaw.parquet` keypoint directly (`get_jaw_y`, 6 lines)
+  and the ~100-line fallback is deliberately not copied.
+- Dropped from the port as redundant or superseded: `tongue_kinematics` cells 119-134
+  (one-off `plot_kinematics_vs_q` calls, subsumed by the §6 screen), cells 131-134
+  (hexbin/scatter of kinematics against each other, no latents involved — that is `kin_01`
+  territory), and `cueresponse` cells 17, 22-24 (a commented-out plot helper and the
+  keypoint loading `kin_06` already owns).
+
+### Verification
+
+The model-fit path cannot run here, so the §6 screen machinery was tested **independently
+of the real latents**: real kinematics from
+`data/for_local/all_tongue_movements_04022026.parquet` (14,039 cue-response trials, 44
+sessions) against a *synthetic* latent built as a known linear function of one kinematic
+column plus noise, at two noise levels, with a pure-noise negative control. The driver was
+chosen to be a hard target — `excursion_angle_deg` sits at ρ = 0.92-0.97 with `endpoint_y`,
+`min_y`, `max_y` and `max_y_from_jaw` — so this tests discrimination against near-twins,
+not just against unrelated columns. Result: **all four methods ranked the planted driver
+first at both noise levels**; the noise control gave driver q = 0.99 and held-out
+R² = −0.001; RidgeCV ordered strong (0.80) > weak (0.31) > noise (−0.001). The test
+execs the notebook's own cell sources, so it exercises the shipped code rather than a copy.
+
+That run also produced the number quoted in §6's prose: a latent planted on **one**
+kinematic column made **17 of 24** columns clear FDR in the Spearman panel. Sixteen were
+not findings — which is the correlated-feature caveat, measured.
+
+### Files
+
+- `code/kin_07_value_encoding.ipynb` — new, 40 cells (8 sections).
+- `TODO.md`, `REORG.md` — `kin_07` moved out of planned; both HOLD rows updated.
+
 ## 2026-09-15 (6)
 
 ### `kin_06_lick_geometry_choice.ipynb` — jaw position now read from real keypoints, preferentially

@@ -18,7 +18,7 @@ current-state map only.
 
 ## KEEP — active analysis (flat)
 
-- `eph_00`–`eph_09` · `kin_00`–`kin_06` · `fip_00_explore`
+- `eph_00`–`eph_09` · `kin_00`–`kin_07` · `fip_00_explore`
   - `eph_07_bout_encoding`: within-trial (go-responsive) vs ITI LC-unit encoding of
     tongue-movement bouts, ported from `tongue_kinematics_ephys_intertrialmovs.ipynb`.
     Movement-bout-derived (`annotate_movement_bouts` + `classify_bout_times` /
@@ -69,6 +69,30 @@ current-state map only.
     previous-choice strata). `plot_standard_lick_landmarks` lives in the notebook, not
     `plotstyle.py` — one consumer. Executed end-to-end locally except §3–§4.
     `tongue_kinematics_cueresponse.ipynb` now gates on `kin_07` alone. See `TODO.md`.
+  - `kin_07_value_encoding`: do behavioural-model latents (Q, RPE) explain tongue
+    kinematics? The one topic the refactored series did not track at all — merged from
+    the two partly-overlapping single-session copies in `tongue_kinematics` (111–138) and
+    `cueresponse` (17–28). Latents come from `get_mle_model_fitting`; the notebook
+    imports it from `aind_analysis_arch_result_access.df_mle_model_fitting` (the
+    `han_pipeline` path both sources use is now a deprecated shim) with a fallback.
+    **Pooled, not single-session**: the fetch is ~1 s/session, 40 of 44 sessions have a
+    `QLearning_L2F1_CKfull_softmax` fit (subject 751004's four sessions have no MLE
+    records), and pooling is what makes **session** available as the sampling unit.
+    Three statistical problems in the sources are corrected rather than inherited —
+    pseudo-replication (trial-level latents merged onto 246k movement rows; fixed by
+    aggregating to one row per trial *and* testing across sessions), no
+    multiple-comparison control (§6's 24×11 grid is BH-FDR corrected throughout), and
+    over-read correlated features (§6.1 measures the redundancy: five kinematic pairs
+    exceed ρ = 0.99, three columns are literally the same variable once within-session
+    z-scored, so only the `GroupKFold`-on-session RidgeCV R² panel is a genuine
+    predictive measure). `TODO.md`'s claim that `attach_model_latents_to_trials` is
+    defined identically in the two sources is **wrong** — they differ in the sign of
+    `q_diff`; ported once as `R − L`, matching `kin_06`'s frame. **Code Ocean only and
+    effectively unexecuted**: §6.1 is the only section with real output; the §6 screen
+    machinery was verified against a synthetic latent instead. Both
+    `tongue_kinematics.ipynb` and `tongue_kinematics_cueresponse.ipynb` are now fully
+    replicated, but **their archive gates stay open until this runs on Code Ocean**.
+    See `TODO.md`.
   - `eph_09_structural_axes`: does the RT-encoding spatial gradient align with LC's
     structural organization? Fits the RT-encoding axis (`T_rt`) and its baseline control
     (`T_rt_bl`) — the step `eph_08` skipped — plus three structural axes: waveform
@@ -113,12 +137,10 @@ current-state map only.
 
 ### Planned additions (from the HOLD ports — see `TODO.md`)
 
-Not yet written (except where noted). Listed here so the target layout is legible
-before the remaining ports land.
-
-| Planned | Kind | Gates archiving of |
-|---|---|---|
-| `kin_07_value_encoding.ipynb` | new | `tongue_kinematics`, `tongue_kinematics_cueresponse` |
+**Nothing remains planned.** `kin_07_value_encoding.ipynb` — the last of the six ports —
+landed 2026-09-15 and is in KEEP above. What remains is not writing but *running*: `kin_07`
+and `eph_09` are both written and unexecuted on Code Ocean, and those two runs are the only
+things holding open the archive gates for three of the five HOLD notebooks.
 
 **No new modules remain planned.** `spatial_axes.py` landed 2026-09-15 with
 `eph_09_structural_axes.ipynb` (both now in KEEP above), and `eph_08` was refactored onto it,
@@ -161,16 +183,18 @@ of them.
 | `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal~~ **all done, in `kin_02` §8–§11** | `kin_02` §8–§11 (done) — **no remaining gate; ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | ~~within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts`~~ **done, in `eph_07`** | `eph_07` (done) — **no remaining gate; ready to archive** |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | ~~RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones~~ **all written, in `eph_09` + `spatial_axes.py`** | `eph_09` (done, **unrun**) — gate open until `eph_09` executes on Code Ocean |
-| `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; **kinematics vs behavioral-model latents** (Spearman/MI/RidgeCV/RF, prev-trial RPE) still open | `kin_05` (done) **+** `kin_07` |
-| `tongue_kinematics_cueresponse.ipynb` | ~~jaw/spout landmark geometry + endpoints by event; choice prediction from pre-lick kinematics (ridge-logistic, AUC, binned P(right lick))~~ **done, in `kin_06` §3–§9**; **Q-value encoding** still open | ~~`kin_06`~~ (done) **+** `kin_07` — **only the `kin_07` gate remains** |
+| `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; ~~kinematics vs behavioural-model latents (Spearman/MI/RidgeCV/RF, prev-trial RPE)~~ **all written, in `kin_07` §3–§7** | `kin_05` (done) **+** `kin_07` (written, **unrun**) — gate open until `kin_07` executes on Code Ocean |
+| `tongue_kinematics_cueresponse.ipynb` | ~~jaw/spout landmark geometry + endpoints by event; choice prediction from pre-lick kinematics (ridge-logistic, AUC, binned P(right lick))~~ **done, in `kin_06` §3–§9**; ~~Q-value encoding~~ **done, in `kin_07` §3–§6** | ~~`kin_06`~~ (done) **+** `kin_07` (written, **unrun**) — gate open until `kin_07` executes on Code Ocean |
 
 Two corrections to the earlier reading of this table:
 
 - **`cueresponse` is not just "spatial geometry."** The landmark figures are the setup for a
   choice-prediction analysis (cells 43–56) that is the actual result.
-- **Kinematics × behavioral-model latents is an untracked topic**, present in *two* of these
+- **Kinematics × behavioural-model latents is an untracked topic**, present in *two* of these
   notebooks and in no `kin_*`/`eph_*` notebook. It gates two archivals, so neither
   `tongue_kinematics` nor `tongue_kinematics_cueresponse` can be retired without `kin_07`.
+  `kin_07` was written 2026-09-15 and covers both; because it is Code Ocean-only and
+  unexecuted, both gates stay open until it runs.
 
 Already covered elsewhere — do **not** port: `tongue_kinematics` cells 78–79 (lick-detection
 FP/FN parameter sweep) duplicate `tongue_lickometer.ipynb`, which is KEEP.
@@ -219,7 +243,10 @@ per-notebook section outlines are in `TODO.md`):
    source notebook's archive gate stays open. See `TODO.md`.
 5. `kin_06_lick_geometry_choice` — pooled in a reconstructed jaw-centered frame; two
    Code Ocean-only sections (§3–§4, per-session spout keypoints). — **done**
-6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`.
+6. `kin_07_value_encoding` — pooled over the 40 sessions with an MLE fit; new dependency
+   on `get_mle_model_fitting`, confirmed live. — **written 2026-09-15, unrun on Code Ocean.**
 
-Archive a HOLD notebook only when **every** gate in the HOLD table above is met — three of the
-five wait on two ports each.
+Archive a HOLD notebook only when **every** gate in the HOLD table above is met. All six ports
+are now *written*; three of the five HOLD notebooks wait only on `kin_07` and `eph_09`
+executing on Code Ocean. Two — `tongue_latency.ipynb` and
+`tongue_kinematics_ephys_intertrialmovs.ipynb` — have no remaining gate at all.
