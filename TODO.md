@@ -676,15 +676,7 @@ Both notebooks execute clean locally through their skip paths.
 3. **The MERFISH block specifically** needs the rebuilt image. Until then it will print
    `Could not load MERFISH data: No module named 'scanpy'` and set `HAS_MERFISH = False` —
    which is the guard working, not a bug. Re-run after the rebuild.
-4. **`eph_09` §8 projects *signed* `T_rt`**, while the reference figure is `|T_rt|`
-   (abs). Its wf panel therefore will **not** match `rt_response_projection_abs.svg` until
-   `feat_proj` is wrapped in `np.abs`. Decide which is the headline before running — the
-   reference's signed-`T_rt` panels are a separate figure (its cells 38/40, all ns).
-5. **No anatomical filter outside `eph_08`/`eph_09`.** The `z_ccf` bounds filter added here
-   is the only thing excluding mislocalised units; `data_loading`'s QC checks spike quality
-   only. `eph_04` and `spatial_encoding.py` project the same unit table and still include
-   unit 85. Consider lifting the filter into `data_loading` or `spatial_encoding`.
-6. **`scanpy==1.10.3` against the pinned block.** Isolated `RUN` layers separate pip's
+4. **`scanpy==1.10.3` against the pinned block.** Isolated `RUN` layers separate pip's
    *resolution*, not the environment — scanpy can still move shared packages. `scipy==1.13.0`
    is re-asserted in that layer as a tripwire. If the build fails there, that is the tripwire
    firing: resolve it rather than dropping the pin.

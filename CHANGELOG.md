@@ -478,8 +478,9 @@ moved into the library.
   figure" subsection — where the figure came from, the two root causes (windows, ML fold),
   what was deliberately not matched (the mesh), and why the archived notebook's stored
   outputs and `execution_count` values were the whole case. Superseded the window values in
-  the 2026-09-15 `all_counts_df` fix note. Added two new open items: `eph_09` §8 projects
-  signed `T_rt` rather than `|T_rt|`, and no anatomical filter exists outside eph_08/eph_09.
+  the 2026-09-15 `all_counts_df` fix note. (Two further items raised here — eph_09 §8's
+  signed `T_rt` and the absence of an anatomical filter outside eph_08/eph_09 — were
+  reviewed and dropped 2026-09-16.)
 - `REORG.md`: corrected `spatial_axis_comparison_rt_encoding.ipynb`'s ARCHIVE entry — it is
   **not** an "old dup of `_update`" but the notebook that generated the poster figure, and
   the only surviving record of its provenance. Updated both HOLD rows.
