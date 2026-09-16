@@ -4,6 +4,24 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### eph_08 / eph_09: fold ML to the positive side (second replication fix)
+- After the window fix, `eph_08` produced r=0.19, p=0.0637, n=99 against the reference's
+  r=0.184, p=0.0681, n=99 — n exact, r off by ~0.006.
+- Cause: the ML fold sign. Both notebooks folded unit coordinates to `-ML`
+  (`ccfs[:, ml] = -np.abs(...)`) while the structural axes are *fitted* in `+ML` space
+  (`ccf_wf[:, ml] = np.abs(...)`), flipping the ML component of every projection relative to
+  the axis it is projected onto. The reference folds to `+ML` ("POSITIVE, matching upstream").
+  Isolated locally: `+ML` gives r=0.0130 and `-ML` gives r=0.0230 on the cached table, a
+  +0.010 shift matching the observed gap in sign and magnitude.
+- Flipped to `np.abs` in `ccf_points_lps_mm` (parameter renamed `fold_left` -> `fold_right`,
+  all call sites updated), the mesh centroid, and `eph_09`'s §7 arrow origin.
+- Kept the newer `20250418_transformed_remesh_10_ccf25.obj` mesh rather than the reference's
+  `new_core_mesh.obj`. Centering is a pure translation along the axis, so this leaves r, p
+  and n unchanged and only offsets the plotted x-axis (~0.19 mm vs the reference figure).
+  Verified the mesh is entirely `+ML` (0.519-1.311 mm, 0 of 40208 vertices negative), so
+  `eph_09`'s §7 contours are unaffected by the fold change.
+
+
 ### eph_08 / eph_09: use the reference run's spike-count windows and z_ccf filter
 - Traced the poster figure `rt_response_projection_abs.svg` (2026-05-04 00:34:41) to
   `code/archive/spatial_axis_comparison_rt_encoding.ipynb` cell 42 (`execution_count` 37),
