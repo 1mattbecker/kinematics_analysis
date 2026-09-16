@@ -4,6 +4,36 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_03_missed_licks`: use the library's video alignment instead of a hand-rolled offset
+
+§2 computed the session-to-video offset itself, as the per-row difference between `kps_raw_*`'s
+video-relative `time` and `tongue_kins`'s `time_in_session`. The library already owns this:
+
+- `kinematics.video_clip_utils.get_video_time(session_time, tongue_kins)` reads the offset off the
+  first row of `tongue_kins`, which carries both time bases. Called at 0 it returns the offset.
+- `video_alignment.session_time_to_video_time(times, offset)` applies it in §6.
+- `kinematics.video_clip_utils.find_labeled_video(session_id, data_root)` locates the session's
+  labeled video under `<root>/<session>*/pred_outputs/video_preds/labeled_videos/*_labeled.mp4`,
+  replacing a hardcoded `video_preds_labeltest` path.
+
+`load_session` now reads `time` and `time_in_session` from `tongue_kins` and returns the library's
+offset. Checked: the library offset and the previous per-row median agree exactly on a planted
+12.34 s offset, `session_time_to_video_time` matches `get_video_time` elementwise, and the
+session→video→session round trip is exact. `find_labeled_video` was tested both ways — it returns
+the file when the layout exists and raises `FileNotFoundError` otherwise, which the cell catches
+and reports as a skip.
+
+`video_alignment.compute_video_session_offset` is the other entry point, computing the same
+quantity from the raw acquisition CSV plus the first go-cue time. It is noted in §2 but not used,
+since the intermediate tables already carry both bases and the raw CSV is not in
+`intermediate_data/`.
+
+Clip cutting stays on `tongue_lickometer_utils.extract_clips_ffmpeg_encode`, which re-encodes and
+so lands on the requested frame. `video_clip_utils.extract_clips_ffmpeg_after_reencode` is faster
+and supports `filename_stems`, but stream-copies with `-c copy`, which snaps the start to the
+nearest preceding keyframe — too coarse for a 1 s clip centered on one event at 500 fps. The
+tradeoff is recorded in a comment at the call site.
+
 ### `val_03_missed_licks`: new notebook — pose tracking as QC on lickometer misses
 
 Answers [dynamic-foraging-processing#96](https://github.com/AllenNeuralDynamics/dynamic-foraging-processing/issues/96),
