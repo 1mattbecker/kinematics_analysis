@@ -620,7 +620,8 @@ movements (which is exactly what `kin_05` establishes).
 
 ## Create `spatial_axes.py` and `eph_09_structural_axes.ipynb`
 
-_Logged 2026-09-11. **Written 2026-09-15 — code complete, NOT yet executed on Code Ocean.**
+_Logged 2026-09-11. **Written 2026-09-15. `eph_08` replicated the reference figure on Code
+Ocean 2026-09-16 (see "Replication" below); `eph_09` is still NOT executed there.**
 Both external assets confirmed mounted by the user before starting; `scanpy==1.10.3` added to
 `environment/Dockerfile` in its own layer, so **the capsule image must be rebuilt** before the
 MERFISH block can run._
@@ -640,10 +641,9 @@ Both notebooks execute clean locally through their skip paths.
 
 **NOT verified — needs a Code Ocean run:**
 
-1. **`eph_08` output equivalence on real data.** The refactor is a pure move and was shown
-   bit-identical on synthetic input, but `eph_08` skips locally, so the poster figure
-   `rt_response_projection_abs` has **not** been regenerated. Check it first — compare the
-   printed waveform axis and the figure's r / p / n against the previous run.
+1. ~~**`eph_08` output equivalence on real data.**~~ **Done 2026-09-16** — `eph_08`
+   reproduces the reference figure exactly (r=0.184 displayed as 0.18, **p=0.0681**, n=99).
+   It took two fixes; see "Replication of the reference figure" below.
 2. **Everything in `eph_09` past §1.** No cell touching real data has run. Expect to debug
    column names on first contact, in particular:
    - ~~`all_counts_df` must carry `baseline_spike_count`~~ — superseded: see the
@@ -657,7 +657,15 @@ Both notebooks execute clean locally through their skip paths.
 3. **The MERFISH block specifically** needs the rebuilt image. Until then it will print
    `Could not load MERFISH data: No module named 'scanpy'` and set `HAS_MERFISH = False` —
    which is the guard working, not a bug. Re-run after the rebuild.
-4. **`scanpy==1.10.3` against the pinned block.** Isolated `RUN` layers separate pip's
+4. **`eph_09` §8 projects *signed* `T_rt`**, while the reference figure is `|T_rt|`
+   (abs). Its wf panel therefore will **not** match `rt_response_projection_abs.svg` until
+   `feat_proj` is wrapped in `np.abs`. Decide which is the headline before running — the
+   reference's signed-`T_rt` panels are a separate figure (its cells 38/40, all ns).
+5. **No anatomical filter outside `eph_08`/`eph_09`.** The `z_ccf` bounds filter added here
+   is the only thing excluding mislocalised units; `data_loading`'s QC checks spike quality
+   only. `eph_04` and `spatial_encoding.py` project the same unit table and still include
+   unit 85. Consider lifting the filter into `data_loading` or `spatial_encoding`.
+6. **`scanpy==1.10.3` against the pinned block.** Isolated `RUN` layers separate pip's
    *resolution*, not the environment — scanpy can still move shared packages. `scipy==1.13.0`
    is re-asserted in that layer as a tripwire. If the build fails there, that is the tripwire
    firing: resolve it rather than dropping the pin.
@@ -693,10 +701,55 @@ probably never executed as written. `/root/capsule/scratch` is also not persiste
 Ocean, so even a file that once existed there is gone.
 
 **Fix:** both notebooks now follow the `eph_02` pattern —
-`load_units_with_spike_times` → `build_all_counts_df(units_with_spikes, cfg, base_dirs)` with
-the project-wide `AnalysisConfig(align_key="goCue", count_window_s=(0.0, 0.2),
-baseline_window_s=(-1.0, 0.0), min_trials_per_group=20)`, which is what `eph_01`–`eph_06` use
-and what `eph_08`'s own markdown documents.
+`load_units_with_spike_times` → `build_all_counts_df(units_with_spikes, cfg, base_dirs)`.
+
+> **Superseded 2026-09-16 on the window values only.** That fix used the project-wide
+> `count_window_s=(0.0, 0.2)`, `baseline_window_s=(-1.0, 0.0)`. Those are `eph_01`–`eph_06`'s
+> windows but **not** the reference figure's, and they are why the first Code Ocean run gave
+> r=0.013 instead of 0.184. Both notebooks now use `(0.0, 0.5)` / `(-2.0, 0.0)`. Building
+> `all_counts_df` in-notebook (rather than reading a path) was and remains correct.
+
+### Replication of the reference figure (resolved 2026-09-16)
+
+**Target.** `rt_response_projection_abs.svg` — three panels, `|T_rt|` (response, abs)
+projected onto the waveform / MERFISH / retrograde axes; wf panel r=0.184, p=0.0681, n=99.
+
+**Where it came from.** `code/archive/spatial_axis_comparison_rt_encoding.ipynb` cell 42
+(`execution_count` 37), saved to `/root/capsule/scratch/figures/poster/`, SVG timestamp
+2026-05-04 00:34:41, committed 16 minutes later in `2f20188`. **Not** `_update` — that file
+was *created* in the same commit, after the figure existed. Confirmed independently: the
+SVG's per-panel x-tick colours are that notebook's `COLORS` entries for the three axes, and
+cell 42's stored output carries the figure's r/p/n verbatim.
+
+**Two root causes, both now fixed:**
+
+1. **Spike-count windows.** Cell 9 of that run (`execution_count` 7) builds `all_counts_df`
+   with `count_window_s=(0.0, 0.5)`, `baseline_window_s=(-2, 0.0)` — also the published
+   analysis's windows (500 ms post-cue, 2 s pre-cue baseline). `eph_08`/`eph_09` had
+   `(0.0, 0.2)` / `(-1.0, 0.0)`, inherited from a **commented-out** cfg in `_update` whose
+   values had already been changed. Fixing this moved r from 0.013 to 0.19.
+2. **ML fold sign.** The reference folds unit coordinates to `+ML`
+   (`ccfs[:, ml] = np.abs(...)`, commented "POSITIVE, matching upstream"); `eph_08`/`eph_09`
+   folded to `-ML` while the structural axes are *fitted* in `+ML` space
+   (`ccf_wf[:, ml] = np.abs(...)`), flipping the ML component of every projection relative to
+   the axis it is projected onto. Fixing this moved r from 0.19 to 0.184.
+
+Also added: the reference's `z_ccf` ∈ [-5.2, -3.5] anatomical filter, which drops exactly one
+mislocalised unit (`behavior_758017_2025-02-06_11-26-14` unit 85, `z_ccf = -2.174`, 2.25 mm
+from the mesh centroid vs 0.79 mm for every other unit), taking n from 100 to 99. In `eph_09`
+it sits **after** the axis fits and **before** §8, matching the reference's ordering (axis fit
+n=100, projections n=99).
+
+**Deliberately not matched: the mesh.** The reference uses `new_core_mesh.obj` with a bespoke
+transform; both notebooks keep `20250418_transformed_remesh_10_ccf25.obj` + `pir_to_lps`.
+Centering is a pure translation along the projection axis, so r, p and n are unaffected and
+only the plotted x-axis shifts (~0.19 mm; ours spans ≈ -0.65…+0.58, the reference
+-0.78…+0.44). Verified locally: with the `+ML` fold, both meshes give identical r.
+
+**Method note worth keeping.** The whole case rested on the archived notebook's **stored
+outputs and `execution_count` values** — they pinned the windows, the axis, the unit counts
+and the run ordering. `_update` had its outputs cleared and could prove none of it. Clearing
+notebook outputs is lossy for provenance.
 
 **Assumption to check on the next run:** that this cfg matches whatever produced the
 now-missing cached parquet. If `eph_08`'s poster figure comes out numerically different from

@@ -146,6 +146,18 @@ moved into the library.
   `detect_licks_multiple` orphaned in `tongue_kinematics.ipynb`) recorded as explicitly
   **out of scope** for that item.
 
+### Docs: record the reference-figure replication
+- `TODO.md`: replaced the stale "eph_08 output equivalence … not verified" item (and the
+  earlier claim that the target was unreproducible) with a "Replication of the reference
+  figure" subsection — where the figure came from, the two root causes (windows, ML fold),
+  what was deliberately not matched (the mesh), and why the archived notebook's stored
+  outputs and `execution_count` values were the whole case. Superseded the window values in
+  the 2026-09-15 `all_counts_df` fix note. Added two new open items: `eph_09` §8 projects
+  signed `T_rt` rather than `|T_rt|`, and no anatomical filter exists outside eph_08/eph_09.
+- `REORG.md`: corrected `spatial_axis_comparison_rt_encoding.ipynb`'s ARCHIVE entry — it is
+  **not** an "old dup of `_update`" but the notebook that generated the poster figure, and
+  the only surviving record of its provenance. Updated both HOLD rows.
+
 ### eph_08 / eph_09: fold ML to the positive side (second replication fix)
 - After the window fix, `eph_08` produced r=0.19, p=0.0637, n=99 against the reference's
   r=0.184, p=0.0681, n=99 — n exact, r off by ~0.006.
