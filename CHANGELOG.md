@@ -4,6 +4,30 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### Docs: reconcile `TODO.md` / `REORG.md` with the completed runs
+
+Status review after `eph_09` and `kin_07` ran on Code Ocean. Five places still described work
+that is finished:
+
+- `TODO.md` carried an **orphaned second gate table** — an earlier patch replaced the table
+  header but left the old body rows, so the file listed three archive gates as still open
+  directly below the table saying all five were met. Removed.
+- `TODO.md` recommended-order items 4 and 6 still read "not yet run on Code Ocean" / "Code
+  Ocean-only sections unrun" for `eph_09` and `kin_07`. Both now record the 2026-09-16 runs.
+- `TODO.md`'s `eph_09` "NOT verified" item 2 ("Everything in `eph_09` past §1. No cell
+  touching real data has run.") is struck through — the run needed none of the debugging it
+  anticipated. Only the MERFISH block remains gated, on the `scanpy` image rebuild.
+- `REORG.md`'s "Planned additions" still said `kin_07` and `eph_09` were unexecuted and
+  holding three gates open.
+- `REORG.md`'s `val_02_lickometer` entry still described it as not running and mid-repair;
+  `val_03_missed_licks.ipynb` was missing from KEEP entirely.
+
+Also corrected the notebook count: `code/` went 34 → 29 at Phase 2 close, and is at 30 now
+that `val_03_missed_licks` has landed.
+
+No analysis code touched.
+
+
 ### `val_03_missed_licks`: state the confidence conditioning in §4, plot densities
 
 Both §4 distributions were already measured from the same confidence-filtered arrays —
