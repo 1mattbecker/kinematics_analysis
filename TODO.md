@@ -130,10 +130,29 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
    (40 of 44 sessions have a fit; ~48 s for the full sweep), so the notebook pools
    rather than running single-session as both sources do.
 
-Archive only when **all** gates for a notebook are met:
+**All gates met — all five HOLD notebooks archived 2026-09-16.**
 
-| HOLD notebook | Archive after |
-|---|---|
+| HOLD notebook | Gate | Archived |
+|---|---|---|
+| `tongue_latency.ipynb` | `kin_02` §8–§11 | ✅ |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` | ✅ |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` (run, good) | ✅ |
+| `tongue_kinematics.ipynb` | `kin_05` + `kin_07` (run, good) | ✅ |
+| `tongue_kinematics_cueresponse.ipynb` | `kin_06` + `kin_07` (run, good) | ✅ |
+
+Verified before moving: **no executable dependency** on any of the five from anything in
+`code/` — every apparent hit was either the library module `tongue_kinematics_utils` (a
+substring match, not the notebook) or a provenance line in a docstring/comment.
+
+`spatial_axis_comparison_rt_encoding_update.ipynb` is fully superseded: eph_09 covers its
+§1–§3 (units/RT encoding), §4 (CCF+mesh), §6 (RT axis), §7 (structural axes), §8 (comparison),
+§9 (arrows+cones) and §9b (projection scatters); §5's axis machinery became `spatial_axes.py`;
+§9b's abs-`T_rt` panel is `eph_08` §5; §12's commented-out registry sketch is answered by
+eph_09 using `PerUnitStatsRegistry` properly in §2.
+
+**This closes the HOLD-port work begun 2026-09-11.** `code/` is down to 29 notebooks.
+
+---|---|
 | `tongue_latency.ipynb` | `kin_02` §8–§11 (done) — **no remaining gate, ready to archive** |
 | `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` (done) — **no remaining gate, ready to archive** |
 | `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` — written, **gate open until it runs on Code Ocean** |

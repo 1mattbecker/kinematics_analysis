@@ -178,38 +178,22 @@ the file. Rationale in `TODO.md`'s `eph_07` item.
   gap-aware hysteretic one — on the single session it already uses. Renamed to
   `val_02_lickometer.ipynb` 2026-09-16. See `TODO.md`.
 
-## HOLD — port unreplicated content before archiving (see `TODO.md`)
+## HOLD — cleared 2026-09-16
 
-Audited cell-by-cell on 2026-09-11. The unreplicated content does **not** map one-notebook-to-one-port:
-it clusters into five questions that cut across these files, with duplication between them. Read
-the "Port plan for the five HOLD notebooks" overview at the top of `TODO.md` before starting any
-of them.
+**Empty.** All five HOLD notebooks were ported into the `kin_*`/`eph_*` series and archived
+on 2026-09-16; see `TODO.md` for the per-notebook gates and the port details.
 
-| File | Unreplicated content | Ports into |
-|---|---|---|
-| `tongue_latency.ipynb` | ~~RT + IMI decomposition (Δt de-shift, KS collapse, noise propagation w/ bootstrap CI); single-trial example fig; trial rasters by movement type / ordinal~~ **all done, in `kin_02` §8–§11** | `kin_02` §8–§11 (done) — **no remaining gate; ready to archive** |
-| `tongue_kinematics_ephys_intertrialmovs.ipynb` | ~~within-trial vs ITI bout-aligned ephys encoding; sole copy of `annotate_movement_bouts`~~ **done, in `eph_07`** | `eph_07` (done) — **no remaining gate; ready to archive** |
-| `spatial_axis_comparison_rt_encoding_update.ipynb` | ~~RT-encoding spatial axis fit (`eph_08` skipped it), MERFISH (CCA) + retrograde (LDA) axes, bootstrap direction comparison, confidence cones~~ **all written, in `eph_09` + `spatial_axes.py`** | `eph_09` (done, **unrun**) — gate open until `eph_09` executes on Code Ocean. `eph_08` cleared its own check 2026-09-16: reproduces the poster figure at r=0.184, p=0.0681, n=99, after fixing the spike-count windows and the ML fold (see `TODO.md`). |
-| `tongue_kinematics.ipynb` | ~~lick↔movement correspondence (licks w/o movements, movements w/o licks, multi-lick); per-trial non-lick structure~~ **done, in `kin_05` §3, §5–§8**; ~~kinematics vs behavioural-model latents (Spearman/MI/RidgeCV/RF, prev-trial RPE)~~ **all written, in `kin_07` §3–§7** | `kin_05` (done) **+** `kin_07` (written, **unrun**) — gate open until `kin_07` executes on Code Ocean |
-| `tongue_kinematics_cueresponse.ipynb` | ~~jaw/spout landmark geometry + endpoints by event; choice prediction from pre-lick kinematics (ridge-logistic, AUC, binned P(right lick))~~ **done, in `kin_06` §3–§9**; ~~Q-value encoding~~ **done, in `kin_07` §3–§6** | ~~`kin_06`~~ (done) **+** `kin_07` (written, **unrun**) — gate open until `kin_07` executes on Code Ocean |
+| Former HOLD notebook | Ported into |
+|---|---|
+| `tongue_latency.ipynb` | `kin_02` §8–§11 **+** `kin_05` |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` **+** bout helpers in `ephys_utils.py` |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` **+** `spatial_axes.py` (and `eph_08` §5) |
+| `tongue_kinematics.ipynb` | `kin_05` **+** `kin_07` |
+| `tongue_kinematics_cueresponse.ipynb` | `kin_06` **+** `kin_07` |
 
-Two corrections to the earlier reading of this table:
-
-- **`cueresponse` is not just "spatial geometry."** The landmark figures are the setup for a
-  choice-prediction analysis (cells 43–56) that is the actual result.
-- **Kinematics × behavioural-model latents is an untracked topic**, present in *two* of these
-  notebooks and in no `kin_*`/`eph_*` notebook. It gates two archivals, so neither
-  `tongue_kinematics` nor `tongue_kinematics_cueresponse` can be retired without `kin_07`.
-  `kin_07` was written 2026-09-15 and covers both; because it is Code Ocean-only and
-  unexecuted, both gates stay open until it runs.
-
-Already covered elsewhere — do **not** port: `tongue_kinematics` cells 78–79 (lick-detection
-FP/FN parameter sweep) duplicate `val_02_lickometer.ipynb`, which is KEEP.
-
-Also tracked in `TODO.md`: consolidate the duplicated `compute_outbound_metrics`
-(`add_outbound` + `tongue_movements_all`) into the library. `annotate_movement_bouts` is the
-same orphan-code pattern — it lands in `ephys_utils.py` with `eph_07`, and becomes a library
-candidate once `eph_07` has exercised it and the library/repo boundary criteria exist.
+Still open and tracked in `TODO.md`: consolidate `compute_outbound_metrics` into the library;
+`annotate_movement_bouts` is the same orphan-code pattern and now lives in `ephys_utils.py`
+pending the library/repo boundary decision.
 
 ## ARCHIVE — ready to move to `code/archive/`
 
