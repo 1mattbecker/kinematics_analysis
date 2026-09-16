@@ -2,6 +2,36 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-16
+
+### eph_08 / eph_09: use the reference run's spike-count windows and z_ccf filter
+- Traced the poster figure `rt_response_projection_abs.svg` (2026-05-04 00:34:41) to
+  `code/archive/spatial_axis_comparison_rt_encoding.ipynb` cell 42 (`execution_count` 37),
+  committed 16 min later in `2f20188`. Confirmed by the SVG's per-panel tick colours, which
+  are that notebook's `COLORS` entries for the waveform / MERFISH / retrograde axes, and by
+  cell 42's stored output matching the figure's r/p/n exactly.
+- **Root cause of the failed replication: the spike-count windows.** Cell 9 of that run
+  (`execution_count` 7) builds `all_counts_df` with `count_window_s=(0.0, 0.5)` and
+  `baseline_window_s=(-2, 0.0)`. `eph_08`/`eph_09` had `(0.0, 0.2)` / `(-1.0, 0.0)`,
+  inherited from a commented-out cfg in `spatial_axis_comparison_rt_encoding_update.ipynb`
+  — a file created *after* the figure, in the same commit, whose commented block had already
+  been changed. The 500 ms / 2 s windows also match the published analysis.
+- Changed both notebooks to `(0.0, 0.5)` / `(-2.0, 0.0)`; both continue to build
+  `all_counts_df` in-notebook. Added a markdown note before each counts cell recording the
+  provenance and a numeric check (response window should give 50 nominally / 43 FDR
+  significant units of 103; 42 / 36 means the old windows are still in effect), plus prints
+  of those counts.
+- Added the reference's `z_ccf` ∈ [-5.2, -3.5] anatomical filter with its own note. It drops
+  exactly one mislocalised unit (`behavior_758017_2025-02-06_11-26-14` unit 85,
+  `z_ccf = -2.174`, 2.25 mm from the mesh centroid vs 0.79 mm for every other unit), taking
+  the projection from n=100 to the reference's n=99. In `eph_09` it is placed after the axis
+  fits and before §8, matching the reference's ordering (axis fit n=100, projections n=99).
+- Verified locally against `data/for_local/`: with the old windows the pipeline reproduces
+  the current `eph_08` output exactly (r=0.011, p=0.9109, n=100, proj max 2.196,
+  |T_rt| max 12.096), and reproduces the reference's mesh centroid to 8 decimals, its
+  unit counts, and its waveform axis — isolating the windows as the only remaining
+  difference. Rebuilding counts needs spike times, so the final check must run on Code Ocean.
+
 ## 2026-09-15 (8)
 
 ### `kin_07_value_encoding.ipynb` — two fixes from the first Code Ocean run
