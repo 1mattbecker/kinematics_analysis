@@ -4,6 +4,36 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer`: reverted to the original notebook, library translation only
+Reverted the whole redesign. The notebook is now the original `tongue_lickometer.ipynb`
+algorithm and figures, with two changes and nothing else:
+
+- **Imports** — full dotted library paths (`kinematics.tongue_lickometer_utils`,
+  `kinematics.tongue_kinematics_utils`) replacing the bare module names. The runtime
+  `pip install` cells are dropped; both packages are Dockerfile-pinned.
+- **Data loading** — old cells 3-4 (NWB glob, `parseSessionID`, the always-`False` date filter,
+  the raw Lightning-Pose CSV, `trim_kinematics_timebase_to_match`) replaced by one cell reading
+  the per-session `intermediate_data/` parquets. `time_in_session` comes from `tongue_kins`;
+  the keypoint is now `tongue_tip_center` (the current model's name for `tongue_tip`);
+  masking stays at the original `confidence_threshold=0.8`; the `spout_l`/`spout_r` swap is
+  preserved.
+
+Every analysis cell after that is the original, verbatim: the 30 px / 0.05 s worked example,
+the three-way parameter sweep, the F1 heatmaps and interaction plots, the refractory FacetGrid,
+the ILI CDFs and histograms, the metric curves at 30 px / 0.1 s, the event-key classification,
+the distance-to-spout column, `plot_tongue_trajectory`, and the video clip extraction.
+
+**Removed entirely** (all of it added 2026-09-16 and reverted the same day): Implementation B
+and its unit tests, the scoring-convention self-test, the directional rate wrappers, the
+precision-recall surfaces and QC operating points, the confidence-premise measurement, the
+event-time offset analysis, the refractory-vs-hysteresis test, the disagreement triage, the
+`plotstyle` restyling, the `IS_CO` skip-guards and the section commentary. 37 cells -> 18.
+
+The original's metric names (`recall`, `precision`, `false_negative_rate`,
+`false_discovery_rate`, `f1_score`) are restored as written.
+
+## 2026-09-16
+
 ### `val_02_lickometer` §3: simplify the loading cell
 - **`time_in_session` is now read from `tongue_kins.parquet`** rather than recomputed.
   `kinematics_filter` reindexes onto its input rows, copies extra columns back by position, and
