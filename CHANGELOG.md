@@ -4,6 +4,33 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_03_missed_licks`: §7 — `lick_coverage`, Wilson intervals, within-subject spread
+
+The executed run gave `spearman(miss_rate@10px, tracked_frac) = +0.277`, against +0.329 at 30 px.
+Conditioning on a tight `d` did **not** remove the correlation.
+
+`tracked_frac` is the wrong covariate. It counts every tongue-visible frame, so it rises with
+non-lick tongue movement as well as with tracking quality; a session with more tongue-out time
+produces more excursions that pass within 10 px of a spout without contacting. Meanwhile
+`spearman(miss_rate, n_pose) = -0.081` — the number of qualifying events does not predict the
+rate, so the correlation is not a sample-size effect.
+
+- **`lick_coverage`** replaces it: of the lickometer's licks, the fraction with a tracked tongue
+  within ±100 ms. It conditions on a lick having happened, so behaviour divides out and what is
+  left is pose sensitivity. Both are printed with their ranges; the correlation is reported as
+  "n/a (no spread)" when a covariate is near-constant, which is itself the answer — the example
+  session had coverage 99.98%, and if that holds everywhere then pose sensitivity is uniform and
+  the `tracked_frac` correlation is behavioural.
+- **Wilson 95% intervals** on every miss rate, drawn on the ranking. `n_pose` spans 145 to 3928,
+  so intervals run from 0.9 to 15.1 points wide. `MIN_N_POSE = 300` marks sessions as reported but
+  not ranked — under the old ranking, positions 2 and 4 were the two smallest-n sessions in the
+  set (`763590`: 48/145 and 43/214).
+- **Within-subject spread** as a second table. `791691` ran 1.8% / 13.0% / 31.1% / 38.2% on four
+  consecutive days; `782394` ran 0.0-1.6%. A 20x swing inside one animal in one week is not
+  behaviour, and is a stronger flag than a high rank.
+
+§3 and §7 figures moved to `layout="constrained"`.
+
 ### `val_03_missed_licks`: direct prose throughout; §4 and §5 conclusions corrected
 
 Markdown 13,036 -> 7,986 chars. Cut the contrastive framing and the reader-instruction asides:
