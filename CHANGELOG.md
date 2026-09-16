@@ -4,6 +4,34 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### Planning: repair and refocus `tongue_lickometer.ipynb` (plan only, no notebook changes)
+- Audited `code/tongue_lickometer.ipynb` (21 cells). It does not run: every domain import is a
+  bare name for a module promoted into `aind-dynamic-foraging-behavior-video-analysis`.
+- **The library's two kinematics modules define the same six functions, and four have drifted.**
+  `detect_licks` differs in *signature* (extra `timestamps` arg) and is **225× slower** in
+  `tongue_kinematics_utils` (pure-Python row loop: 51.8 s vs 0.2 s per 1.8 M-frame session);
+  `calculate_metrics` / `calculate_metrics_witheventkeys` differ in return arity, the extra
+  `tn` being computed as counts subtracted from a timestamp. Call sites fail loudly against
+  `tongue_kinematics_utils`, not silently. Resolution recorded in the library/repo boundary item.
+- Reframed the notebook around the question it actually asks — can pose tracking detect a lick
+  *defined as tongue–spout contact* — which no other notebook or library path asks; the
+  pipeline's `coverage_pct` route is contact-agnostic and recall-only. Consequence: **F1 is the
+  wrong objective** for the stated goal of using pose as QC on the lickometer, since the two QC
+  uses want opposite precision/recall asymmetries. Plan replaces the F1 argmax with a
+  precision–recall surface and two named operating points.
+- Scope settled: **one session**, two detector implementations compared — the current
+  threshold+refractory detector as baseline, and a gap-aware hysteretic detector timestamped at
+  closest approach. Multi-session deferred as not-yet-well-posed (the threshold is in pixels,
+  which are not transferable across sessions).
+- Benchmarked both sweep grids (A ~38 s, B ~6 s per session) and prototyped the hysteretic
+  detector against three known failure modes of the current one. All B results so far are
+  synthetic and flagged as such.
+- Added the plan as a `TODO.md` item; updated the `tongue_lickometer.ipynb` entry in `REORG.md`;
+  appended the duplication resolution to the boundary item. Three adjacent findings
+  (`model_quality.ipynb` misdescribed, `test_session_wrapper.ipynb` misfiled,
+  `detect_licks_multiple` orphaned in `tongue_kinematics.ipynb`) recorded as explicitly
+  **out of scope** for that item.
+
 ### eph_08 / eph_09: fold ML to the positive side (second replication fix)
 - After the window fix, `eph_08` produced r=0.19, p=0.0637, n=99 against the reference's
   r=0.184, p=0.0681, n=99 — n exact, r off by ~0.006.

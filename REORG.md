@@ -169,7 +169,13 @@ the file. Rationale in `TODO.md`'s `eph_07` item.
   `data_loading` inclusion filter).
 - `test_session_wrapper.ipynb` — per-session analysis wrapper.
 - `model_quality.ipynb` — foraging behavioral-model quality.
-- `tongue_lickometer.ipynb` — lickometer↔Lightning-Pose lick-detection validation.
+- `tongue_lickometer.ipynb` — can Lightning-Pose detect a lick *defined as tongue–spout
+  contact*? The repo's only measurement of detection **precision**; the library's
+  `coverage_pct` path is contact-agnostic and recall-only. Does not currently run (every
+  domain import is a bare name for a module now in the library). Being repaired and refocused
+  as a two-implementation comparison — the current threshold+refractory detector vs a
+  gap-aware hysteretic one — on the single session it already uses. Target name
+  `val_02_spout_contact_detection.ipynb`; the rename is **not** a prerequisite. See `TODO.md`.
 
 ## HOLD — port unreplicated content before archiving (see `TODO.md`)
 

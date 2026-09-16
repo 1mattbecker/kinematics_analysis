@@ -823,6 +823,403 @@ already archived. `_update` is the source for this port.)
 
 ---
 
+## Repair and refocus `tongue_lickometer.ipynb` (→ `val_02_spout_contact_detection`)
+
+_Logged 2026-09-16. The notebook does not run: every domain import is a bare name for a module
+that moved into the library. Scope settled as: one session, two detector implementations
+compared._
+
+### Why — the question this notebook asks
+
+**Can Lightning-Pose tongue tracking detect a lick, where a lick is defined as the tongue
+reaching the spout?**
+
+This is a *spatial contact* definition, and it is why the notebook exists. Nothing else in the
+repo or the library asks it:
+
+| | Detector | A lick is… | Reference |
+|---|---|---|---|
+| **This notebook** | tongue within *N* px of a spout | **contact with the spout** | lickometer (for now) |
+| Library / `kin_*` | `segment_movements_trimnans` → `annotate_licks_in_kinematics(tol=0.01)` | any tracked tongue excursion matched to a lickometer time | lickometer (always) |
+
+The library's path is **agnostic to whether the tongue reached the spout**. Which is why
+`kin_05` has a population of "movements without licks" — under the library's definition those
+are unexplained; under this one, many are simply protrusions that never made contact.
+
+So `detect_licks` is not a stale duplicate of the pipeline's detector. It is the only
+implementation of the contact definition, and the only thing in the repo that can measure
+**precision** — how often video claims contact when the lickometer says nothing.
+
+**Where this is going.** The endpoint is not "tune a detector to agree with the lickometer" but
+to reach a parameter set where pose tracking can serve as **QC on the lickometer** — catching
+lickometer misses (bad contact, capacitive dropout) and false triggers (spout jostling, paw
+contact). Two consequences shape the notebook:
+
+- **F1 is the wrong objective.** F1 weights precision and recall equally; the two QC uses want
+  opposite asymmetries. To flag a *lickometer miss* — pose says contact, lickometer says
+  nothing — that event must be credible: **high pose precision**. To flag a *false trigger*,
+  the absence must be credible: **high pose recall**. A single F1 argmax (cells 8–11) is right
+  for neither. Produce a **precision–recall surface** with two named operating points; keep F1
+  as a summary only. This also dissolves the notebook's own 30-vs-35 px waffling in cell 11 —
+  those are two operating points, not two candidates for one answer.
+- **No supervised fitting to lickometer labels.** A detector trained to reproduce the
+  lickometer cannot audit it. Every parameter must be justifiable from geometry and tongue
+  kinematics alone. Say so in the notebook; it is the first thing a reader will suggest.
+
+**Reference direction.** Report **both directions, always, with names that carry the
+direction** — never a bare `precision`/`recall`. Cells 6/7/14 currently print undirected rates
+and cells 19–20 contradict them (taking `FP_times` from the *lickometer* frame and writing
+clips into `…/false_positive/`, where they are lickometer licks the video missed). From the
+notebook's own stored cell-16 output (30 px / 0.1 s / 0.1 s; `tp=5411, fp=435, fn=180`):
+`pose_recall_vs_lickometer` = **0.926**, `pose_precision_vs_lickometer` = **0.968**, with 180
+pose-only and 435 lickometer-only events. **Those two populations are the eventual QC product**,
+not error terms to be minimized away. `f1 = 2tp/(2tp+fp+fn)` is symmetric, so every existing F1
+heatmap is correct as drawn regardless of direction — nothing already plotted is discarded.
+
+### Why — what is broken
+
+**Every domain import is a dead bare name.** `tongue_kinematics_utils` and
+`tongue_lickometer_utils` were promoted into `aind-dynamic-foraging-behavior-video-analysis`.
+The package ships no `__init__.py` under `kinematics/`, so the full dotted path is the only
+import form — what every modern notebook in `code/` already uses.
+
+**Both library modules define the same six names; four have drifted** (diffed against library
+`main`, `b21eac0`):
+
+| Function | `tongue_lickometer_utils` | `tongue_kinematics_utils` | Keep |
+|---|---|---|---|
+| `detect_licks` | `(tongue_df, spoutL, spoutR, threshold)`, vectorized | extra `timestamps` arg, row loop | **`tlu`** — matches all call sites, 225× faster (0.2 s vs 51.8 s/session) |
+| `calculate_metrics` | `(tp, fp, fn)` | `(tp, fp, fn, tn)` | **`tlu`** — `tku`'s `tn` subtracts counts from a timestamp; meaningless |
+| `calculate_metrics_witheventkeys` | 5-tuple | 6-tuple, same bogus `tn` | **`tlu`** |
+| `load_keypoints_from_csv` | plain `read_csv` | `dtype=str` + `to_numeric(errors='coerce')` | **`tku`** |
+| `filter_timestamps_refractory` | — | — | byte-identical |
+| `mask_keypoint_data` | — | — | byte-identical |
+
+Against `tku`, cells 6/7/12/13/17 raise `TypeError` and cells 6/7/14 raise `ValueError`. Loud
+failures, not silent wrong numbers. Only this notebook and `tongue_kinematics.ipynb` (HOLD)
+consume these six names ecosystem-wide; nothing in the library pipeline calls `detect_licks`.
+
+**Convention rot.** `pip install` in cells 0–1 (both Dockerfile-pinned now); no ENV block
+(three hardcoded `/root/capsule/data/...` paths); no `plotstyle`; cell 3 selects the session by
+globbing NWB filenames with a date comparison (`datetime` vs the string `'05-31-2024'`) that is
+always `False`, and only works because the animal filter already leaves one row; cell 4
+reimplements `trim_kinematics_timebase_to_match`, which `integrate_keypoints_with_video_time`
+owns now.
+
+### Scope
+
+- **One session**: `behavior_716325_2024-05-31_10-31-14`, the one already in the notebook. It
+  is in `all_tongue_movements_04022026.parquet` (1 of 44), so it has been reprocessed by the
+  current pipeline and its `intermediate_data/` exists.
+- **Two detector implementations, compared**: **A** = the notebook's current detector (spatial
+  threshold + refractory filter), kept as the baseline; **B** = a gap-aware, hysteretic
+  detector timestamped at closest approach.
+- Everything modernized to current library definitions, reading per-session
+  `intermediate_data/` parquets.
+
+Multi-session is **deferred, not skipped** — see Notes.
+
+### What to do — A1. Re-point data loading at `intermediate_data/`
+
+Verified end to end; every column traced.
+
+```python
+inter = SESSION_DIR / EXAMPLE_SESSION / "intermediate_data"
+
+kps    = {"tongue_tip_center": pd.read_parquet(inter / "kps_raw_tongue_tip_center.parquet")}
+tongue = mask_keypoint_data(kps, "tongue_tip_center", confidence_threshold=CONF)
+
+t0 = float(pd.read_parquet(inter / "nwb_df_trials.parquet")["goCue_start_time"].iloc[0])
+tongue["time"] = tongue["time_raw"] - t0          # == time_in_session
+
+spoutL = pd.read_parquet(inter / "kps_raw_spout_r.parquet")[["x","y"]].mean()  # animal's LEFT
+spoutR = pd.read_parquet(inter / "kps_raw_spout_l.parquet")[["x","y"]].mean()  # animal's RIGHT
+licko  = pd.read_parquet(inter / "nwb_df_licks.parquet")["timestamps"].to_numpy()
+```
+
+- Every `kps_raw_*.parquet` carries `x`, `y`, `confidence`, `time`, `time_raw`
+  (`integrate_keypoints_with_video_time` Step 5 inserts the last two; `time` is
+  `Behav_Time − Behav_Time[0]`, *exactly* what cell 4 built by hand).
+- Writing `time_in_session` into `tongue["time"]` makes detector output directly comparable to
+  `nwb_df_licks['timestamps']` with **no offset arithmetic anywhere**. The hand-rolled
+  `- keypoint_timebase[0]` does not come back.
+- The `spout_l`/`spout_r` swap (bottom camera mirrors L/R) is preserved, matching cells 6/7 and
+  `kin_06` §3.
+
+**Use `kps_raw_*` for positions, not `tongue_kins.parquet`.** `tongue_kins` is
+post-`kinematics_filter`, which cubic-interpolates across NaN gaps, low-pass filters, then
+reindexes onto the full frame set. Tracked frames at the *edges* of each protrusion therefore
+carry values contaminated by interpolation over the untracked gap — and protrusion edges are
+exactly where a contact threshold gets crossed. Raw masked keypoints are the honest input, and
+are what the original notebook used. (`tongue_kins` does keep every row — checked; the
+docstring's "retains only the originally available time points" refers to values, not rows.)
+
+**Delete cells 3 and 4 entirely.** The NWB glob, `parseSessionID`, the broken date filter,
+`trim_kinematics_timebase_to_match`, the raw-CSV load and the manual time-zeroing all collapse
+into the block above. Also drops the dependency on the `matt_test_DLC_LP_results_20240920`
+asset.
+
+### What to do — A2. Imports
+
+```python
+from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_lickometer_utils import (
+    detect_licks, filter_timestamps_refractory, calculate_metrics,
+    calculate_metrics_witheventkeys,
+)
+from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_kinematics_utils import (
+    mask_keypoint_data,
+)
+```
+
+Do **not** block on a library PR. The library-side de-duplication is a deletion plus a pin bump
+plus a Docker rebuild; batch it with the outbound-metrics consolidation below. Resolution
+recorded in the boundary item.
+
+### What to do — A3. Scoring layer, shared by both implementations
+
+Both detectors emit a list of event times; everything downstream is common.
+
+- **New §2 — convention self-test.** Call `calculate_metrics` on hand-built synthetic event
+  lists (one guaranteed coincidence, one pose-only, one lickometer-only) and assert which
+  output slot each lands in. Runs locally, needs no data, and is how the labelling ambiguity
+  above was found.
+- Derive `pose_recall_vs_lickometer` / `pose_precision_vs_lickometer` from a single stated
+  direction. Never print a bare `precision`/`recall`.
+- Fix cells 19–20 to match: pose-only events from the pose-classified frame, lickometer-only
+  from the lickometer frame; clip output directories follow.
+- State, don't fix: `calculate_metrics` uses a greedy two-pointer match that advances the
+  ground-truth index on mismatch. With a 100 ms window and real ILIs of 100–150 ms an
+  interleaved run can be matched sub-optimally. It is not mutual-nearest-neighbour, and the
+  notebook should say so.
+
+### What to do — Implementation A (baseline)
+
+Unchanged in behavior. `detect_licks(tongue, spoutL, spoutR, threshold)` →
+`filter_timestamps_refractory(licks, t_refractory)`. Ported as-is so the comparison is honest;
+**do not quietly improve it.**
+
+Grid (the notebook's own, cell 7): spatial ∈ `arange(10,51,5)` (9) × refractory ∈
+`arange(0,0.11,0.01)` (11) × overlap ∈ `arange(0.005,0.251,0.005)` (50) = 4 950 scorings, 9
+detector runs. **Benchmarked: ~38 s.**
+
+Three properties to document, because they are what B responds to:
+
+1. **`.dropna()` discards the time base.** After it the loop indexes a compacted array where
+   consecutive entries may be 2 ms or 2 s apart, and nothing downstream can tell.
+2. **State re-arms only on a surviving frame outside the threshold.** Since the confidence gate
+   preferentially removes low-confidence retraction frames — the same frames that do the
+   re-arming — raising confidence merges adjacent contacts. Demonstrated: on synthetic frames
+   where the tongue is tracked only near the spout, `detect_licks` returns **one event for the
+   entire session**.
+3. **Events fire on the rising edge**, so event time depends on the spatial threshold.
+
+**The confidence axis exists to expose (2).** Run A at `confidence_threshold` ∈ {0.80, 0.90} —
+the original's value and the current pipeline's. Not a tuning exercise: it is the measurement
+showing A's detection count and ILI distribution are hostage to a masking parameter the
+notebook treats as a constant. One extra pass (~38 s).
+
+### What to do — Implementation B (gap-aware hysteretic contact detector)
+
+Four changes, each fixing one of the above.
+
+1. **Keep the full time base; gaps terminate a contact.** Work on `d(t)` = distance to nearest
+   spout over *all* frames; close an open contact when an untracked gap exceeds `max_gap_s`. A
+   tracking dropout becomes explicit evidence instead of being invisible.
+2. **Timestamp at closest approach**, not first entry — threshold-invariant, and the right
+   physical analogue of the lickometer's electrical contact (deepest protrusion).
+3. **Hysteresis**: enter at `d ≤ enter`, exit at `d > exit`, with a dead band between. Acts on
+   the *signal* at the moment of decision rather than deleting events from the output.
+4. **Asymmetric confidence — high bar to assert, low bar to deny.** `conf ≥ conf_assert` to
+   *open* a contact, `conf ≥ conf_deny` to *close* one. A retraction frame at 0.84 is not
+   trusted to claim contact but is plenty to establish the tongue left. Directly fixes the
+   fusion failure, and the asymmetry is right for a QC instrument where a false contact is
+   expensive and a false gap is cheap.
+
+Vectorizable — no Python loop over frames. Prototyped and benchmarked:
+
+```python
+on  = tracked & (d <= enter) & (conf >= conf_assert)
+off = (tracked & (d > exit_) & (conf >= conf_deny)) | (~tracked & (gap > max_gap_s))
+last_on  = np.maximum.accumulate(np.where(on,  idx, -1))
+last_off = np.maximum.accumulate(np.where(off, idx, -1))
+inside   = last_on > last_off          # one event per contiguous run, at argmin(d)
+```
+
+Grid: `enter` ∈ `arange(10,51,5)` (9) × dead band ∈ {5,10,15,20,25} px (5) × overlap (50).
+**Benchmarked: 133 ms per detector run, 6 s for the 45-run grid** — cheaper than A.
+
+Fixed rather than swept, with stated justification:
+
+- `max_gap_s = 0.020` — matches the library's own segmentation tolerance
+  (`segment_movements_trimnans(max_dropped_frames=10)` at 500 Hz). Use the library's number
+  rather than inventing one.
+- `conf_assert = 0.90` — the current pipeline's value.
+- `conf_deny = 0.60` — sanity-check, do not tune. Report sensitivity in a line, not an axis.
+
+**Choosing the dead band.** There is a wide valid window, which is why this is not trading one
+arbitrary number for two. *Lower bound*: the band must exceed the tracker's position noise, or
+a stationary tongue wanders across it — that noise is measurable, and `pixel_error.ipynb`
+already reports it for `tongue_tip_center`. *Upper bound*: the band must sit well inside a full
+retraction excursion (jaw→spout distance, tens of px), or genuine retractions stop crossing it
+— `kin_06` §3 computes that distance per session. Flatness between those bounds is itself a
+checkable result.
+
+**The falsifiable claim.** Put the dead band **and** the refractory period on B's grid
+together. Prediction: **once the dead band exceeds the noise scale, F1 goes flat along the
+refractory axis** — the refractory filter buys nothing, because hysteresis has already removed
+what it was there to remove. If it does not go flat, hysteresis is not capturing everything and
+there is a second source of double-triggering to find. Either outcome is a result.
+
+### What to do — the comparison
+
+Six figures, all on the one session. Total sweep cost well under two minutes.
+
+| # | Figure | What it shows |
+|---|---|---|
+| 1 | Detection counts + ILI distributions, A vs B, at conf 0.80 and 0.90 | A's count and ILI tail move with the masking parameter; B's should not |
+| 2 | **Precision–recall surface** per implementation, with the two QC operating points marked | the deliverable; replaces the F1 argmax |
+| 3 | Event-time offset vs matched lickometer events (median + spread) vs spatial threshold | A drifts with threshold; B should be flat |
+| 4 | F1 vs refractory period, for B at several dead bands | the falsifiable claim above |
+| 5 | Per-event inspection of the two disagreement populations at B's operating point, + distance to nearest spout | the QC product |
+| 6 | Labeled video clips at example disagreement timepoints (CO only) | ground-truth eyeball |
+
+On figure 3 — from the prototype, on a synthetic ramped protrusion, A fires **14–22 ms early
+and drifts 8 ms across the 25–40 px range**, while B lands exactly at closest approach at every
+threshold. If that reproduces on real data it explains a structural feature of the cell-9
+heatmap: the spatial and overlap axes are coupled by construction, so the apparent improvement
+along the diagonal is partly the overlap window absorbing a threshold-induced latency shift,
+not a real optimum. Cell 11 flagged the symptom (*"maximizing both … produces best performance;
+however, unsure if this is truly warranted"*) without the explanation. With B the two axes
+decouple, and the required overlap window should shrink well below 100 ms — sharpening the §8
+argument.
+
+On the ILI argument (cells 12–13): the sub-100 ms population is a **mixture** of jitter
+artifacts and genuinely fast licks. The refractory filter cannot separate them — it deletes
+both, which is why the argument has to lean on "faster than a real lick" as a blanket claim.
+Hysteresis separates them by construction, because only the artifacts lack a retraction. So
+whatever short ILIs survive B are real, and the distribution becomes interpretable instead of
+an assumption to defend.
+
+### What to do — section plan
+
+| § | Content | From |
+|---|---|---|
+| 1 | Header (contact definition; why it differs from the library's), setup, `plotstyle`, ENV | new — copy `kin_06` cell 3 |
+| 2 | Scoring-convention self-test | **new** (A3) |
+| 3 | Load `intermediate_data/`; the distance signal `d(t)` | replaces cells 3–4 |
+| 4 | **Implementation A** — detector, its three properties, worked example at 30 px / 0.1 s | cell 6 |
+| 5 | **Implementation B** — detector, the four changes, worked example at matched settings | **new** |
+| 6 | Sweeps for both; precision–recall surfaces; two QC operating points | cells 7–10, reframed |
+| 7 | Confidence sensitivity: A vs B at 0.80 / 0.90 (figure 1) | **new** |
+| 8 | Event-time accuracy vs threshold (figure 3); overlap-threshold justification revisited | cells 14–16 + new |
+| 9 | ILI structure and the refractory-vs-hysteresis test (figure 4) | cells 12–13, reframed |
+| 10 | Per-event inspection of disagreement populations (figure 5) | cells 17–19 |
+| 11 | Labeled video clips (CO only) | cell 20 |
+| 12 | Short markdown: relation to `coverage_pct` and `kin_05` — **no new analysis** | **new** |
+
+Cell 11 and the trailing comment blocks become markdown. Cell 19's inline
+`plot_tongue_trajectory` stays in the notebook (one consumer — same call `kin_06` made for
+`plot_standard_lick_landmarks`), restyled onto `plotstyle`.
+
+For §11, keep `extract_clips_ffmpeg_encode`. Do **not** substitute
+`video_clip_utils.extract_clips_ffmpeg_after_reencode`, which uses `-c copy` and snaps to
+keyframes — it will not land on an exact event timepoint. The `libx264` re-encode is correct
+here; its eventual home is `video_clip_utils`.
+
+§12 states the boundary, does not re-measure it: `analyze_tongue_movement_quality` →
+`tongue_quality_stats.json` → `coverage_pct` is the fraction of lickometer licks with a nearby
+tongue **movement** — a recall measure for a contact-agnostic detector, already computed per
+session, already pooled by `test_session_quality_analysis.ipynb`, already thresholded at 90 % by
+`data_loading.load_session_quality_filter`. No precision side, no free parameter. Cite it.
+`kin_05` §4 inspects licks-without-movements with per-event traces — cross-reference rather
+than duplicate. `pixel_error.ipynb` measures keypoint error against human labels: different
+layer, no overlap.
+
+**Where B lives.** In the notebook, not the library, until validated on real data.
+`detect_licks` stays as the baseline. Once B has earned it, promote it into
+`tongue_lickometer_utils` *alongside* `detect_licks`, not replacing it — they implement
+different decision rules and the comparison should stay reproducible.
+
+### Notes
+
+**Verified 2026-09-16:**
+- All six function pairs diffed against library `main` (`b21eac0`).
+- `detect_licks` 0.2 s (`tlu`) vs 51.8 s (`tku`) per 1.8 M-frame session; A's full grid 38 s.
+- B vectorized: 133 ms/run, 6 s for the 45-run grid; agrees with a loop prototype on a toy trace.
+- A's re-arming failure (tongue tracked only near the spout → 1 event/session); A emits 4 events
+  on one noisy protrusion where B emits 1; A fires 14–22 ms early with 8 ms of
+  threshold-dependent drift, B lands at closest approach at every threshold.
+- Directional rates recomputed from the notebook's own stored cell-8 / cell-16 outputs.
+- Full loading path: `kps_raw_*.parquet` carries `x`/`y`/`confidence`/`time`/`time_raw`;
+  `nwb_df_trials.parquet` supplies the `goCue_start_time` origin; together these reproduce
+  `time_in_session`, matching `nwb_df_licks['timestamps']`.
+- `kinematics_filter` reindexes onto the full frame set and asserts the time base is unaltered
+  — `tongue_kins` keeps every row, but values are interpolation-contaminated at protrusion edges.
+- `behavior_716325_2024-05-31_10-31-14` is in the pooled parquet.
+
+**Unverified:**
+- **Everything about B's behavior is synthetic so far.** The latency offset's real magnitude
+  depends on actual protrusion kinematics; the flat-in-refractory prediction is a prediction.
+- **"Confidence is lowest during retraction"** — the premise behind B's asymmetric gate — is a
+  physical assumption about the tracker, not measured. `plot_keypoint_confidence_analysis`
+  (saved per session by `analyze_tongue_movement_quality`) is where to check it before leaning
+  on `conf_deny`.
+- Whether `session_analysis_mlk/<session>/intermediate_data/` exists for the example session.
+  `kin_05`/`kin_06` assume this path; neither has run there.
+- Whether the `video_preds_labeltest` asset (§11's labeled video) is still attached.
+- Real session frame count. The 38 s / 6 s figures assume 1.8 M frames (1 h @ 500 Hz).
+
+**Local vs Code Ocean.** Local: §1, §2 only — plus B's unit tests, which run on synthetic
+traces with no data. The sweeps need per-frame keypoints and NWB lick times; neither is in
+`data/for_local/`. Header should read like `eph_09`'s, not `kin_06`'s. Code Ocean: §3–§12.
+
+**Deferred: multi-session.** Not skipped — **not yet well-posed.** The threshold is in pixels,
+and pixels are not transferable: camera position, zoom and spout placement vary, so 30 px is a
+different physical distance in each session. Pooling would put a tight-looking error bar around
+a quantity that does not mean the same thing session to session. The prerequisite is expressing
+the threshold in jaw→spout units (`kin_06` §3 computes that scale, one extra parquet read).
+Report the conversion factor for this session alongside the pixel value so the parameter is
+quotable later; then "does the normalized threshold transfer?" becomes a real second question,
+and 44 sessions at ~44 s each is ~30 min whenever it is asked.
+
+**Ordering and risk.** A1 → A2 → A3 is the repair and is testable on the example session alone
+— commit that first. Implementation B and the comparison figures are the second commit. Nothing
+already plotted becomes wrong: F1 is symmetric, so the existing heatmaps stand. What changes is
+which figure carries the conclusion (precision–recall surface, not F1 argmax), and whether A's
+parameters survive the 0.80 → 0.90 confidence shift — which is the point of re-running.
+
+**On the `val_` prefix.** The category is real — these notebooks validate the *instrument*, not
+the behavior, and fit neither `kin_` nor `eph_`. But adopting a prefix is a repo-wide decision
+that should be taken on its own, not on the back of one notebook, and `pixel_error` /
+`test_session_quality_analysis` should **not** move at the same time (a `git mv` plus a
+reference sweep with no analysis change, and three notebooks in flight at once). The
+`val_02_spout_contact_detection` filename is the target, **not a prerequisite** — nothing in
+this item depends on the rename happening first.
+
+### Adjacent findings — not part of this item
+
+Turned up while auditing `code/` for this plan. Independent of the lickometer notebook; each
+should be decided on its own.
+
+1. **`REORG.md` describes `model_quality.ipynb` wrongly** — listed as "foraging
+   behavioral-model quality"; it is a single-session Lightning-Pose pipeline walkthrough (load
+   → mask `tongue_tip_center` @0.90 → filter → segment → annotate → lick coverage), already on
+   modern library imports. One-line factual correction.
+2. **`test_session_wrapper.ipynb` is filed under methods evaluation but is a batch runner** —
+   19 cells, most commented out, wrapping `run_batch_analysis`. Operations, not evaluation;
+   arguably belongs under "KEEP — pipeline / data generation". One-line reclassification.
+3. **`tongue_kinematics.ipynb` cells 103–105 call `detect_licks_multiple`, which exists
+   nowhere** — not in library `main`, `fix/video-csv-header`, `code/`, or local library history
+   (`LC_manuscript` could not be fetched; "not found", not "does not exist"). This matters to
+   *that* notebook's archive gate: REORG's "already covered elsewhere — do not port" line is
+   true for cells 78–79, but 103–105 are a different, unrunnable analysis (a multi-keypoint
+   contact detector). Either it gets re-derived somewhere or it is explicitly dropped, but
+   `tongue_kinematics.ipynb` should not be archived under the claim that it is already covered.
+   If re-derived, this notebook is the natural host — three tongue keypoints give a better
+   contact estimate than one — but that is a future Implementation C, not scope here.
+
+---
+
 ## Define the boundary between the library and this repo's `code/` modules
 
 _Logged 2026-09-15. Do this before the next round of "should this go in the library?" decisions —
@@ -890,6 +1287,25 @@ kinematic features, but its column set (`kcols`) is chosen for this project's en
 - Agree the criteria, then record them in `CLAUDE.md` so the rule is enforced at the point new
   code gets written, not rediscovered per function.
 - Resolve the library-internal duplication in (1) — one definition, one import path.
+
+  > **Resolved by inspection 2026-09-16** (see the `tongue_lickometer` item above). Keep
+  > `tongue_lickometer_utils`'s `detect_licks` (vectorized; 225× faster than
+  > `tongue_kinematics_utils`'s row-loop copy, and the only signature its call sites use),
+  > `calculate_metrics` and `calculate_metrics_witheventkeys` (the `tku` copies add a `tn`
+  > that subtracts counts from a timestamp — delete, do not merge). Keep
+  > `tongue_kinematics_utils`'s `load_keypoints_from_csv` (coerces to numeric; `tlu`'s does
+  > not) and its `mask_keypoint_data` / `filter_timestamps_refractory` (byte-identical — keep
+  > one copy). Net: `tongue_lickometer_utils` owns **contact detection and event scoring**,
+  > `tongue_kinematics_utils` owns **keypoint I/O, filtering and movement segmentation**; the
+  > two implement different lick definitions and both are load-bearing, so this is a
+  > de-duplication, not a consolidation. Also move `extract_clips_ffmpeg_encode` from
+  > `tongue_lickometer_utils` to `video_clip_utils` (its `libx264` re-encode is the correct
+  > precise-seek variant; do **not** replace it with `extract_clips_ffmpeg_after_reencode`,
+  > which is `-c copy` and keyframe-snapped). Only two consumers exist ecosystem-wide —
+  > `tongue_lickometer.ipynb` and `tongue_kinematics.ipynb` (HOLD) — so this is a low-risk
+  > deletion, and the lickometer notebook can ship against `tongue_lickometer_utils` before
+  > the library PR lands. A validated Implementation B would land here too, **alongside**
+  > `detect_licks` rather than replacing it.
 - Decide the plotting rule in (2): either the library's plotters adopt `plotstyle.py`, or the
   library stops shipping plot functions and this repo owns presentation entirely.
 - State the layering in (3) explicitly in both modules' docstrings.
