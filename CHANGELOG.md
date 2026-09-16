@@ -2,6 +2,37 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-15 (8)
+
+### `kin_07_value_encoding.ipynb` — two fixes from the first Code Ocean run
+
+- **Fixed a `KeyError: 'max_x_from_jaw_y'` in §5.** `build_trial_tables` selected only
+  `KIN_COLS`, so the column §5 derives `max_x_from_jaw_y_rel` / `_distance` from never
+  reached `trials_cue`. Added `AUX_KIN_COLS` — carried into both trial tables but
+  deliberately excluded from §6's screen grid, since the raw absolute version is a
+  near-duplicate of `max_y_from_jaw` and would add a redundant heatmap row.
+- **Replaced the RidgeCV "beats null by 2 SD" criterion with a permutation p-value.**
+  Found by the new integration test below: on fabricated noise latents, `summarize_screen`
+  reported `rpe` as beating its null on an R² of +0.0000 against a null of −0.0024. With
+  3 shuffles the null SD is itself noise, so the criterion was meaningless. `ridge_r2_screen`
+  now defaults to 20 shuffles and returns `p_perm` = `(1 + #{null >= r2}) / (1 + n_shuffles)`;
+  a latent counts as predicted only if R² > 0 **and** `p_perm` < 0.05, starred on the panel.
+  §8's checklist item 3 updated to say so — this feeds the notebook's headline conclusion.
+- **`run_value_screen` gained a `methods` argument.** §6.3 reads only the Spearman panel but
+  was paying for the random forest and both nulls; it now requests `("spearman",)`. Skipped
+  panels come back NaN-shaped so the plot/summary helpers still accept the result.
+- Added a loud warning when `add_jaw_relative_columns` resolves zero jaw keypoints, instead
+  of silently producing all-NaN columns, and guarded §5's Wilcoxon the way `spearman_screen`
+  already was.
+
+**New verification.** `verify_pipeline.py` fabricates a `trial_latents` table with the real
+schema from the local parquet and runs every stage §3.6 onward — `build_trial_tables`,
+`add_jaw_relative_columns`, `per_session_slopes`, `run_value_screen` (all four methods and
+spearman-only), `add_previous_trial_rpe`, `plot_value_screen`, `summarize_screen`. It
+validates *column availability at each stage*, not any scientific result, and is what would
+have caught the `max_x_from_jaw_y` bug before the Code Ocean run. All stages pass; the
+synthetic-latent screen test still passes unchanged.
+
 ## 2026-09-15 (7)
 
 ### `kin_07_value_encoding.ipynb` — new: do behavioural-model latents explain tongue kinematics?
