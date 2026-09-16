@@ -119,14 +119,14 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
 3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — clear spec, reuses
    `eph_00`'s helpers. — **done**
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module. —
-   **written 2026-09-15, not yet run on Code Ocean.** Assets confirmed mounted; `scanpy`
-   added to the Dockerfile (image rebuild required). See the item below for what is
-   still unverified.
+   **done.** Written 2026-09-15; both notebooks run on Code Ocean 2026-09-16 and `eph_08`
+   reproduces the reference figure (r=0.18, p=0.0681, n=99). `scanpy` is in the Dockerfile
+   and the MERFISH block still needs the image rebuild — see the item below.
 5. `kin_06_lick_geometry_choice` — mostly pooled; two Code Ocean-only sections (§3–§4,
    which need per-session **spout** keypoints — the jaw turned out to be recoverable from
    the pooled parquet, see the item below). — **done**
 6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`. —
-   **written 2026-09-15; Code Ocean-only sections unrun.** Dependency confirmed live
+   **done.** Written 2026-09-15, run on Code Ocean 2026-09-16. Dependency confirmed live
    (40 of 44 sessions have a fit; ~48 s for the full sweep), so the notebook pools
    rather than running single-session as both sources do.
 
@@ -150,14 +150,8 @@ substring match, not the notebook) or a provenance line in a docstring/comment.
 §9b's abs-`T_rt` panel is `eph_08` §5; §12's commented-out registry sketch is answered by
 eph_09 using `PerUnitStatsRegistry` properly in §2.
 
-**This closes the HOLD-port work begun 2026-09-11.** `code/` is down to 29 notebooks.
-
----|---|
-| `tongue_latency.ipynb` | `kin_02` §8–§11 (done) — **no remaining gate, ready to archive** |
-| `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` (done) — **no remaining gate, ready to archive** |
-| `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` — written, **gate open until it runs on Code Ocean** |
-| `tongue_kinematics.ipynb` | `kin_05` (done) **+** `kin_07` — written, **gate open until it runs on Code Ocean** |
-| `tongue_kinematics_cueresponse.ipynb` | ~~`kin_06`~~ (done) **+** `kin_07` — written, **gate open until it runs on Code Ocean** |
+**This closes the HOLD-port work begun 2026-09-11.** `code/` went from 34 notebooks to 29
+(30 once `val_03_missed_licks.ipynb` landed later the same day).
 
 ---
 
@@ -663,16 +657,10 @@ Both notebooks execute clean locally through their skip paths.
 1. ~~**`eph_08` output equivalence on real data.**~~ **Done 2026-09-16** — `eph_08`
    reproduces the reference figure exactly (r=0.184 displayed as 0.18, **p=0.0681**, n=99).
    It took two fixes; see "Replication of the reference figure" below.
-2. **Everything in `eph_09` past §1.** No cell touching real data has run. Expect to debug
-   column names on first contact, in particular:
-   - ~~`all_counts_df` must carry `baseline_spike_count`~~ — superseded: see the
-     `all_counts_df` fix below; it is now built locally with `baseline_window_s=(-1.0, 0.0)`,
-     so the column is guaranteed present.
-   - `all_counts_df` must carry `baseline_spike_count` for the `T_rt_bl` axis.
-   - The `(session_prefix, unit_str)` merge in §2 — confirm the join is not silently empty
-     (§2 prints the surviving unit counts; if they are 0, the unit-key canonicalization is
-     the suspect).
-   - `retro_ccf` must have `injection_region`, `x`, `y`, `z`.
+2. ~~**Everything in `eph_09` past §1.**~~ **Done 2026-09-16** — the user ran `eph_09`
+   end-to-end on Code Ocean and reported it good. The merge, the `baseline_spike_count`
+   column and the `retro_ccf` fields all resolved without debugging. Only the MERFISH block
+   (item 3) is still gated, on the image rebuild.
 3. **The MERFISH block specifically** needs the rebuilt image. Until then it will print
    `Could not load MERFISH data: No module named 'scanpy'` and set `HAS_MERFISH = False` —
    which is the guard working, not a bug. Re-run after the rebuild.

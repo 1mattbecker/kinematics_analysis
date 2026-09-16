@@ -137,10 +137,11 @@ current-state map only.
 
 ### Planned additions (from the HOLD ports — see `TODO.md`)
 
-**Nothing remains planned.** `kin_07_value_encoding.ipynb` — the last of the six ports —
-landed 2026-09-15 and is in KEEP above. What remains is not writing but *running*: `kin_07`
-and `eph_09` are both written and unexecuted on Code Ocean, and those two runs are the only
-things holding open the archive gates for three of the five HOLD notebooks.
+**Nothing remains planned, and nothing remains to run.** `kin_07_value_encoding.ipynb` —
+the last of the six ports — landed 2026-09-15 and is in KEEP above. Both it and `eph_09`
+ran on Code Ocean 2026-09-16, which closed the last three archive gates; all five HOLD
+notebooks are now in `code/archive/`. The one outstanding run is `eph_09`'s MERFISH block,
+which waits on the `scanpy` image rebuild.
 
 **No new modules remain planned.** `spatial_axes.py` landed 2026-09-15 with
 `eph_09_structural_axes.ipynb` (both now in KEEP above), and `eph_08` was refactored onto it,
@@ -170,13 +171,15 @@ the file. Rationale in `TODO.md`'s `eph_07` item.
 - `test_session_wrapper.ipynb` — per-session analysis wrapper.
 - `model_quality.ipynb` — foraging behavioral-model quality.
 - `val_02_lickometer.ipynb` (was `tongue_lickometer.ipynb`) — can Lightning-Pose detect a
-  lick *defined as tongue–spout
-  contact*? The repo's only measurement of detection **precision**; the library's
-  `coverage_pct` path is contact-agnostic and recall-only. Does not currently run (every
-  domain import is a bare name for a module now in the library). Being repaired and refocused
-  as a two-implementation comparison — the current threshold+refractory detector vs a
-  gap-aware hysteretic one — on the single session it already uses. Renamed to
-  `val_02_lickometer.ipynb` 2026-09-16. See `TODO.md`.
+  lick *defined as tongue–spout contact*? The repo's only measurement of detection
+  **precision**; the library's `coverage_pct` path is contact-agnostic and recall-only.
+  Renamed and repaired 2026-09-16: imports re-pointed at the library, data loading re-pointed
+  at `intermediate_data/`, and the original threshold+refractory analysis (F1, parameter
+  sweeps) kept intact inside an organized setup/loading structure. See `TODO.md`.
+- `val_03_missed_licks.ipynb` — the converse question: when the *lickometer* misses a lick,
+  does pose tracking see it? Uses tongue–spout distance at lick times vs matched random
+  times, with the confidence conditioning stated explicitly (a tracked-tongue null, not an
+  all-frames null). Added 2026-09-16.
 
 ## HOLD — cleared 2026-09-16
 
