@@ -4,6 +4,44 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_03_missed_licks`: new notebook — pose tracking as QC on lickometer misses
+
+Answers [dynamic-foraging-processing#96](https://github.com/AllenNeuralDynamics/dynamic-foraging-processing/issues/96),
+"QC request for missed licks". Inverts `val_02`: there the lickometer was the reference and pose
+was scored against it; here pose is the instrument auditing the lickometer, and the quantity of
+interest is the **pose-only** event — tongue at the spout, no lickometer contact.
+
+Written to read linearly for someone who does not work with this data. 35 cells, 19 code.
+
+- **§3 what the pose data looks like** — an 8 s window of tongue x/y with spout positions, over a
+  distance-to-nearer-spout trace with the threshold and lickometer ticks marked.
+- **§4 distance at lickometer licks** — minimum tracked tongue-spout distance within ±100 ms of
+  every lickometer lick, against a random-time null, plus a CDF annotated with what each candidate
+  threshold captures. This is the figure that shows why no single pixel threshold is correct.
+  Also reports the fraction of lickometer licks with no tracked tongue at all, which floors the
+  method's sensitivity.
+- **§5 threshold sweep** — precision and recall vs threshold, the three event counts vs threshold,
+  and the two plotted against each other as an explicit operating-point curve.
+- **§6 what pose-only events are** — trajectory panels for pose-only events beside matched licks
+  for contrast, then labeled-video clips. Clip times convert session time back to video time via
+  `VIDEO_OFFSET`, recovered from the per-row difference between `kps_raw_*`'s video-relative
+  `time` and `tongue_kins`'s `time_in_session`. (`val_02` §9 cut clips at session times against a
+  video-time video, so its clips are offset by that amount.)
+- **§7 across all sessions** — the §5 classification over every session in `session_analysis_mlk`,
+  reporting per-session rate ranked and colored by tracking quality, rate vs tracked fraction as
+  the confound control, and the spread of precision.
+- **§8 possible QC metrics**, characterized not prescribed: session-level rate, per-trial flag,
+  a high-confidence subset cut at a low percentile of the confirmed-lick distance distribution
+  (the answer to the false-positive rate in §5), and a tracking-coverage gate. §9 lists six
+  limitations, including that the issue's own session has no pose output.
+- **§10** writes every figure's numbers to `FIG_DIR/val_03_summary.json` for building a
+  shareable write-up.
+
+Verified: all 19 code cells parse under Python 3.9, no use-before-definition, and every cell was
+executed end to end against a three-session stand-in fixture on disk — no errors, no warnings.
+Locally the notebook opens clean, printing one skip line per data-dependent cell. **It has not
+been run against real data**, so no number in it has been seen yet.
+
 ### `val_02_lickometer`: clear the `idxmin` FutureWarning in §8
 
 `tongue_masked[spout_cols].idxmin(axis=1, skipna=True)` ran over every frame, including the
