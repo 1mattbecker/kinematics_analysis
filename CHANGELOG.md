@@ -4,6 +4,27 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer`: clear the `idxmin` FutureWarning in §8
+
+`tongue_masked[spout_cols].idxmin(axis=1, skipna=True)` ran over every frame, including the
+untracked ones where both distance columns are NaN. pandas warns that all-NA rows will raise
+`ValueError` in a future version.
+
+It was also mislabelling those frames. `idxmin` returns NaN for an all-NA row, and NaN fails the
+`== 'distance_to_left_spout'` test, so the lambda fell through to `'Right'` — every frame below
+the confidence threshold was labelled right-spout. `idxmin` now runs only over the rows that
+have a distance, and untracked frames are left unlabelled.
+
+Nothing downstream reads `nearest_spout`; only `nearest_spout_distance` is plotted, and that is
+unchanged. Checked against the old path: identical on every tracked frame, NaN instead of
+`'Right'` on untracked ones.
+
+The one warning left when the notebook runs is a `DeprecationWarning` about Jupyter migrating to
+platformdirs, raised from `seaborn`'s import chain and from `tongue_kinematics_utils`, not from
+notebook code. Its fix is `JUPYTER_PLATFORM_DIRS=1` in the image, which is `/environment`'s call,
+and it would fire from the kernel before any cell runs regardless. Not silenced here — a blanket
+warnings filter would hide unrelated deprecations too.
+
 ### `val_02_lickometer`: name the counts for what they measure; formatting cleanup
 
 `calculate_metrics(a, b, w)` returns `(matched, unmatched-in-b, unmatched-in-a)`. The notebook
