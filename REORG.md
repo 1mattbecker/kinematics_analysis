@@ -195,7 +195,7 @@ Still open and tracked in `TODO.md`: consolidate `compute_outbound_metrics` into
 `annotate_movement_bouts` is the same orphan-code pattern and now lives in `ephys_utils.py`
 pending the library/repo boundary decision.
 
-## ARCHIVE — ready to move to `code/archive/`
+## ARCHIVE — moved to `code/archive/`
 
 Superseded by the new series / modules / library:
 - `rt_ols_registry_pipeline.ipynb`, `registry_usage_example.py` → `ephys_utils` + `encoding_methods` + registry + `eph_01`
@@ -225,10 +225,10 @@ Reference (→ `code/archive/reference/`):
 1. `git tag wild-prereorg` — restore point. — **done**
 2. Create `code/archive/` (+ `code/archive/reference/`). — **done**
 3. `git mv` the ARCHIVE files (history preserved; nothing imports them). — **done**
-4. HOLD files stay until their `TODO.md` ports land, then archive.
+4. HOLD files stay until their `TODO.md` ports land, then archive. — **done 2026-09-16**
 
-Step 4 is the remaining work. Recommended order, by value ÷ risk (full rationale and
-per-notebook section outlines are in `TODO.md`):
+**Step 4 complete.** The order actually followed (full rationale and per-notebook section
+outlines are in `TODO.md`):
 
 1. `kin_02` §8–§10 — pooled parquet only, no new dependencies, fully local-testable. — **done**
 2. `kin_05_nonlick_movements` — mostly pooled; two partial Code Ocean-only sections
@@ -236,13 +236,13 @@ per-notebook section outlines are in `TODO.md`):
 3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — reuses `eph_00`'s
    raster/PETH helpers. — **done**
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module. —
-   **written 2026-09-15; assets confirmed mounted, `scanpy` added to the Dockerfile.**
-   Not yet run on Code Ocean, so `eph_08`'s poster-figure output is unconfirmed and the
-   source notebook's archive gate stays open. See `TODO.md`.
+   **done.** `eph_08` replicated the reference poster figure on 2026-09-16 (r=0.184,
+   p=0.0681, n=99) after two fixes — the spike-count windows and the ML fold sign; `eph_09`
+   verified on Code Ocean the same day. See `TODO.md`.
 5. `kin_06_lick_geometry_choice` — pooled in a reconstructed jaw-centered frame; two
    Code Ocean-only sections (§3–§4, per-session spout keypoints). — **done**
 6. `kin_07_value_encoding` — pooled over the 40 sessions with an MLE fit; new dependency
-   on `get_mle_model_fitting`, confirmed live. — **written 2026-09-15, unrun on Code Ocean.**
+   on `get_mle_model_fitting`, confirmed live. — **done**, verified on Code Ocean 2026-09-16.
 
 Archive a HOLD notebook only when **every** gate in the HOLD table above is met. All six ports
 are now *written*; three of the five HOLD notebooks wait only on `kin_07` and `eph_09`

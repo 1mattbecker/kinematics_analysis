@@ -366,6 +366,21 @@ moved into the library.
   `detect_licks_multiple` orphaned in `tongue_kinematics.ipynb`) recorded as explicitly
   **out of scope** for that item.
 
+### Reorg Phase 2 complete: all five HOLD notebooks ported and archived
+- `eph_09` and `kin_07` verified on Code Ocean by the user; `eph_08` had already replicated
+  the reference poster figure (r=0.184, p=0.0681, n=99). That cleared the last gates.
+- `git mv`'d all five into `code/archive/`: `tongue_latency`,
+  `tongue_kinematics_ephys_intertrialmovs`, `spatial_axis_comparison_rt_encoding_update`,
+  `tongue_kinematics`, `tongue_kinematics_cueresponse`. `code/` goes from 34 to 29 notebooks.
+- Checked first that nothing in `code/` executably depends on any of the five — every
+  apparent reference was the library module `tongue_kinematics_utils` (a substring match) or
+  a provenance comment.
+- Confirmed `spatial_axis_comparison_rt_encoding_update` is fully superseded: `eph_09` covers
+  its §1-§4, §6-§9 and §9b; §5's machinery is `spatial_axes.py`; the abs-`T_rt` panel is
+  `eph_08` §5; §12's commented registry sketch is answered by eph_09's proper registry use.
+- `TODO.md` gate table and `REORG.md` HOLD / execution-plan sections rewritten to record
+  completion. This closes the HOLD-port work begun 2026-09-11.
+
 ### Docs: record the reference-figure replication
 - `TODO.md`: replaced the stale "eph_08 output equivalence … not verified" item (and the
   earlier claim that the target was unreproducible) with a "Replication of the reference
