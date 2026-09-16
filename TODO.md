@@ -882,6 +882,13 @@ _Logged 2026-09-16. The notebook does not run: every domain import is a bare nam
 that moved into the library. Scope settled as: one session, two detector implementations
 compared._
 
+> **Error in A1 above, found on the first Code Ocean run:** the loading block specifies
+> `nwb_df_trials.parquet["goCue_start_time"]`. That column does not exist —
+> `create_df_trials(adjust_time=True)` drops every absolute time column, replacing each with
+> `<col>_in_session` / `<col>_in_trial` and keeping the first-go-cue value as
+> **`goCue_start_time_raw`**. Fixed in the notebook. The same run confirmed
+> `session_analysis_mlk/<session>/intermediate_data/` exists, closing the first open assumption.
+>
 > **Status 2026-09-16: implemented on `wild` in two commits** — the repair (A1/A2/A3 +
 > Implementation A) and then Implementation B with the six comparison figures. The notebook
 > now runs. **Nothing has been executed against the real session**: local runs cover §1, §2,

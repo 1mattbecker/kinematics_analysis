@@ -4,6 +4,40 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer`: fix the `goCue_start_time` KeyError; use `find_session_dir`; drop the §2 self-test
+- **Bug fix (first Code Ocean run).** `nwb_df_trials.parquet` has no `goCue_start_time` column.
+  `create_df_trials(adjust_time=True)` **drops** every absolute time column and replaces each
+  with `<col>_in_session` / `<col>_in_trial`, keeping the unshifted first-go-cue value as
+  `goCue_start_time_raw`. The plan's A1 block (`TODO.md`) specified `goCue_start_time`, which
+  never existed in that table. Now reads `goCue_start_time_raw`, accepts the pre-`adjust_time`
+  name as a fallback, and raises listing the actual columns if neither is present. The value is
+  printed so the time base is visible in the run log.
+  *Confirms `session_analysis_mlk/<session>/intermediate_data/` exists — the item's first open
+  assumption.*
+- **`find_session_dir`** (`ephys.tongue_ephys`) replaces the hand-built `SESSION_DIR / session`
+  path, matching `ephys_utils.py:348`. It handles the exact-match-then-prefix-glob lookup.
+- **Considered and rejected: sourcing `time_in_session` from `tongue_kins.parquet`** instead of
+  recomputing it. `kinematics_filter` restricts its output to `[t_min, t_max]` of the *tracked*
+  tongue frames, so `tongue_kins` does not span the session and its rows do not correspond to
+  the `kps_raw_*` frame set. A merge would have been both fragile (float key across an
+  interpolation step) and wrong at the edges. The two-line subtraction is exact:
+  `goCue_start_time_raw` is `nwb.trials[SESSION_ALIGNMENT][0]`, the same value
+  `add_time_in_session_from_nwb` and `create_df_events` both use.
+- **Considered and rejected: `load_intermediate_data`** for the trials/licks reads. It loads five
+  tables including `tongue_kins`, `tongue_movs` and `nwb_df_events`, none of which this notebook
+  uses — a large read to obtain two small ones.
+- **Removed the §2 self-test cell.** The direction is resolved in code: the two wrappers convert
+  `tp`/`fp`/`fn` once and nothing downstream reads them. The test asserted what those six lines
+  already state, and the library change that would break it (the pending de-duplication) alters
+  arity and so fails loudly anyway. The convention statement stays in the §2 markdown, now with
+  the original notebook's stored counts as a scale reference for a fresh run
+  (recall 0.926 / precision 0.968).
+- **Still not covered by any library function**: loading `kps_raw_*.parquet`. `kin_06` has an
+  inline `load_kps_raw` and this notebook now has a second ad-hoc reader — a repo-side duplicate
+  worth folding into the library alongside the other pending changes.
+
+## 2026-09-16
+
 ### `tongue_lickometer.ipynb` → `val_02_lickometer.ipynb`; markdown rewritten
 - **Renamed** (`git mv`), with `FIG_DIR` and the references in `REORG.md` and `TODO.md` updated.
   `pixel_error` / `test_session_quality_analysis` deliberately not moved — that is a separate
