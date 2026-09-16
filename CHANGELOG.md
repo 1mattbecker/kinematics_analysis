@@ -4,6 +4,25 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `eph_09` MERFISH block ran — the reorg has nothing left waiting on a run
+
+The capsule image rebuild picked up `scanpy==1.10.3` and the MERFISH structural axis ran on
+Code Ocean. Two consequences recorded in `TODO.md` and `REORG.md`:
+
+- All four items in the `eph_09` "NOT verified — needs a Code Ocean run" list are closed.
+  The list is kept as a record of what was checked, not as open work.
+- The `scipy==1.13.0` tripwire re-asserted in the scanpy Dockerfile layer **did not fire** —
+  the build succeeded, so scanpy did not move shared packages. The tripwire stays: isolated
+  `RUN` layers separate pip's *resolution*, not the environment, so a later build could still
+  hit it.
+
+`REORG.md` now states plainly that the reorg is complete and the file is a current-state map
+of `code/` rather than a plan. Also cleared the last two "written, unrun" markers (`kin_07`,
+`eph_09`) from the port-plan table and `kin_07`'s KEEP entry, and the stale trailing paragraph
+of the execution plan, which still described three archive gates as open.
+
+No analysis code touched.
+
 ### Docs: reconcile `TODO.md` / `REORG.md` with the completed runs
 
 Status review after `eph_09` and `kin_07` ran on Code Ocean. Five places still described work

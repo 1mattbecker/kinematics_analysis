@@ -22,9 +22,9 @@ series.
 | `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26; also 5, 8, 9, 14 (§11, single-session illustration — reassigned from `kin_05` below on 2026-09-14) |
 | `kin_05_nonlick_movements` *(new)* — **done** | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
 | `kin_06_lick_geometry_choice` *(new)* — **done** | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
-| `kin_07_value_encoding` *(new)* — **written, unrun** | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
+| `kin_07_value_encoding` *(new)* — **done** | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
 | `eph_07_bout_encoding` *(new)* — **done** | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
-| `eph_09_structural_axes` *(new)* — **written, unrun** | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
+| `eph_09_structural_axes` *(new)* — **done** | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
 
 Plus one new flat module, `spatial_axes.py` (see the items below). The bout-segmentation
 helpers fold into the existing `ephys_utils.py` rather than getting a module of their own —
@@ -120,8 +120,8 @@ one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
    `eph_00`'s helpers. — **done**
 4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module. —
    **done.** Written 2026-09-15; both notebooks run on Code Ocean 2026-09-16 and `eph_08`
-   reproduces the reference figure (r=0.18, p=0.0681, n=99). `scanpy` is in the Dockerfile
-   and the MERFISH block still needs the image rebuild — see the item below.
+   reproduces the reference figure (r=0.18, p=0.0681, n=99). The capsule image was rebuilt
+   with `scanpy==1.10.3` and the MERFISH block ran 2026-09-16. Nothing here is outstanding.
 5. `kin_06_lick_geometry_choice` — mostly pooled; two Code Ocean-only sections (§3–§4,
    which need per-session **spout** keypoints — the jaw turned out to be recoverable from
    the pooled parquet, see the item below). — **done**
@@ -633,16 +633,16 @@ movements (which is exactly what `kin_05` establishes).
 
 ## Create `spatial_axes.py` and `eph_09_structural_axes.ipynb`
 
-_Logged 2026-09-11. **Written 2026-09-15. `eph_08` replicated the reference figure on Code
-Ocean 2026-09-16 (see "Replication" below); `eph_09` is still NOT executed there.**
-Both external assets confirmed mounted by the user before starting; `scanpy==1.10.3` added to
-`environment/Dockerfile` in its own layer, so **the capsule image must be rebuilt** before the
-MERFISH block can run._
+_Logged 2026-09-11. **Complete 2026-09-16.** Written 2026-09-15; `eph_08` replicated the
+reference figure on Code Ocean 2026-09-16 (see "Replication" below) and `eph_09` ran
+end-to-end there the same day, MERFISH block included, after the image rebuild picked up
+`scanpy==1.10.3`. Both external assets were confirmed mounted before starting._
 
 ### Status: what landed, and what is still unverified
 
 Landed: `code/spatial_axes.py`; `code/eph_09_structural_axes.ipynb` (34 cells); `eph_08`
-refactored onto the module; `scanpy` in the Dockerfile.
+refactored onto the module; `scanpy` in the Dockerfile. **All of it has now run on Code
+Ocean** — the list below is kept as a record of what was checked and how, not as open work.
 
 **Verified locally** — `spatial_axes.py` is pure numpy/sklearn and was checked against
 synthetic data with known planted axes (30 assertions, all passing): linear/CCA/LDA all
@@ -652,22 +652,23 @@ falls, and the module's CCA pair is **bit-identical** to the inline copies delet
 `eph_08` (same axis, same bootstrap cloud, same cone, same projections, same seed).
 Both notebooks execute clean locally through their skip paths.
 
-**NOT verified — needs a Code Ocean run:**
+**Was NOT verified — all four items closed by the Code Ocean runs of 2026-09-16:**
 
 1. ~~**`eph_08` output equivalence on real data.**~~ **Done 2026-09-16** — `eph_08`
    reproduces the reference figure exactly (r=0.184 displayed as 0.18, **p=0.0681**, n=99).
    It took two fixes; see "Replication of the reference figure" below.
 2. ~~**Everything in `eph_09` past §1.**~~ **Done 2026-09-16** — the user ran `eph_09`
    end-to-end on Code Ocean and reported it good. The merge, the `baseline_spike_count`
-   column and the `retro_ccf` fields all resolved without debugging. Only the MERFISH block
-   (item 3) is still gated, on the image rebuild.
-3. **The MERFISH block specifically** needs the rebuilt image. Until then it will print
-   `Could not load MERFISH data: No module named 'scanpy'` and set `HAS_MERFISH = False` —
-   which is the guard working, not a bug. Re-run after the rebuild.
-4. **`scanpy==1.10.3` against the pinned block.** Isolated `RUN` layers separate pip's
-   *resolution*, not the environment — scanpy can still move shared packages. `scipy==1.13.0`
-   is re-asserted in that layer as a tripwire. If the build fails there, that is the tripwire
-   firing: resolve it rather than dropping the pin.
+   column and the `retro_ccf` fields all resolved without debugging.
+3. ~~**The MERFISH block specifically** needs the rebuilt image.~~ **Done 2026-09-16** — the
+   image was rebuilt and the MERFISH axis ran, so `HAS_MERFISH` is now `True` on Code Ocean.
+   If a future rebuild loses `scanpy` the block degrades to `HAS_MERFISH = False` with a
+   `Could not load MERFISH data` message — that is the guard working, not a bug.
+4. ~~**`scanpy==1.10.3` against the pinned block.**~~ **Held 2026-09-16** — the rebuild
+   succeeded, so the `scipy==1.13.0` tripwire re-asserted in that layer did not fire and
+   scanpy did not move shared packages. Isolated `RUN` layers separate pip's *resolution*,
+   not the environment, so keep the tripwire: if a later build fails there, resolve it
+   rather than dropping the pin.
 
 ### Decisions taken during the port (revisit if you disagree)
 
@@ -866,8 +867,8 @@ already archived. `_update` is the source for this port.)
   (`merfish_data/adata/adata_mer_subset_2_2k.h5ad` and
   `LC_retro/manual_proofread_ccf_18brains.csv`, under `/root/capsule/data`, from the upstream
   capsule), so the degraded fallback was not needed and all three structural axes are
-  written. `scanpy` was indeed absent from the pip block and is now added — see the status
-  section above.
+  written. `scanpy` was indeed absent from the pip block, was added, and the rebuilt image
+  ran the MERFISH axis on 2026-09-16 — see the status section above.
 - Retrograde LDA sign is arbitrary; the source aligns it to the waveform axis (cell 22). Keep
   that convention or the cone figure flips between runs.
 - Code Ocean only, like `eph_08`. Use the same `IS_CO` skip-guard structure so it runs clean

@@ -87,12 +87,11 @@ current-state map only.
     z-scored, so only the `GroupKFold`-on-session RidgeCV R² panel is a genuine
     predictive measure). `TODO.md`'s claim that `attach_model_latents_to_trials` is
     defined identically in the two sources is **wrong** — they differ in the sign of
-    `q_diff`; ported once as `R − L`, matching `kin_06`'s frame. **Code Ocean only and
-    effectively unexecuted**: §6.1 is the only section with real output; the §6 screen
-    machinery was verified against a synthetic latent instead. Both
-    `tongue_kinematics.ipynb` and `tongue_kinematics_cueresponse.ipynb` are now fully
-    replicated, but **their archive gates stay open until this runs on Code Ocean**.
-    See `TODO.md`.
+    `q_diff`; ported once as `R − L`, matching `kin_06`'s frame. **Code Ocean only; run
+    there 2026-09-16** and reported good — before that only §6.1 had real output and the
+    §6 screen machinery had been verified against a synthetic latent. That run closed the
+    archive gates for both `tongue_kinematics.ipynb` and
+    `tongue_kinematics_cueresponse.ipynb`, which are now in `code/archive/`. See `TODO.md`.
   - `eph_09_structural_axes`: does the RT-encoding spatial gradient align with LC's
     structural organization? Fits the RT-encoding axis (`T_rt`) and its baseline control
     (`T_rt_bl`) — the step `eph_08` skipped — plus three structural axes: waveform
@@ -103,11 +102,11 @@ current-state map only.
     `AnalysisSpec`/`fit_encoding`/`per_unit_stats_registry` (as `eph_01`) and unit QC
     through `data_loading`, so no inline copies were added. Each structural axis sits
     behind `HAS_WAVEFORM`/`HAS_MERFISH`/`HAS_RETRO`, so a missing asset drops that axis
-    rather than failing. **Code Ocean only and entirely unexecuted** — written 2026-09-15,
-    skip path verified locally only. MERFISH additionally needs the `scanpy` Dockerfile
-    layer added the same day, i.e. an image rebuild. `spatial_axis_comparison_rt_encoding_
-    update.ipynb` is fully replicated but its archive gate stays open until this runs.
-    See `TODO.md`.
+    rather than failing. **Code Ocean only; verified there 2026-09-16** — written
+    2026-09-15, run end-to-end the following day with all three structural axes live, the
+    MERFISH one after an image rebuild picked up the `scanpy` Dockerfile layer.
+    `spatial_axis_comparison_rt_encoding_update.ipynb` is fully replicated by it and was
+    archived the same day. See `TODO.md`.
 - Modules: `data_loading.py`, `ephys_utils.py`, `encoding_methods.py`, `encoding_plots.py`,
   `per_unit_stats_registry.py`, `spatial_encoding.py`, `spatial_axes.py`, `plotstyle.py`,
   `ccf_utils.py`
@@ -140,8 +139,8 @@ current-state map only.
 **Nothing remains planned, and nothing remains to run.** `kin_07_value_encoding.ipynb` —
 the last of the six ports — landed 2026-09-15 and is in KEEP above. Both it and `eph_09`
 ran on Code Ocean 2026-09-16, which closed the last three archive gates; all five HOLD
-notebooks are now in `code/archive/`. The one outstanding run is `eph_09`'s MERFISH block,
-which waits on the `scanpy` image rebuild.
+notebooks are now in `code/archive/`. `eph_09`'s MERFISH block ran the same day after the
+image rebuild, so no part of the reorg is waiting on a run.
 
 **No new modules remain planned.** `spatial_axes.py` landed 2026-09-15 with
 `eph_09_structural_axes.ipynb` (both now in KEEP above), and `eph_08` was refactored onto it,
@@ -247,7 +246,10 @@ outlines are in `TODO.md`):
 6. `kin_07_value_encoding` — pooled over the 40 sessions with an MLE fit; new dependency
    on `get_mle_model_fitting`, confirmed live. — **done**, verified on Code Ocean 2026-09-16.
 
-Archive a HOLD notebook only when **every** gate in the HOLD table above is met. All six ports
-are now *written*; three of the five HOLD notebooks wait only on `kin_07` and `eph_09`
-executing on Code Ocean. Two — `tongue_latency.ipynb` and
-`tongue_kinematics_ephys_intertrialmovs.ipynb` — have no remaining gate at all.
+The gate rule was: archive a HOLD notebook only when **every** gate in the HOLD table above
+is met. All six ports were written by 2026-09-15; the last two gates closed when `kin_07` and
+`eph_09` ran on Code Ocean on 2026-09-16, and all five HOLD notebooks were archived that day.
+
+**The reorg is complete.** This file is now a current-state map of `code/`, not a plan —
+update the KEEP lists as notebooks are added or renamed, and keep actionable work in
+`TODO.md`.
