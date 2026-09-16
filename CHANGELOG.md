@@ -4,6 +4,25 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer`: verification pass on the port
+Checked the ported notebook against the legacy source at `5e0bc8e:code/tongue_lickometer.ipynb`.
+All 17 code cells parse under Python 3.9; imports, the `ENV` block and the guarded load cell
+were executed locally (the load cell takes the `[skip]` branch). No use-before-definition across
+cells in execution order. Library paths and signatures confirmed against the installed package:
+`detect_licks` resolves to the 4-argument `tongue_lickometer_utils` copy, not the 5-argument
+`tongue_kinematics_utils` one.
+
+- Dropped the last mention of `load_keypoints_from_csv`, in a comment in §2 explaining why the
+  original's `.insert()` was replaced by an assignment. The remaining comment states the fact:
+  `kps_raw_*` already has a video-relative `time` column, overwritten with go-cue-relative
+  session time.
+- §8 header now records the argument-order behavior: `calculate_metrics_witheventkeys` names
+  its parameters `ground_truth, detected_events` but is passed pose events first, so `fn`
+  counts unmatched pose events and `fp` unmatched lickometer events. `FP_times` therefore comes
+  from the lickometer frame and §9 writes to `false_positive/`. Left as written.
+
+No change to the detection algorithm, the parameter sweep, any figure, or any metric name.
+
 ### `val_02_lickometer`: fix `cannot insert time, already exists`
 `kps_raw_*.parquet` already carries a `time` column (`integrate_keypoints_with_video_time`
 writes it as `Behav_Time - Behav_Time[0]`, alongside `time_raw`), so the original's
