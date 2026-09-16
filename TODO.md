@@ -829,6 +829,33 @@ _Logged 2026-09-16. The notebook does not run: every domain import is a bare nam
 that moved into the library. Scope settled as: one session, two detector implementations
 compared._
 
+> **Status 2026-09-16: implemented on `wild` in two commits** — the repair (A1/A2/A3 +
+> Implementation A) and then Implementation B with the six comparison figures. The notebook
+> now runs. **Nothing has been executed against the real session**: local runs cover §1, §2,
+> §4.1's synthetic demonstrations and §5's five unit tests; every Code Ocean-only cell was
+> smoke-tested against synthetic stand-in `intermediate_data/` parquets only.
+>
+> **Still open, and what to do next:**
+> - **Run it on Code Ocean.** That is the whole remaining point — every claim about B is still
+>   a prediction from synthetic traces.
+> - **Two assumptions this item flagged are still unverified**, and are now checked at runtime
+>   rather than assumed: `session_analysis_mlk/<session>/intermediate_data/` exists (the loader
+>   raises with the missing-file list, no fallback), and confidence is lowest during retraction
+>   (§3.2 measures it and prints a verdict plus the consequence for B's change 4).
+> - **Two departures from this plan**, both found while building and both recorded in
+>   `CHANGELOG.md`: the overlap window must be held **fixed** during operating-point selection,
+>   since it is a scoring parameter and letting it float buys agreement by widening the window;
+>   and the flat-in-refractory test as posed was confounded by the filter also deleting genuine
+>   fast licks, so flatness is now checked only below the shortest genuine ILI and paired with
+>   a direct count of what the filter still deletes.
+> - **One correction to a claim above:** A's re-arming failure is *not* unconditional. It
+>   collapses to one event per session precisely when the confidence mask is at least as tight
+>   as the spatial threshold — measured boundary at a 30 px threshold: masking at 35 px gives
+>   the correct 4 events, masking at 30 px gives 1.
+> - Still deferred as written: multi-session (§12), promoting B into the library, the `val_`
+>   rename, and the library-side de-duplication (the notebook already imports the paths that
+>   survive it, so it does not block).
+
 ### Why — the question this notebook asks
 
 **Can Lightning-Pose tongue tracking detect a lick, where a lick is defined as the tongue
