@@ -4,6 +4,33 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer`: original analysis, organized setup and loading
+Same analysis as the previous entry's revert — the original algorithm, parameter sweep, figures
+and interpretation, unchanged — put back into a sectioned notebook structure.
+
+- **Setup (§1)** — imports on full dotted library paths; `ENV` / `IS_CO` / `SCRATCH` / `DATA` /
+  `FIG_DIR` / `SAVE_FIG` block; `SESSION_DIR`, `EXAMPLE_SESSION` and `CONF = 0.8` named at the
+  top instead of scattered as literals.
+- **Load (§2)** — `find_session_dir` plus the per-session `intermediate_data/` parquets, behind
+  an `IS_CO` guard so the notebook opens clean locally. `all_licks` and the spout means are
+  computed once here rather than repeated in two analysis cells (they previously depended on
+  `nwb` and `keypoint_timebase`, which no longer exist).
+- **§3-§9** — the original cells, verbatim. Worked example at 30 px / 0.05 s; the three-way
+  sweep over spatial threshold x refractory x coincidence window; F1 heatmaps and interaction
+  plots; the refractory FacetGrid; ILI CDFs and histograms; metric curves at 30 px / 0.1 s; the
+  event-key classification; distance to nearest spout; `plot_tongue_trajectory`; clip extraction.
+  Metric names (`recall`, `precision`, `false_negative_rate`, `false_discovery_rate`,
+  `f1_score`) as originally written.
+- **Comment-only cells promoted to markdown**, wording unchanged — the parameter-search
+  conclusions, the ILI reasoning, the 30 px / 100 ms motivation, and the final-stats note. These
+  were code cells containing nothing but comments.
+- Hardcoded `/root/capsule` paths in the clip cell now go through `DATA` / `SCRATCH`.
+
+Nothing from the earlier redesign returns: no Implementation B, no tests, no alternative
+metrics, no added figures. 32 cells, 17 of them code.
+
+## 2026-09-16
+
 ### `val_02_lickometer`: reverted to the original notebook, library translation only
 Reverted the whole redesign. The notebook is now the original `tongue_lickometer.ipynb`
 algorithm and figures, with two changes and nothing else:
