@@ -4,6 +4,14 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer`: fix `cannot insert time, already exists`
+`kps_raw_*.parquet` already carries a `time` column (`integrate_keypoints_with_video_time`
+writes it as `Behav_Time - Behav_Time[0]`, alongside `time_raw`), so the original's
+`tongue_masked.insert(0, 'time', ...)` collides. That line was correct against
+`load_keypoints_from_csv`, which returns only `x`/`y`/`confidence`, and was carried over
+verbatim when the data source changed. Now assigns instead, overwriting the video-relative
+`time` with the go-cue-relative session time that `all_licks` is on.
+
 ### `val_02_lickometer`: original analysis, organized setup and loading
 Same analysis as the previous entry's revert — the original algorithm, parameter sweep, figures
 and interpretation, unchanged — put back into a sectioned notebook structure.
