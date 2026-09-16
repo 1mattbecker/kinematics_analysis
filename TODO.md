@@ -68,7 +68,7 @@ see the `eph_07` item for why.
   Consolidate to one; keep the **cell 15** variant (session-wide z-scoring), which is the
   most defensible normalization.
 - `tongue_kinematics` cells 78–79 (lick-detection FP/FN parameter sweep) are already covered
-  by `tongue_lickometer.ipynb`, which is KEEP. **No port needed.**
+  by `val_02_lickometer.ipynb`, which is KEEP. **No port needed.**
 
 ### Orphan code that needs a home before its notebook is archived
 
@@ -876,7 +876,7 @@ already archived. `_update` is the source for this port.)
 
 ---
 
-## Repair and refocus `tongue_lickometer.ipynb` (→ `val_02_spout_contact_detection`)
+## Repair and refocus `tongue_lickometer.ipynb` (→ `val_02_lickometer`)
 
 _Logged 2026-09-16. The notebook does not run: every domain import is a bare name for a module
 that moved into the library. Scope settled as: one session, two detector implementations
@@ -1269,12 +1269,10 @@ which figure carries the conclusion (precision–recall surface, not F1 argmax),
 parameters survive the 0.80 → 0.90 confidence shift — which is the point of re-running.
 
 **On the `val_` prefix.** The category is real — these notebooks validate the *instrument*, not
-the behavior, and fit neither `kin_` nor `eph_`. But adopting a prefix is a repo-wide decision
-that should be taken on its own, not on the back of one notebook, and `pixel_error` /
-`test_session_quality_analysis` should **not** move at the same time (a `git mv` plus a
-reference sweep with no analysis change, and three notebooks in flight at once). The
-`val_02_spout_contact_detection` filename is the target, **not a prerequisite** — nothing in
-this item depends on the rename happening first.
+the behavior, and fit neither `kin_` nor `eph_`. **Done 2026-09-16: renamed to
+`val_02_lickometer.ipynb`.** `pixel_error` / `test_session_quality_analysis` were deliberately
+left alone — moving them is a `git mv` plus a reference sweep with no analysis change, and
+belongs to a separate repo-wide decision.
 
 ### Adjacent findings — not part of this item
 
@@ -1382,7 +1380,7 @@ kinematic features, but its column set (`kcols`) is chosen for this project's en
   > `tongue_lickometer_utils` to `video_clip_utils` (its `libx264` re-encode is the correct
   > precise-seek variant; do **not** replace it with `extract_clips_ffmpeg_after_reencode`,
   > which is `-c copy` and keyframe-snapped). Only two consumers exist ecosystem-wide —
-  > `tongue_lickometer.ipynb` and `tongue_kinematics.ipynb` (HOLD) — so this is a low-risk
+  > `val_02_lickometer.ipynb` and `tongue_kinematics.ipynb` (HOLD) — so this is a low-risk
   > deletion, and the lickometer notebook can ship against `tongue_lickometer_utils` before
   > the library PR lands. A validated Implementation B would land here too, **alongside**
   > `detect_licks` rather than replacing it.

@@ -4,6 +4,24 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `tongue_lickometer.ipynb` → `val_02_lickometer.ipynb`; markdown rewritten
+- **Renamed** (`git mv`), with `FIG_DIR` and the references in `REORG.md` and `TODO.md` updated.
+  `pixel_error` / `test_session_quality_analysis` deliberately not moved — that is a separate
+  repo-wide decision.
+- **All 18 markdown cells rewritten to state facts only.** Removed the framing prose: the
+  "where this is going" section, the argument that F1 is the wrong objective, the "labelling
+  trap" / "the deliverable" / "the QC product" headings, and the read-this-before instructions.
+  The header is now one sentence of goal, the two lick definitions, the quantities reported, and
+  scope. F1 and the two directional rates are presented as three reported quantities rather than
+  as competing objectives — the sweep computes all three at every parameter combination, so both
+  questions are answered from the same output.
+- Same treatment applied to the print statements and docstrings: verdict blocks in §§3.2, 7, 8
+  and 9 now state the outcome and its consequence without commentary.
+- No code paths changed. Re-verified after the rewrite: local run (§1, §2, §4.1, §5 unit tests)
+  and the synthetic-`intermediate_data/` smoke test of every Code Ocean cell both pass.
+
+## 2026-09-16
+
 ### `tongue_lickometer.ipynb`: Implementation B, the six comparison figures, the refractory test
 Second half of the `TODO.md` plan. B lives in the notebook, not the library, until it is
 validated on real data; `detect_licks` stays as the baseline.
