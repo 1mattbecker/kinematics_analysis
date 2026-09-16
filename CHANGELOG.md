@@ -4,6 +4,26 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `val_02_lickometer` §3: simplify the loading cell
+- **`time_in_session` is now read from `tongue_kins.parquet`** rather than recomputed.
+  `kinematics_filter` reindexes onto its input rows, copies extra columns back by position, and
+  asserts `result['time'] == df['time']`, so `tongue_kins` and `kps_raw_tongue_tip_center` are
+  row-aligned. Correcting the earlier entry, which claimed the filter restricted its output to
+  the tracked-frame span — that restriction applies only to the internal interpolation grid.
+- **Drops the whole time-base apparatus**: the `nwb_df_trials` read, the `goCue_start_time_raw`
+  column-candidate lookup, `t0`, the `raw_timestamps` cross-check and the range-overlap
+  assertion. The `goCue_start_time` KeyError is moot — the trials table is no longer read.
+- **Drops `REQUIRED_INTERMEDIATES` and the two explicit existence checks.** A missing file now
+  raises from `pd.read_parquet` naming the path, which is the same information.
+- §3 loading cell: **98 lines → 32**. The §3 markdown loses two paragraphs.
+- Positions still come from `kps_raw_*`, not `tongue_kins` — unchanged, and for the unchanged
+  reason: `kinematics_filter` interpolates across NaN gaps, contaminating x/y at protrusion
+  edges, which is where a contact threshold is crossed. Only the *time* column is taken from
+  `tongue_kins`, and that one the filter guarantees.
+- Local run and mock smoke test both pass; the mock now writes a row-aligned `tongue_kins`.
+
+## 2026-09-16
+
 ### `val_02_lickometer`: fix the `goCue_start_time` KeyError; use `find_session_dir`; drop the §2 self-test
 - **Bug fix (first Code Ocean run).** `nwb_df_trials.parquet` has no `goCue_start_time` column.
   `create_df_trials(adjust_time=True)` **drops** every absolute time column and replaces each
@@ -16,13 +36,11 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   assumption.*
 - **`find_session_dir`** (`ephys.tongue_ephys`) replaces the hand-built `SESSION_DIR / session`
   path, matching `ephys_utils.py:348`. It handles the exact-match-then-prefix-glob lookup.
-- **Considered and rejected: sourcing `time_in_session` from `tongue_kins.parquet`** instead of
-  recomputing it. `kinematics_filter` restricts its output to `[t_min, t_max]` of the *tracked*
-  tongue frames, so `tongue_kins` does not span the session and its rows do not correspond to
-  the `kps_raw_*` frame set. A merge would have been both fragile (float key across an
-  interpolation step) and wrong at the edges. The two-line subtraction is exact:
-  `goCue_start_time_raw` is `nwb.trials[SESSION_ALIGNMENT][0]`, the same value
-  `add_time_in_session_from_nwb` and `create_df_events` both use.
+- ~~Considered and rejected: sourcing `time_in_session` from `tongue_kins.parquet`.~~
+  **Wrong — corrected in the next entry.** The `[t_min, t_max]` restriction in
+  `kinematics_filter` applies to its internal interpolation grid, not to its output; the
+  function reindexes back onto the input rows, copies extra columns by position, and asserts
+  `result['time'] == df['time']`. `tongue_kins` is row-aligned with `kps_raw_*`.
 - **Considered and rejected: `load_intermediate_data`** for the trials/licks reads. It loads five
   tables including `tongue_kins`, `tongue_movs` and `nwb_df_events`, none of which this notebook
   uses — a large read to obtain two small ones.
