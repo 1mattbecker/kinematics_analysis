@@ -4,6 +4,68 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-16
 
+### `tongue_lickometer.ipynb`: Implementation B, the six comparison figures, the refractory test
+Second half of the `TODO.md` plan. B lives in the notebook, not the library, until it is
+validated on real data; `detect_licks` stays as the baseline.
+
+- **`detect_contacts_hysteretic`** — gap-aware hysteretic contact detection, fully vectorized
+  (running maxima of the last open/close frame index; no Python loop over frames, ~0.12 s on
+  1.8 M frames). Four changes to A, one per structural property: the full time base is kept so
+  an untracked gap longer than `max_gap_s` terminates a contact; events are timestamped at
+  closest approach rather than first entry; enter and exit use different thresholds with a dead
+  band between; and confidence is gated asymmetrically (`conf_assert` to open, `conf_deny` to
+  close). Fixed parameters are justified from elsewhere rather than tuned — `max_gap_s = 0.020`
+  is the library's own `segment_movements_trimnans(max_dropped_frames=10)` tolerance at 500 Hz,
+  `conf_assert = 0.90` is the pipeline's, `conf_deny = 0.60` is a sanity-check value whose
+  sensitivity is reported as a line rather than given an axis.
+- **Five unit tests for B, run locally on synthetic traces** — closest-approach timing invariant
+  across entry thresholds; one event on a noisy protrusion where A emits two; immunity to A's
+  re-arming collapse; gap termination on the same trace §4.1 uses for A; and agreement with an
+  explicit frame loop over a 20 s noisy trace.
+- **Dead-band bounds are measured, not picked.** Lower: `pixel_error.ipynb` gives
+  `tongue_tip_center` = 3.67 ± 2.02 px against human labels, so the band must clear ~4-6 px.
+  Upper: §3.1 computes this session's jaw→spout distance. The grid spans 5-25 px.
+- **Six figures**: (1) detection counts and ILI distributions, A vs B at confidence 0.80/0.90;
+  (2) the precision–recall surface with two named QC operating points; (3) event-time offset vs
+  threshold; (4) the refractory-vs-hysteresis test; (5) the two disagreement populations with
+  distance-to-spout triage; (6) labeled video clips.
+- **Two design problems found and fixed while building, both departures from the plan as
+  written:**
+  - *The overlap window was free during operating-point selection.* It is a **scoring**
+    parameter, not a detector parameter — letting it float lets the search buy agreement by
+    widening the window until everything matches, flattering whichever detector has worse
+    timing. The surface and both operating points are now evaluated at a fixed 100 ms window;
+    §8 asks separately whether 100 ms is justified. The full overlap sweep is still computed,
+    because §8 needs it.
+  - *The flat-in-refractory test was confounded.* The refractory filter also deletes **genuine**
+    fast licks, so F1 moves along the refractory axis whenever the refractory period approaches
+    the real ILI, whether or not artifacts remain — the test could report "not flat" for a
+    reason unrelated to hysteresis. Now the flatness check is restricted to refractory periods
+    below the shortest genuine ILI (taken from the lickometer's own distribution, not assumed),
+    and the direct measurement — how many events the filter still finds to delete — is reported
+    and plotted alongside. Both criteria must pass, and the failure branch names the three
+    candidate second sources of double-triggering.
+- **§10's triage buckets are now mutually exclusive**, cut at the detector's own two thresholds,
+  so each count points at a different explanation: pose blind (dropout), inside the entry
+  threshold (pose should have fired), inside the dead band (near-miss), beyond it (the only row
+  that is a QC finding on its own).
+- Every verdict in §§3.2, 7, 8 and 9 prints both branches and states what a contradicting result
+  would mean. Everything the plan asserted about B — the 14-22 ms latency offset, the
+  threshold-dependent drift, the flat-in-refractory prediction — came from synthetic traces and
+  is labelled as a prediction in the notebook.
+
+**What was executed.** Locally: §1, §2, §4.1's synthetic demonstrations and §5's five unit
+tests — all pass. Every Code Ocean-only cell was additionally smoke-tested end to end against
+synthetic stand-in `intermediate_data/` parquets, which caught a missing `io` import, an invalid
+per-bar `alpha` list, and the two design problems above. **No cell has been run against the real
+session**; `data/for_local/` has only the pooled parquet. Two assumptions remain unverified and
+are checked at runtime rather than assumed: that
+`session_analysis_mlk/<session>/intermediate_data/` exists (the loader raises with the
+missing-file list instead of falling back), and that tracking confidence is lowest during
+retraction (§3.2 measures it and prints a verdict with a stated consequence for B's change 4).
+
+## 2026-09-16
+
 ### `tongue_lickometer.ipynb`: repair (A1/A2/A3) and Implementation A
 Implements the first half of the `TODO.md` plan logged earlier today. The notebook now runs;
 before this it could not, because every domain import was a bare name for a module that had
