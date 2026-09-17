@@ -37,6 +37,15 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
   gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
   over only two sessions and misses the three-session requirement, so neither metric reaches it.
+- §8 reloads the §7 session at `CONF` = 0.8 and 0.95 and overlays the distance-to-spout traces for
+  the same ten events, with the session-level numbers at each floor and whether metric A's flag
+  survives. `CONF` = 0.8 is inherited from `val_02`; the library's `mask_keypoint_data` defaults to
+  0.9 and `tongue_analysis` masks at 0.90, so the val_* series runs below the rest of the codebase.
+  `load_session` gained an optional `conf` argument for this, defaulting to `CONF`, so every
+  existing call is unchanged.
+- §8 also records that the §7 clips carry the Lightning Pose pipeline's own overlay threshold, set
+  when `*_labeled.mp4` was rendered. It is neither `CONF` nor recorded anywhere in this repo, so a
+  frame masked out of the analysis can still show a marker in the clip.
 - `tracked_frac` is gone. It mixed tongue-out time with tracking quality, so the sign of its
   correlation with the miss rate had two readings, and nothing in the notebook acted on it. The
   correlation it rested on was +0.277 over 51 sessions, which is p = 0.049 with a 95% CI of
