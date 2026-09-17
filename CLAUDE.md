@@ -39,39 +39,167 @@ and code editing. Data lives on Code Ocean — do not expect data files to be pr
 
 ```
 kinematics_analysis/
-├── code/               # All analysis code — notebooks and scripts
+├── code/               # All analysis code — notebooks + flat modules
+│   └── archive/        # Superseded/scratch notebooks (provenance only, not run)
+│       └── reference/  # Collaborator notebooks kept for reference
+├── data/for_local/     # Small local subset for development (see Data below)
 ├── environment/        # Docker + postinstall scripts (DO NOT MODIFY)
 ├── metadata/           # Project metadata
 ├── .codeocean/         # Code Ocean config (DO NOT MODIFY)
-└── CLAUDE.md           # This file
+├── CLAUDE.md           # This file
+├── TODO.md             # Actionable work — read before starting anything
+└── CHANGELOG.md        # Notable changes, newest first
 ```
+
+**Import constraint:** notebooks import repo modules by bare name
+(`from data_loading import ...`), so active `.py` modules must stay **flat in `code/`**.
+Only notebooks relocate into `archive/`, where they don't need to run.
+
+---
+
+## The library — `aind-dynamic-foraging-behavior-video-analysis`
+
+Most domain code lives in an installable AIND library, not in this repo. Wherever `TODO.md`
+says "the library", it means this one.
+
+- **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
+  branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
+- **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
+  to `@main` — so anything merged to `main` reaches the capsule on its next image build.
+  There is no version pin to shield against upstream changes.
+- **Import path:** `aind_dynamic_foraging_behavior_video_analysis`. `requires-python = ">=3.9"`,
+  which is what keeps it compatible with this capsule.
+- Its `README.md` is still the unedited AIND template — read the module source, not the README.
+
+| Library module | What it owns |
+|---|---|
+| `kinematics/tongue_kinematics_utils.py` | The bulk of the domain code (~1.4k lines): `segment_movements`, `calculate_metrics`, `detect_licks`, `aggregate_tongue_movements`, `annotate_trials_*`, `assign_movements_to_licks`, `get_trial_level_df` |
+| `kinematics/tongue_analysis.py` | Batch driver — `run_batch_analysis`, `generate_tongue_dfs`, `analyze_tongue_movement_quality` |
+| `kinematics/tongue_lickometer_utils.py` | Lickometer/pose comparison — `mask_keypoint_data`, `load_keypoints_from_csv`; used by `val_02`/`val_03` |
+| `kinematics/video_clip_utils.py` | Clip extraction + labeling, `find_labeled_video`, `get_video_time` |
+| `kinematics/kinematics_nwb_utils.py` | Session-ID parsing, NWB file lookup |
+| `ephys/tongue_ephys.py` | Raster/PETH machinery — `make_rp_and_events`, `compute_psth`, `RasterPlotter`, `load_intermediate_data`, `get_session_prefix` |
+| `video_alignment.py` | Video↔session/behavior clock conversion — `compute_video_session_offset`, `session_time_to_video_time` |
+| `TransferToNWB.py` | Bonsai JSON/mat → NWB (a copy also sits in `code/`) |
+
+**The boundary between the library and `code/`'s modules is ad hoc, and this is a known
+problem.** Both sides carry "kinematics utils" and "ephys utils"; the library duplicates
+`detect_licks` / `calculate_metrics` / `filter_timestamps_refractory` between
+`tongue_kinematics_utils` and `tongue_lickometer_utils`; and it ships plot functions that
+ignore this repo's `plotstyle.py`. Defining the criteria is an open `TODO.md` item —
+**read it before adding a module here or promoting anything to the library.**
 
 ---
 
 ## Key notebooks and scripts
 
-*(Update this section as files are added or renamed)*
+*(Update this section as files are added or renamed.)*
 
-- Tongue kinematics pipeline: lick detection, bout classification, outbound phase metrics
-- `compute_outbound_metrics()` — core function for kinematic feature extraction
-- UMAP embedding of movement bouts
-- Partial correlation analysis
-- `fip_00_explore.ipynb` — fiber photometry access/plotting. Structured as imports →
-  data loading → data processing → data viz. Loads the saved parquet hierarchy via
-  `rachel_analysis_utils.nwb_utils.load_nwb_list`; `USE_CURATION` + `CURATION_FILE`
-  (`DA_NE_4channel_datacuration_firstpass`, which carries `correct_mapping`) annotate
-  `df_fip['intended_measurement']`. Processing picks three example signals (NAc DA/dLight,
-  PL/GCaMP, NAc ACh/rAch) and aligns motion energy to the FIP clock; `pearsonR` series are
-  excluded (signal-signal correlations, not photometry). Viz: full/60s traces, peri-go-cue
-  averages, FIP↔motion-energy onset alignment, and ME×FIP cross-correlation. Runs on Code
-  Ocean (data asset `6babbf3d…`). First step toward correlating FIP with tongue kinematics.
-  A "Multi-session comparison" section reruns the single-session pipeline over all curated
-  sessions (`process_session` loop; missing-ME sessions skipped) and pools results with session
-  as the sampling unit (mean ± SEM), grouped by region × subject. Four cross-session analyses:
-  ETR of FIP from ME, ETR of ME from FIP, within-trial (0–2s) vs ITI (2–4s) by go cue, and
-  peri-go-cue responses by consecutive-reward/failure streak (`enrich_df_trials.num_reward_past`).
-  Motion energy can be injected into `df_fip` as a pseudo-channel (`event="ME"`, via
-  `attach_me_to_df_fip`) so the upstream `plot_fip` PSTH machinery treats it like a FIP channel.
+Analysis notebooks are numbered series, each a linear line of questioning on one topic.
+Many are **Code Ocean-only** — they use per-session intermediates absent from `data/for_local/`
+and guard those sections behind an `IS_CO` skip so they still run clean locally.
+
+### `kin_*` — tongue kinematics (behavior only)
+
+| Notebook | Question |
+|---|---|
+| `kin_00_movement_qc` | What is noise vs. real tongue movement? (See the noise-definition note below.) |
+| `kin_01_population` | How are movement parameters distributed across sessions? |
+| `kin_02_latency` | How does latency vary with cue-response ordinal k, and does it decompose as RT ≈ RT₁ + (k−1)·Δt? |
+| `kin_03_umap` | Discrete clusters or continuous structure in movement kinematics? |
+| `kin_04_timecourse` | Does movement vigor drift across a session, or track reward? |
+| `kin_05_nonlick_movements` | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? |
+| `kin_06_lick_geometry_choice` | Does the direction of a preparatory movement predict which spout is licked? |
+| `kin_07_value_encoding` | Do behavioral-model latents (Q, RPE) show up in *how* the tongue moves? |
+
+### `eph_*` — LC units × tongue kinematics
+
+| Notebook | Question |
+|---|---|
+| `eph_00_single_unit_inspection` | Per-unit rasters/PETHs — the visual entry point |
+| `eph_01_monovariate_rt` | Does reaction time predict spike count? |
+| `eph_02_monovariate_kinematics` | Does spike count predict tongue kinematics? |
+| `eph_03_partial_correlations` | Is kinematics encoding RT-independent, or shared variance? |
+| `eph_04_spatial` | Where in CCF do RT and kinematics encoders cluster? |
+| `eph_05_temporal` | When, relative to the go cue, does RT-predictive firing occur? |
+| `eph_06_behavioral_comparison` | RT encoding vs. the AIND behavioral model ("Sue") outputs |
+| `eph_07_bout_encoding` | Do units respond differently to within-trial vs. ITI movement bouts? |
+| `eph_08_waveform_axis` | Poster figure: \|T_rt\| vs. each unit's projection onto the waveform axis |
+| `eph_09_structural_axes` | Does the RT-encoding gradient align with waveform / MERFISH / projection-target axes? |
+
+`eph_01`–`eph_04` and `eph_06` all write into `PerUnitStatsRegistry`, so their per-unit
+T-statistics compose and can be compared across analyses. Add new per-unit measures through
+`encoding_methods`/the registry rather than inline, so they compose too.
+
+### `fip_*` — fiber photometry
+
+| Notebook | Question |
+|---|---|
+| `fip_00_explore` | FIP access/plotting; relate signals to motion energy, single-session then pooled |
+| `fip_01_movement_value_coding` | Motion energy × RPE / value coding (tonic value, phasic RPE) |
+| `fip_02_ne_only_events` | Do NE and DA transients dissociate around movement onsets? |
+
+### `val_*` — detection validation
+
+| Notebook | Question |
+|---|---|
+| `val_02_lickometer` | Can Lightning-Pose detect a lick *defined as tongue–spout contact*? The repo's only measure of **precision** (the library's `coverage_pct` path is recall-only) |
+| `val_03_missed_licks` | The converse — when the lickometer misses a lick, does pose tracking see it? |
+| `val_04_lickometer_qc` | The answer to #96 — per session, what fraction of *contact-like* tongue excursions (calibrated against that session's lickometer-confirmed contacts) have no lickometer event, split by lickometer context (skipped beat / silent bout / bout edge / isolated), with gates and flags. Runs locally on the exported event tables in `data/for_local/` |
+| `val_05_lickometer_qc_methods` | The analyses behind every choice in `val_04`: where the raw pose/lickometer disagreement comes from (pre-trial, disengaged tail, keypoint jitter at the spout), depth/dwell of confirmed vs unconfirmed excursions, matching (onset vs closest approach, window, one-to-one vs any-in-window, alignment), the skipped-beat test, sensitivity of the ranking. `val_03` is the earlier long-form workup |
+
+### Model quality / methods evaluation
+
+- `pixel_error.ipynb` — keypoint-tracking pixel error vs. confidence (Lightning-Pose accuracy)
+- `test_session_quality_analysis.ipynb` — session-level quality and session selection; feeds
+  the `data_loading` inclusion filter
+- `model_quality.ipynb` — a single-session **Lightning-Pose pipeline walkthrough** (load →
+  mask `tongue_tip_center` @0.90 → filter → segment → annotate → lick coverage), already on
+  modern library imports. Despite the name it is not about foraging behavioral-model quality
+
+### Pipeline / data generation
+
+`build_all_tongue_movements.py` (per-session `tongue_movs.parquet` → quality filter →
+`all_tongue_movements.parquet`; `%run` by `tongue_movements_all.ipynb`) · `add_outbound.ipynb`
+(computes `out_*` outbound metrics into per-session parquets) · `attach_data.ipynb` ·
+`test_session_wrapper.ipynb` (batch runner wrapping `run_batch_analysis`; mostly commented
+out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py` /
+`TransferToNWB.py` / `backup_nwb_utils_dynamicforaging.py`.
+
+### Repo modules (`code/*.py`, flat by necessity)
+
+| Module | What it owns |
+|---|---|
+| `data_loading.py` | Session/unit QC and inclusion filters, `load_units_with_spike_times` |
+| `ephys_utils.py` | `AnalysisConfig`, spike counting, session bundles, `build_all_counts_df` — **and** behavior-derived features that serve ephys alignment (`build_trial_features`, `annotate_movement_bouts`, `classify_bout_times`) |
+| `encoding_methods.py` | Generic per-unit encoding — `AnalysisSpec`, `fit_encoding`, OLS/GLM/Spearman/partial |
+| `per_unit_stats_registry.py` | Results store + FDR + cross-analysis `compare`; used by `eph_01/02/03/04/06` |
+| `encoding_plots.py` | Stateless plot functions for encoding results |
+| `spatial_encoding.py` | `SpatialEncoder` — CCF maps, spatial-dependence permutation tests. **No axis fitting** |
+| `spatial_axes.py` | Fitting/comparing 3-D gradient *directions* — linear/CCA/LDA + bootstrap, `compare_bootstrap_directions`, `cone_half_angle`. Coordinate-frame agnostic (takes plain Nx3) |
+| `ccf_utils.py` | CCF conversions — `pir_to_lps`, `ccf_pts_convert_to_mm`, `project_to_plane` |
+| `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
+| `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
+| `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock, signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
+
+`spatial_encoding.py` and `spatial_axes.py` are deliberately separate: *where* a statistic is
+large and *in which direction* it changes are different questions with different inputs.
+
+### Things worth knowing before editing
+
+- **Cached intermediates:** exactly two are cached (`all_counts_df.parquet`,
+  `filtered_ephys.pkl`), and the `eph_*` notebooks rebuild them via
+  `ephys_utils.build_all_counts_df`. Results stay in memory; reader notebooks re-fit.
+- **Spike-count windows are load-bearing.** `eph_08`/`eph_09` use
+  `count_window_s=(0.0, 0.5)`, `baseline_window_s=(-2.0, 0.0)`, matching the paper and the
+  poster figure. Changing them silently breaks the replication — see `TODO.md`.
+- **Column-name trap:** in `all_tongue_movements_*.parquet`, `endpoint_x/y` and
+  `max_x_from_jaw`/`max_y_from_jaw` are **absolute camera pixel positions** despite the names;
+  the jaw-relative distances are `max_x_distance`/`max_y_distance`. They are not pooled-safe
+  raw — each session carries its own camera/jaw offset. Use `kin_06`'s `get_jaw_positions()`.
+- **QC "noise"** means confident misdetection of the wrong body part. Lickometer agreement,
+  confidence, and duration are *not* valid noise filters — use cross-keypoint geometry and
+  trajectory shape.
 
 ---
 
