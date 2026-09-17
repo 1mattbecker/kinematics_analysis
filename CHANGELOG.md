@@ -27,6 +27,16 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   +0.277; detection uses one camera and a session-mean spout position; and #96's own session has no
   pose output.
 - §6 writes `val_04_lickometer_qc.csv`, one row per session with both flags.
+- §7 takes the session flagged by both metrics with the highest miss rate, which on this set is
+  `behavior_791691_2025-06-24` (38.2%, 1,499 false negatives of 3,928 pose licks, subject range
+  36.3 points). It plots the distance-to-spout trace around ten randomly drawn false negatives and
+  cuts a 1 s labeled-video clip for each. `load_session` now carries `video_offset` for the clip
+  timing, and the config gained a `DATA` root for `find_labeled_video`.
+- The first full Code Ocean run changed several counts, and the prose now matches it. With
+  `lick_coverage` measured per session the gates pass 46 of 53 rather than 51, and metric A flags
+  four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
+  gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
+  over only two sessions and misses the three-session requirement, so neither metric reaches it.
 - `tracked_frac` is gone. It mixed tongue-out time with tracking quality, so the sign of its
   correlation with the miss rate had two readings, and nothing in the notebook acted on it. The
   correlation it rested on was +0.277 over 51 sessions, which is p = 0.049 with a 95% CI of
