@@ -37,6 +37,11 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
   gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
   over only two sessions and misses the three-session requirement, so neither metric reaches it.
+- §7's panels and clips are locked to the same window and numbered to match. `HALFWIN` is now
+  `CLIP_LENGTH / 2`, so changing the clip length moves the panels with it; the panel title reads
+  `clip n · <time> s` and the clips cell prints a table of clip number, event time in session and
+  video clocks, and clip span, matching the `_clip_<n>_` in each filename. §8's overlay uses the
+  same window and titles.
 - §7's panels now show lickometer events as ticks along the bottom, with the 100 ms match window
   shaded, and print the gap to the nearest lickometer event for each of the ten. A panel with no
   ticks is a stretch where the lickometer recorded nothing; ticks just outside the band are a timing
