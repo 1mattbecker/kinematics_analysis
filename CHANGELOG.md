@@ -37,6 +37,11 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
   gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
   over only two sessions and misses the three-session requirement, so neither metric reaches it.
+- The diagnostics added while investigating one session now sit in a clearly marked appendix rather
+  than interleaved with the answer to #96. Sections 1-7 are the deliverable: the method, the
+  per-session miss rate, the day-to-day range, the limitations, the two QC metrics, and the example
+  panels with clips. The appendix holds why events score as false negatives, the matcher against an
+  optimum, the confidence threshold comparison and the event series export. Nothing was deleted.
 - §9 exports the event series to parquet: one row per pose excursion below `D0` (with the
   `detect_licks` onset and the moment of closest approach) and one row per lickometer event, for all
   53 sessions, plus the distance traces around each false negative in the §7 session. Both streams
