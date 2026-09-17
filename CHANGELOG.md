@@ -4,6 +4,45 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-17
 
+### `val_04_lickometer_qc` rewritten around candidate missed licks; `val_05_lickometer_qc_methods` and `lickometer_qc.py` added
+
+The previous metric, the fraction of pose licks with no paired lickometer event, turned out to
+measure pose noise rather than the lickometer. Working on the exported event tables (now in
+`data/for_local/`), the 38% "miss rate" of `791691 2025-06-24` decomposed as: 380 excursions
+before the first lickometer event, ~260 in the disengaged final half hour, and, of the rest, 733
+excursions that were shallower or briefer than that session's own lickometer-confirmed contacts
+(a keypoint jittering at the 10 px threshold crosses it 11 to 22 times per second). Cross-
+correlating the streams per 5-minute block showed no clock offset anywhere in the session.
+
+- A *confirmed contact* is an excursion with a lickometer event within 100 ms
+  of closest approach. *Contact-like* is calibrated per session: at least as deep as the median
+  confirmed contact, dwelling between the 25th percentile and twice the 95th percentile of
+  confirmed dwell (the median confirmed approach runs 3.9 to 8.8 px across sessions, so a fixed
+  pixel rule scores sessions unequally). A *candidate missed lick* is contact-like, has no
+  lickometer event within 100 ms, and occurs while the lickometer was active (event within 60 s
+  on both sides). Miss rate = candidates / (candidates + confirmed). Matching is "any event in
+  the window" rather than one-to-one pairing: the greedy matcher was re-verified optimal on all
+  53 real sessions, but pairing imposes a count floor and left 271 excursions unmatched with a
+  lickometer event inside their window.
+- Median session 0.8%. Flagged (Wilson lower bound > 5%, ≥ 200 contact-like
+  excursions, |stream offset| ≤ 50 ms): `791691` 2025-06-26 (10.1%) and 2025-06-24 (9.2%),
+  `751004` 2024-12-22 (8.3%). `763590` (33%, 16%) is gated on count and, for 05-01, on a −66 ms
+  offset. Candidates are split by lickometer context; skipped beats inside bouts, the issue's
+  pattern, are 112 of 596 candidates. `758018` has the highest skipped-beat fraction on all three
+  days (28/15/13% of double intervals hold an excursion) but those excursions are shallower and
+  briefer than its confirmed contacts, so they read as short protrusions rather than misses;
+  `784806 2025-06-18`'s are contact-like. `751004 2024-12-22`'s flag is sensitive to the exact
+  contact-like boundary; `791691`'s two flags survive every variant tested.
+- `lickometer_qc.py` (flat module, numpy/pandas only, library imported lazily) holds the
+  shared pipeline; `build_event_tables` writes a `val_04_sessions.parquet` sidecar with
+  `lick_coverage` and trial bounds, which the local run does not yet have (the coverage gate is
+  skipped locally and reported as such).
+- `val_05_lickometer_qc_methods` holds the anatomy of the example session, depth/dwell and
+  neighbour-count tables, the matching choices, the skipped-beat test with its single-interval
+  control, and a one-at-a-time sensitivity table. The previous `val_04` appendix moved there.
+- Both notebooks run locally on `data/for_local/val_04_*_events.parquet`; the Code Ocean-only
+  cells (event-table build, clips, confidence-threshold comparison, trace export) are guarded.
+
 ### `val_04_lickometer_qc`: a short notebook answering dynamic-foraging-processing#96
 
 A new notebook covering the method, the per-session miss rate across 53 sessions, the limitations

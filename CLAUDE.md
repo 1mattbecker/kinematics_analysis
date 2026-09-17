@@ -145,7 +145,8 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 |---|---|
 | `val_02_lickometer` | Can Lightning-Pose detect a lick *defined as tongue–spout contact*? The repo's only measure of **precision** (the library's `coverage_pct` path is recall-only) |
 | `val_03_missed_licks` | The converse — when the lickometer misses a lick, does pose tracking see it? |
-| `val_04_lickometer_qc` | The short answer to #96 — how often does the lickometer miss a lick the tongue completed, and which two statistics flag a failing session? `val_03` is its long-form workup |
+| `val_04_lickometer_qc` | The answer to #96 — per session, what fraction of *contact-like* tongue excursions (calibrated against that session's lickometer-confirmed contacts) have no lickometer event, split by lickometer context (skipped beat / silent bout / bout edge / isolated), with gates and flags. Runs locally on the exported event tables in `data/for_local/` |
+| `val_05_lickometer_qc_methods` | The analyses behind every choice in `val_04`: where the raw pose/lickometer disagreement comes from (pre-trial, disengaged tail, keypoint jitter at the spout), depth/dwell of confirmed vs unconfirmed excursions, matching (onset vs closest approach, window, one-to-one vs any-in-window, alignment), the skipped-beat test, sensitivity of the ranking. `val_03` is the earlier long-form workup |
 
 ### Model quality / methods evaluation
 
@@ -178,6 +179,7 @@ out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py
 | `spatial_axes.py` | Fitting/comparing 3-D gradient *directions* — linear/CCA/LDA + bootstrap, `compare_bootstrap_directions`, `cone_half_angle`. Coordinate-frame agnostic (takes plain Nx3) |
 | `ccf_utils.py` | CCF conversions — `pir_to_lps`, `ccf_pts_convert_to_mm`, `project_to_plane` |
 | `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
+| `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
 | `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock, signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
 
 `spatial_encoding.py` and `spatial_axes.py` are deliberately separate: *where* a statistic is
