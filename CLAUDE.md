@@ -145,6 +145,7 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 |---|---|
 | `val_02_lickometer` | Can Lightning-Pose detect a lick *defined as tongue–spout contact*? The repo's only measure of **precision** (the library's `coverage_pct` path is recall-only) |
 | `val_03_missed_licks` | The converse — when the lickometer misses a lick, does pose tracking see it? |
+| `val_04_lickometer_qc` | The short answer to #96 — how often does the lickometer miss a lick the tongue completed, and which two statistics flag a failing session? `val_03` is its long-form workup |
 
 ### Model quality / methods evaluation
 
