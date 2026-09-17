@@ -4,29 +4,32 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-17
 
-### `val_04_lickometer_qc`: the short answer to dynamic-foraging-processing#96
+### `val_04_lickometer_qc`: a short notebook answering dynamic-foraging-processing#96
 
-A new notebook carrying the method, the per-session miss rate across 53 sessions, the limitations,
-and two QC metrics. 21 cells against `val_03`'s 35. The threshold sweep table, the single-event
-trajectory panels, the video-clip extraction, the per-trial flag and the high-confidence event list
-stay in `val_03`, which remains the workup.
+A new notebook covering the method, the per-session miss rate across 53 sessions, the limitations
+and two QC metrics, in 21 cells rather than `val_03`'s 35. The threshold sweep table, the
+single-event trajectory panels, the video clip extraction, the per-trial flag and the
+high-confidence event list all stay in `val_03`, which remains the full workup.
 
-- Everything runs at `D0` = 10 px, 2.7x the 3.67 px `tongue_tip_center` error. The sweep survives as
-  the calibration curve in §2: recall 0.45 / miss 0.9% at 10 px, recall 0.90 / miss 3.6% at 30 px.
-- `val_03` §8 listed five QC metrics, A-E. This keeps two. The session miss rate, gated on
-  `n_pose` >= 300 and `lick_coverage` >= 0.90 and flagged on a Wilson lower bound above 10%, ranks
-  sessions for review. The within-subject day-to-day range, flagged above 10 points, separates a
-  failing rig from a quiet animal and recovers `763590`, which the first one's `n_pose` gate drops.
-- `791691` runs 38.2 / 1.9 / 31.1 / 13.0% on four consecutive days. Median session is 2.8%, range
-  0.0-38.2%.
-- §5 lists six limitations, each with a number attached: no ground truth, since precision is
-  measured against the instrument under test; `D0` biases in both directions; pixel scale varies
-  1.8x across sessions; `spearman(miss_rate, tracked_frac)` = +0.277; one camera against
-  session-mean spouts; #96's own session has no pose output.
+- Everything runs at one distance, `D0` = 10 px, which is 2.7x the 3.67 px `tongue_tip_center`
+  error. The threshold sweep survives only as the calibration curve in §2, where recall is 0.45 and
+  the miss rate 0.9% at 10 px, against 0.90 and 3.6% at 30 px.
+- `val_03` §8 listed five candidate QC metrics; this keeps two. The first is the session miss rate,
+  gated on `n_pose` >= 300 and `lick_coverage` >= 0.90 and flagged when the Wilson lower bound
+  exceeds 10%, which gives a ranked list of sessions to review. The second is the day-to-day range
+  within a subject, flagged above 10 points, which indicates whether a high rate is the rig or the
+  animal. The second one also picks up `763590`, which the first one's `n_pose` gate excludes.
+- `791691` gives 38.2%, 1.9%, 31.1% and 13.0% on four consecutive days. The median session across
+  the set is 2.8% and the range is 0.0% to 38.2%.
+- §5 lists six limitations, each tied to a number: there is no ground truth, since precision is
+  measured against the instrument being tested; `D0` biases the rate in both directions; the pixel
+  scale varies by a factor of 1.8 across sessions; the miss rate correlates with `tracked_frac` at
+  +0.277; detection uses one camera and a session-mean spout position; and #96's own session has no
+  pose output.
 - §6 writes `val_04_lickometer_qc.csv`, one row per session with both flags.
 
-Unexecuted: needs `session_analysis_mlk/*/intermediate_data/` on Code Ocean. Numbers quoted in the
-prose come from the 53-session run recorded in `val_03`.
+Not yet executed: it needs `session_analysis_mlk/*/intermediate_data/` on Code Ocean. The numbers
+quoted in the prose come from the 53-session run recorded in `val_03`.
 
 ## 2026-09-16
 
