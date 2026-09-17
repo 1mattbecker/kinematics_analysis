@@ -37,6 +37,14 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
   gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
   over only two sessions and misses the three-session requirement, so neither metric reaches it.
+- §7 gained a diagnostic for why an event is a false negative when the panel shows both a pose lick
+  and a lickometer tick. Three mechanisms, measured per session: the event-count floor
+  (`miss rate >= 1 - n_lickometer / n_pose`, since the matcher pairs each lickometer event at most
+  once, so a detector that fires twice as often as the lickometer has a 50% miss rate whatever the
+  hardware did); consumption, where a lickometer event claimed by one pose lick leaves the next one
+  unmatched with a tick inside its own window; and a clock offset, which sends every event to false
+  negative and false positive together. It reports the split and plots the pose-to-lickometer offset
+  distribution.
 - §7's panels and clips are locked to the same window and numbered to match. `HALFWIN` is now
   `CLIP_LENGTH / 2`, so changing the clip length moves the panels with it; the panel title reads
   `clip n · <time> s` and the clips cell prints a table of clip number, event time in session and
