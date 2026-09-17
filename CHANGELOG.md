@@ -37,6 +37,10 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
   gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
   over only two sessions and misses the three-session requirement, so neither metric reaches it.
+- `EXAMPLE_OVERRIDE` in §7 chooses the session for the plots and clips. It takes any substring of a
+  session name, reports an ambiguous or missing match instead of failing, and warns when the chosen
+  session is not flagged by both metrics. Left as `None` it keeps the automatic pick. §8 follows §7,
+  so setting it once moves both sections.
 - §8 reloads the §7 session at `CONF` = 0.8 and 0.95 and overlays the distance-to-spout traces for
   the same ten events, with the session-level numbers at each floor and whether metric A's flag
   survives. `CONF` = 0.8 is inherited from `val_02`; the library's `mask_keypoint_data` defaults to
