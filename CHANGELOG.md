@@ -27,6 +27,11 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   +0.277; detection uses one camera and a session-mean spout position; and #96's own session has no
   pose output.
 - §6 writes `val_04_lickometer_qc.csv`, one row per session with both flags.
+- `tracked_frac` is gone. It mixed tongue-out time with tracking quality, so the sign of its
+  correlation with the miss rate had two readings, and nothing in the notebook acted on it. The
+  correlation it rested on was +0.277 over 51 sessions, which is p = 0.049 with a 95% CI of
+  [0.00, 0.51]. Limitation 4 now states the behavioural confound from first principles and says
+  that nothing here measures it.
 - Terminology follows the confusion matrix in
   [Precision and recall](https://en.wikipedia.org/wiki/Precision_and_recall#Definition), with the
   pose lick as the actual condition and the lickometer as the prediction. §1 carries the 2x2 table.
