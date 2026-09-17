@@ -27,6 +27,15 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   +0.277; detection uses one camera and a session-mean spout position; and #96's own session has no
   pose output.
 - §6 writes `val_04_lickometer_qc.csv`, one row per session with both flags.
+- Terminology follows the confusion matrix in
+  [Precision and recall](https://en.wikipedia.org/wiki/Precision_and_recall#Definition), with the
+  pose lick as the actual condition and the lickometer as the prediction. §1 carries the 2x2 table.
+  Under that assignment `miss_rate` = FN / P is the false negative rate and the name was already
+  right, but the curve labelled `recall` was TP / (TP + FP), which is precision, and has been
+  renamed. True recall is 1 - `miss_rate`. `n_lickometer_only` (FP) and `precision` are now carried
+  through to the per-session table and the CSV. Checked against the library: it takes
+  (ground_truth, detected_events) and returns (tp, fp, fn), so passing pose first already put the
+  roles this way.
 
 Not yet executed: it needs `session_analysis_mlk/*/intermediate_data/` on Code Ocean. The numbers
 quoted in the prose come from the 53-session run recorded in `val_03`.
