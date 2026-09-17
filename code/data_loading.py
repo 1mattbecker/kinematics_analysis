@@ -18,7 +18,9 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_analysis import (
+    get_quality_summary,
     get_session_name_from_path,
+    load_tongue_quality_stats,
     session_already_done,
 )
 from aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys import get_session_prefix
@@ -46,19 +48,19 @@ def load_session_quality_filter(
         for subdir in base_dir.iterdir():
             if not (subdir.is_dir() and session_already_done(subdir)):
                 continue
-            json_file = subdir / "tongue_quality_stats.json"
+            # Schema is declared next to the writer in the library
+            # (tongue_analysis.TONGUE_QUALITY_STATS_FILENAME).
             try:
-                with open(json_file, "r") as f:
-                    d = json.load(f)
+                q = get_quality_summary(load_tongue_quality_stats(subdir))
             except Exception as e:
                 print(f"[skip] {subdir.name}: {e}")
                 continue
 
-            cov   = float(d.get("coverage_pct", 0.0))
-            dur50 = float(d.get("percentiles", {}).get("duration", {}).get("0.5", 0.0))
+            cov   = q["coverage_pct"]
+            dur50 = q["duration_p50"]
             row   = {
                 "session_path": subdir,
-                "session_id":   d.get("session_id", subdir.name),
+                "session_id":   q["session_id"] or subdir.name,
                 "coverage_pct": cov,
                 "duration_p50": dur50,
             }

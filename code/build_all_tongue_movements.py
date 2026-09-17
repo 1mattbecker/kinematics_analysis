@@ -3,14 +3,21 @@ build_all_tongue_movements.py
 
 Builds the combined all_tongue_movements parquet: loop over per-session
 intermediates, keep sessions that pass the tongue-tracking quality filter,
-concatenate their movement tables. The tongue_movs.parquet files already
-contain the outbound (out_*) metrics.
+concatenate their movement tables. The tongue_movs.parquet files carry the
+outbound (out_*) metrics: natively once the library's
+aggregate_tongue_movements has been re-run on the sessions, otherwise via
+the add_outbound.ipynb backfill.
 """
 
-import json
 from pathlib import Path
 
 import pandas as pd
+
+from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_analysis import (
+    get_quality_summary,
+    load_tongue_quality_stats,
+    session_already_done,
+)
 
 BASE = Path("/root/capsule/data/keypoint_tracking_bottomview_LCrecordings_20260403")
 OUT = Path("/root/capsule/scratch/temp/all_tongue_movements_04022026.parquet")
@@ -21,13 +28,10 @@ DURATION50_MIN = 0.06  # median movement duration, seconds
 
 def passes_quality(session_dir):
     """True if the session's tongue_quality_stats.json clears the thresholds."""
-    stats = session_dir / "tongue_quality_stats.json"
-    if not stats.exists():
+    if not session_already_done(session_dir):
         return False
-    d = json.loads(stats.read_text())
-    cov = float(d.get("coverage_pct", 0.0))
-    dur50 = float(d.get("percentiles", {}).get("duration", {}).get("0.5", 0.0))
-    return cov > COVERAGE_MIN and dur50 > DURATION50_MIN
+    q = get_quality_summary(load_tongue_quality_stats(session_dir))
+    return q["coverage_pct"] > COVERAGE_MIN and q["duration_p50"] > DURATION50_MIN
 
 
 chunks = []

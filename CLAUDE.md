@@ -69,25 +69,49 @@ says "the library", it means this one.
   There is no version pin to shield against upstream changes.
 - **Import path:** `aind_dynamic_foraging_behavior_video_analysis`. `requires-python = ">=3.9"`,
   which is what keeps it compatible with this capsule.
-- Its `README.md` is still the unedited AIND template — read the module source, not the README.
+- Its `README.md` is the AIND template plus a "Scope" section stating what belongs in the
+  library — read that section, then the module source.
 
 | Library module | What it owns |
 |---|---|
-| `kinematics/tongue_kinematics_utils.py` | The bulk of the domain code (~1.4k lines): `segment_movements`, `calculate_metrics`, `detect_licks`, `aggregate_tongue_movements`, `annotate_trials_*`, `assign_movements_to_licks`, `get_trial_level_df` |
-| `kinematics/tongue_analysis.py` | Batch driver — `run_batch_analysis`, `generate_tongue_dfs`, `analyze_tongue_movement_quality` |
-| `kinematics/tongue_lickometer_utils.py` | Lickometer/pose comparison — `mask_keypoint_data`, `load_keypoints_from_csv`; used by `val_02`/`val_03` |
-| `kinematics/video_clip_utils.py` | Clip extraction + labeling, `find_labeled_video`, `get_video_time` |
+| `kinematics/tongue_kinematics_utils.py` | Keypoint I/O and masking, filtering, `segment_movements`, `aggregate_tongue_movements` (emits the `out_*` outbound metrics natively via `compute_outbound_metrics`), `annotate_trials_*`, `assign_movements_to_licks`, `get_trial_level_df`, `filter_timestamps_refractory` |
+| `kinematics/tongue_analysis.py` | Batch driver — `run_batch_analysis`, `generate_tongue_dfs`, `analyze_tongue_movement_quality`; declares the `tongue_quality_stats.json` contract (`TONGUE_QUALITY_STATS_FILENAME`, `load_tongue_quality_stats`, `get_quality_summary`) |
+| `kinematics/tongue_lickometer_utils.py` | Spout-*contact* lick detection and event scoring — `detect_licks`, `calculate_metrics`, `calculate_metrics_witheventkeys`; used by `val_02`/`val_03` |
+| `kinematics/video_clip_utils.py` | Clip extraction (`extract_clips_ffmpeg_encode` = frame-accurate re-encode, `extract_clips_ffmpeg_after_reencode` = fast `-c copy`) + labeling, `find_labeled_video`, `get_video_time` |
 | `kinematics/kinematics_nwb_utils.py` | Session-ID parsing, NWB file lookup |
 | `ephys/tongue_ephys.py` | Raster/PETH machinery — `make_rp_and_events`, `compute_psth`, `RasterPlotter`, `load_intermediate_data`, `get_session_prefix` |
 | `video_alignment.py` | Video↔session/behavior clock conversion — `compute_video_session_offset`, `session_time_to_video_time` |
 | `TransferToNWB.py` | Bonsai JSON/mat → NWB (a copy also sits in `code/`) |
 
-**The boundary between the library and `code/`'s modules is ad hoc, and this is a known
-problem.** Both sides carry "kinematics utils" and "ephys utils"; the library duplicates
-`detect_licks` / `calculate_metrics` / `filter_timestamps_refractory` between
-`tongue_kinematics_utils` and `tongue_lickometer_utils`; and it ships plot functions that
-ignore this repo's `plotstyle.py`. Defining the criteria is an open `TODO.md` item —
-**read it before adding a module here or promoting anything to the library.**
+### Library vs repo boundary
+
+Decided 2026-09-17 (the library records the same rule in its `README.md`, "Scope").
+One test: **would another AIND project doing tongue kinematics want this, unchanged?**
+
+- **Library:** code that produces or annotates the per-session intermediates
+  (`tongue_kins.parquet`, `tongue_movs.parquet`, `kps_raw_*.parquet`,
+  `tongue_quality_stats.json`), runs in the batch pipeline, or is generic to tongue-kinematics
+  sessions — keypoint I/O and filtering, segmentation, aggregation (including `out_*`),
+  trial/lick annotation, QC stats, lick detection, video/NWB lookup, clip extraction,
+  raster/PSTH primitives. It must stay stable: the capsule installs it from `main` unpinned.
+- **This repo:** analysis built *on top of* the intermediates for the LC-NE RT-encoding
+  question — encoding models, per-unit registries, spatial topography and axes, figure style.
+  Free to churn.
+- **Plots:** the library's plot functions are pipeline QC artefacts written to disk by
+  `analyze_tongue_movement_quality`. They carry no styling contract and are not used for
+  figures shown in notebooks here; presentation plotting is this repo's job (`plotstyle.py`,
+  `encoding_plots.py`). Do not restyle the library's plotters and do not add plotters there.
+- **Contracts:** a file the library writes and this repo reads is declared next to the writer
+  and read through the accessor, never by path — `tongue_quality_stats.json` is read via
+  `load_tongue_quality_stats` / `get_quality_summary` in `data_loading.py` and
+  `build_all_tongue_movements.py`.
+- **Ambiguous cases** stay here until a second consumer appears: `annotate_movement_bouts` /
+  `classify_bout_times` in `ephys_utils.py`, `build_trial_features` (its column set is chosen
+  for this project's encoding models), `kin_06`'s landmark plot.
+- **Layering** is written into the module docstrings on both sides
+  (`tongue_kinematics_utils`, `tongue_lickometer_utils`, `tongue_ephys` in the library;
+  `ephys_utils` here). Library changes go on a branch of the library repo as a PR; the capsule
+  picks them up on the next image rebuild, so batch library changes and rebuild once.
 
 ---
 

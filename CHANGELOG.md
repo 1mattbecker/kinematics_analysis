@@ -4,6 +4,38 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-17
 
+### Library boundary decided; outbound metrics and the quality-stats contract moved into the library
+
+Two `TODO.md` items closed on the library side (branch `library-boundary-outbound` in the local
+clone of `aind-dynamic-foraging-behavior-video-analysis`; needs a PR, then an image rebuild).
+
+- **Boundary rule** written into `CLAUDE.md` ("Library vs repo boundary") and the library
+  `README.md` ("Scope"): the library owns whatever produces or annotates the per-session
+  intermediates and is generic to tongue-kinematics sessions; this repo owns analysis built on
+  top of them. Layering docstrings added to `tongue_kinematics_utils`, `tongue_lickometer_utils`
+  and `tongue_ephys` in the library and to `ephys_utils.py` here. Library plotters are QC
+  artefacts with no styling contract; presentation plotting stays here.
+- **Library de-duplication.** `tongue_lickometer_utils` keeps `detect_licks`,
+  `calculate_metrics`, `calculate_metrics_witheventkeys` (the `tongue_kinematics_utils` copies,
+  a 225x slower row loop and a meaningless `tn`, are deleted). `tongue_kinematics_utils` keeps
+  `load_keypoints_from_csv`, `mask_keypoint_data`, `filter_timestamps_refractory`.
+  `extract_clips_ffmpeg_encode` (frame-accurate re-encode) moved to `video_clip_utils` next to
+  the `-c copy` variant. Import cells of `val_02`, `val_03`, `val_04` updated accordingly.
+- **Outbound metrics.** `compute_outbound_metrics` is now a library function and
+  `aggregate_tongue_movements` calls it, so `tongue_movs.parquet` carries `out_*` from
+  segmentation. The pooled parquet was found to follow the `tongue_movements_all` copy's
+  convention (`out_duration = 0.0`, not NaN, when the endpoint is the first frame: 18,515 rows),
+  and the library reproduces that copy exactly. `add_outbound.ipynb` and
+  `tongue_movements_all.ipynb` import it instead of defining it; the backfill stays until the
+  per-session pipeline is re-run.
+- **`tongue_quality_stats.json` contract.** Schema documented on
+  `TONGUE_QUALITY_STATS_FILENAME` in `tongue_analysis.py`, with `load_tongue_quality_stats` and
+  `get_quality_summary`; `data_loading.load_session_quality_filter` and
+  `build_all_tongue_movements.py` read through them instead of parsing the JSON by hand.
+- Library gets its first real tests (10, passing on Python 3.9).
+- `TODO.md`: the `val_02` repair item retired (run on Code Ocean) and replaced by
+  "Recharacterize lickometer validation from the ground up".
+
 ### `val_04_lickometer_qc` rewritten around candidate missed licks; `val_05_lickometer_qc_methods` and `lickometer_qc.py` added
 
 The previous metric, the fraction of pose licks with no paired lickometer event, turned out to
