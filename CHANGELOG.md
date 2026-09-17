@@ -37,6 +37,12 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
   gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
   over only two sessions and misses the three-session requirement, so neither metric reaches it.
+- §7's panels now show lickometer events as ticks along the bottom, with the 100 ms match window
+  shaded, and print the gap to the nearest lickometer event for each of the ten. A panel with no
+  ticks is a stretch where the lickometer recorded nothing; ticks just outside the band are a timing
+  disagreement rather than a dropout. Both figures also pin the time axis, which autoscaled per
+  panel because the trace only exists on tracked frames, and §7's legend uses a proxy handle so it
+  appears whether or not the first panel happens to contain a lickometer event.
 - `EXAMPLE_OVERRIDE` in §7 chooses the session for the plots and clips. It takes any substring of a
   session name, reports an ambiguous or missing match instead of failing, and warns when the chosen
   session is not flagged by both metrics. Left as `None` it keeps the automatic pick. §8 follows §7,
