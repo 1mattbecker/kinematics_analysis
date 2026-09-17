@@ -37,6 +37,14 @@ high-confidence event list all stay in `val_03`, which remains the full workup.
   four sessions rather than five: `752014 2025-03-25` scores 16.2% on a coverage of 71.5% and is
   gated out. Metric B flags three subjects covering 12 sessions; `763590` has a 13.0-point range
   over only two sessions and misses the three-session requirement, so neither metric reaches it.
+- §7 also carries `match_events_optimal`, an order-preserving maximum matching, so the greedy
+  matcher in the library can be checked against an upper bound on the same event lists. Over ~9,400
+  synthetic trials, including dense 8 Hz bouts and the regime where the predicted stream is denser
+  than the actual one, it never found more pairs than greedy, so greedy appears already optimal and
+  a false negative with a lickometer event in its window is forced by the event lists rather than by
+  the pairing. The companion diagnostic measures the gap from each false negative to the nearest
+  other pose lick: a cluster just above the 100 ms refractory period means `detect_licks` split one
+  contact into two events too far apart for the filter to merge.
 - §7 gained a diagnostic for why an event is a false negative when the panel shows both a pose lick
   and a lickometer tick. Three mechanisms, measured per session: the event-count floor
   (`miss rate >= 1 - n_lickometer / n_pose`, since the matcher pairs each lickometer event at most
