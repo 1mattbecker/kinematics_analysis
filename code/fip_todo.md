@@ -1,9 +1,36 @@
 # fip_* to-do
 
 Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
-`fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`). Kept separate from
-`TODO.md`/`REORG.md`, which track the `kin_*`/`eph_*` port plan. Newest first, dated
-`YYYY-MM-DD`.
+`fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`,
+`fip_03_da_ne_commonality.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
+`kin_*`/`eph_*` port plan. Newest first, dated `YYYY-MM-DD`.
+
+---
+
+## 2026-09-22
+
+**`fip_03_da_ne_commonality.ipynb` added** (see `CHANGELOG.md` 2026-09-22). Validated statically
+and against synthetic data; never run on Code Ocean. Open items:
+
+- **Run it on Code Ocean.** Run `fip_02` first as a smoke test — no `fip_*` notebook has executed
+  against real data (item 4 below), so the first real run of `fip_03` will surface any
+  `fip_utils` bug its predecessors would have found. Expect ~15 min after
+  `load_curated_sessions()`. Confirm §2 prints 10 sessions / 1 subject.
+- **Sweep the two switches.** Re-run with `ME_TRANSFORM = "raw"` and compare §6's partition
+  against the `log1p` run; if the three components move materially, motion energy's right tail is
+  driving the split and §7 should say so. Then re-run with `TARGET = "events"` and confirm the
+  Poisson path reports D² in place of R² throughout.
+- **Animal-level inference.** The binding constraint is that motion energy exists for 10 sessions
+  from one animal. Two routes: swap the behavioral target to lick/choice events from `df_trials`
+  (~172 curated sessions, 20 subjects), which needs a different event source in §2 and a
+  bootstrap over animals in §6; or run `aind-motion-energy` (capsule 5110154) over more of the
+  20 subjects' behavior-video assets to widen the existing path.
+- **Figure destination.** §1 writes to `/root/capsule/scratch/figures/fip`, which a reproducible
+  run does not preserve. Anything headed for a paper figure needs copying to `/results`.
+- **Open parameter choices**, all with defaults in place and none yet checked against real data:
+  the lag basis (`N_BASIS = 8`, log-warped over −2 to +5 s), block CV geometry (`N_BLOCKS = 5`,
+  `EMBARGO_S = 7.0`), and whether `fu.pick_example` silently taking one fiber per region is
+  acceptable when a session has two dLight fibers.
 
 ---
 

@@ -4,6 +4,45 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-22
 
+### `fip_03_da_ne_commonality.ipynb` — DA/NE variance partition against motion energy
+
+New notebook, fourth in the `fip_*` series. Takes `fip_02`'s finding that DA and NE-proxy
+transients coincide above a circular-shift null and asks how the motion-energy variance the two
+signals explain splits into DA-unique, NE-unique and shared. Runs linearly: load/align (§2),
+cross-correlation with a circular-shift null (§3), event-locked amplitude coupling (§4), a lagged
+ridge encoding model with contiguous-block CV (§5), commonality analysis with a bootstrap over
+sessions (§6), and what the partition can support (§7).
+
+Decisions worth recording:
+
+- **Session is the sampling unit and there is one animal.** Motion energy exists for 10 of 172
+  curated sessions, all subject 808054 (verified against `.codeocean/datasets.json`). No
+  animal-level test is possible; §6's bootstrap intervals describe sessions within one animal.
+  §8 records the lick/choice-target route to real animal-level inference.
+- **Two run-level switches**, `TARGET` (`"continuous"` | `"events"`) and `ME_TRANSFORM`
+  (`"log1p"` | `"raw"`), each resolved in exactly one place and stamped into every saved
+  filename. Prose, section order and figure count do not branch.
+- **Bandwidth is measured, not matched.** Both channels share an acquisition, clock and upstream
+  dF/F, so the only remaining asymmetry is dLight-vs-GCaMP kinetics, which resampling cannot fix.
+  Figure 1b reports each channel's median power frequency instead; §7 carries that into the
+  reading of the unique components.
+- **One ridge penalty per session**, selected on the joint design and reused for the DA-only and
+  NE-only fits, so the nested-model comparison is not confounded by different regularization.
+- **Held-out scores use the training-fold mean as the null**, with a `EMBARGO_S = 7 s` gap either
+  side of each test block because the lagged design reaches across block boundaries.
+- Uses `plotstyle.py`, unlike `fip_00`–`fip_02`, which use bare matplotlib. Figures go to
+  `/root/capsule/scratch/figures/fip`, which a reproducible run does not preserve.
+- No new module: `lagged_design`, `block_cv_score`, `select_alpha`, `commonality`, `event_amps`
+  and `median_freq` are notebook-local. `encoding_methods.py` was not reusable — it fits only
+  univariate `y ~ 1 + x` per group with no R² and no cross-validation.
+
+Validated statically (`nbformat`, `nbconvert`+`py_compile`, `pyflakes`, a 3.10+ syntax scan) and
+by dry-running the notebook's own model cells on synthetic data: a planted DA-private driver is
+recovered as DA-unique 0.49 / NE-unique 0.00 / shared 0.20; an unrelated AR(1) target scores
+R² = −0.004, so block CV with the embargo does not manufacture signal; a kernel planted at +1.0 s
+is recovered at +0.75 s (one basis bump); the Poisson path returns a finite positive D². Not yet
+run against real data on Code Ocean.
+
 ### `run_batch_analysis.py` re-pointed at a fresh full pipeline re-run
 
 Re-points the capsule's Reproducible Run entrypoint (`code/run` → `run_batch_analysis.py`) to
