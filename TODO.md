@@ -950,6 +950,14 @@ merge the library PR, rebuild the capsule image, then re-run `eph_00`/`kin_00` t
 > are QC artefacts with no styling contract, presentation plotting stays here; nothing was
 > restyled. `annotate_movement_bouts` stays in `ephys_utils.py` until it has a second consumer.
 >
+> **After the PR merges and the image rebuilds, run `code/verify_library_migration.ipynb`.**
+> One-shot, Code-Ocean-only checklist: imports resolve on the real capsule, the session set from
+> `load_session_quality_filter` is byte-identical to a hand-parsed re-derivation, and
+> `aggregate_tongue_movements` re-run on one real session's intermediates reproduces the `out_*`
+> columns already in its `tongue_movs.parquet`. Passing it is the acceptance test for this item
+> and the outbound-metrics item below; it does not replace the full pipeline re-run + parity
+> check the outbound item still needs before `add_outbound.ipynb` is archived.
+>
 > **Consumers updated here** (`val_02`, `val_03`, `val_04` import cells) resolve only against
 > the library branch — locally the venv's editable install now points at the clone; on Code
 > Ocean they need the PR merged and the image rebuilt. Until then those three notebooks' import
