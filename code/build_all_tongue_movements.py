@@ -7,6 +7,11 @@ concatenate their movement tables. The tongue_movs.parquet files carry the
 outbound (out_*) metrics: natively once the library's
 aggregate_tongue_movements has been re-run on the sessions, otherwise via
 the add_outbound.ipynb backfill.
+
+Run as a script (`python build_all_tongue_movements.py`) or via `%run` in a
+notebook (both set __name__ == "__main__"); a plain `import
+build_all_tongue_movements` loads the helpers without running the batch job
+— it previously ran the full loop and wrote OUT as a side effect of import.
 """
 
 from pathlib import Path
@@ -34,17 +39,24 @@ def passes_quality(session_dir):
     return q["coverage_pct"] > COVERAGE_MIN and q["duration_p50"] > DURATION50_MIN
 
 
-chunks = []
-for session_dir in sorted(BASE.glob("behavior_*")):
-    if not passes_quality(session_dir):
-        print("skip %s" % session_dir.name)
-        continue
-    movs = pd.read_parquet(session_dir / "intermediate_data" / "tongue_movs.parquet")
-    movs["session"] = session_dir.name
-    chunks.append(movs)
-    print("ok   %s: %d movements" % (session_dir.name, len(movs)))
+def build_all_tongue_movements():
+    """Run the filter + concatenate pass and write OUT. Returns the combined DataFrame."""
+    chunks = []
+    for session_dir in sorted(BASE.glob("behavior_*")):
+        if not passes_quality(session_dir):
+            print("skip %s" % session_dir.name)
+            continue
+        movs = pd.read_parquet(session_dir / "intermediate_data" / "tongue_movs.parquet")
+        movs["session"] = session_dir.name
+        chunks.append(movs)
+        print("ok   %s: %d movements" % (session_dir.name, len(movs)))
 
-all_tongue_movements = pd.concat(chunks, ignore_index=True)
-OUT.parent.mkdir(parents=True, exist_ok=True)
-all_tongue_movements.to_parquet(OUT, index=False)
-print("\nsaved %d movements from %d sessions -> %s" % (len(all_tongue_movements), len(chunks), OUT))
+    all_tongue_movements = pd.concat(chunks, ignore_index=True)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    all_tongue_movements.to_parquet(OUT, index=False)
+    print("\nsaved %d movements from %d sessions -> %s" % (len(all_tongue_movements), len(chunks), OUT))
+    return all_tongue_movements
+
+
+if __name__ == "__main__":
+    all_tongue_movements = build_all_tongue_movements()

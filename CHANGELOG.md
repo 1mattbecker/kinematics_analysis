@@ -2,7 +2,23 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
-## 2026-09-17
+## 2026-09-22
+
+### `build_all_tongue_movements.py` ran its whole batch job on plain `import`
+
+Found while verifying the library migration on Code Ocean: `verify_library_migration.ipynb`
+imports `build_all_tongue_movements` purely to check that its imports resolve, but the script
+had no `if __name__ == "__main__":` guard — the session loop, quality filter, concatenation and
+`to_parquet` write all ran at module import time. The import check silently ran the full batch
+job and wrote to `scratch/temp/`. No canonical file was touched (`OUT` is a scratch path), but
+the side effect was real and unintended.
+
+Fixed: the loop is now `build_all_tongue_movements()`, called only under
+`if __name__ == "__main__":`. `%run build_all_tongue_movements.py` (used by
+`tongue_movements_all.ipynb` cell 1) sets `__name__ == "__main__"` the same as running the
+script directly, so that notebook's behavior is unchanged; a plain `import
+build_all_tongue_movements` now loads the helpers with no side effect, which is what the
+verification notebook needed all along.
 
 ### Library boundary decided; outbound metrics and the quality-stats contract moved into the library
 
