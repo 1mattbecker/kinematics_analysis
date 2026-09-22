@@ -13,7 +13,7 @@ pred_list_path = Path("/root/capsule/scratch/pred_csv_list_20250113.json")
 with open(pred_list_path, "r") as f:
     pred_csv_list = json.load(f)
 
-run_batch_analysis(pred_csv_list, data_root, save_root)
+run_batch_analysis(pred_csv_list, data_root, save_root, extract_clips=False)
 
 # pool into a freshly dated parquet
 date_tag = datetime.date.today().strftime("%m%d%Y")
