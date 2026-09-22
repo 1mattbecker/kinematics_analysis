@@ -4,6 +4,20 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-22
 
+### `run_batch_analysis.py` re-pointed at a fresh full pipeline re-run
+
+Re-points the capsule's Reproducible Run entrypoint (`code/run` → `run_batch_analysis.py`) to
+re-run every session currently in `session_analysis_mlk` through the migrated library into a
+new `session_analysis_fall2026` output dir, leaving the mlk output untouched, then pool the
+result into a freshly dated `all_tongue_movements_MMDDYYYY.parquet`. Session list is
+reconstructed from each mlk session's own recorded `pred_csv` (`tongue_quality_stats.json`)
+rather than the January 2025 `pred_csv_list_20250113.json`, which predates several sessions
+(the 791691/784803/784806/763590 series) already in the current pooled data and would have
+silently dropped them from the re-run. `extract_clips=False` by default to skip re-decoding
+video the mlk run already has clips for. `build_all_tongue_movements()` gained `base`/`out`
+parameters (default-backward-compatible) so this could reuse it instead of duplicating the
+pooling logic. Not yet run — staged for the next Code Ocean session.
+
 ### Library boundary PR merged and verified on Code Ocean; outbound metrics confirmed on real data
 
 - **PR #4 merged** into `aind-dynamic-foraging-behavior-video-analysis`. Image rebuilt.

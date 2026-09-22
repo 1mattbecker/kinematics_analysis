@@ -39,10 +39,28 @@ def passes_quality(session_dir):
     return q["coverage_pct"] > COVERAGE_MIN and q["duration_p50"] > DURATION50_MIN
 
 
-def build_all_tongue_movements():
-    """Run the filter + concatenate pass and write OUT. Returns the combined DataFrame."""
+def build_all_tongue_movements(base=None, out=None):
+    """
+    Run the filter + concatenate pass and write the pooled parquet.
+
+    Parameters
+    ----------
+    base : Path, optional
+        Root folder of per-session `behavior_*` output dirs. Defaults to `BASE`
+        (the canonical `session_analysis_mlk`-derived pipeline output).
+    out : Path, optional
+        Where to write the pooled parquet. Defaults to `OUT`.
+
+    Returns
+    -------
+    pd.DataFrame
+        The combined table (also written to `out`).
+    """
+    base = Path(base) if base is not None else BASE
+    out = Path(out) if out is not None else OUT
+
     chunks = []
-    for session_dir in sorted(BASE.glob("behavior_*")):
+    for session_dir in sorted(base.glob("behavior_*")):
         if not passes_quality(session_dir):
             print("skip %s" % session_dir.name)
             continue
@@ -52,9 +70,9 @@ def build_all_tongue_movements():
         print("ok   %s: %d movements" % (session_dir.name, len(movs)))
 
     all_tongue_movements = pd.concat(chunks, ignore_index=True)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    all_tongue_movements.to_parquet(OUT, index=False)
-    print("\nsaved %d movements from %d sessions -> %s" % (len(all_tongue_movements), len(chunks), OUT))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    all_tongue_movements.to_parquet(out, index=False)
+    print("\nsaved %d movements from %d sessions -> %s" % (len(all_tongue_movements), len(chunks), out))
     return all_tongue_movements
 
 
