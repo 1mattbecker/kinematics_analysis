@@ -1096,14 +1096,12 @@ then archive `add_outbound.ipynb`._
 > synthetic tests cover but this real-data check hasn't hit yet), not the convention itself.
 >
 > **Full pipeline re-run staged 2026-09-22, not yet executed.** `run_batch_analysis.py` (also
-> the capsule's Reproducible Run entrypoint — see `code/run`) now re-runs every session already
-> in `session_analysis_mlk` into a fresh `session_analysis_fall2026`, leaving the mlk output
-> untouched, then pools the result into a freshly dated `all_tongue_movements_MMDDYYYY.parquet`
-> via the now-parametrized `build_all_tongue_movements(base=, out=)`. Session list is
-> reconstructed from each mlk session's own recorded `pred_csv` (not the stale
-> `pred_csv_list_20250113.json`, which predates several sessions now in the pooled data).
-> `extract_clips=False` by default — flip it in the script if fresh clips are wanted too. Needs
-> to actually run on Code Ocean; the full-parquet parity check against
+> the capsule's Reproducible Run entrypoint — see `code/run`) points `save_root` at a fresh
+> `session_analysis_fall2026` (unchanged: reads `pred_csv_list` from the existing
+> `pred_csv_list_20250113.json`) and, after the batch, pools the result into a freshly dated
+> `all_tongue_movements_MMDDYYYY.parquet` via the now-parametrized
+> `build_all_tongue_movements(base=, out=)`. `session_analysis_mlk` is untouched. Needs to
+> actually run on Code Ocean; the full-parquet parity check against
 > `all_tongue_movements_04022026.parquet` (session/movement_id join, same convention-aware
 > comparison as `verify_library_migration.ipynb` §4) still needs to be written once that run
 > completes.
