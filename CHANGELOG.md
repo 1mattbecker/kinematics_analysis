@@ -11,7 +11,9 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   `build_all_tongue_movements.py` `__main__` guard fix above. §4
   (`aggregate_tongue_movements` real-data parity) passed on `behavior_782394_2025-04-23_10-51-14`:
   3,761/3,761 movements match, 50 via the documented zero-length-outbound convention (`0.0` vs
-  `NaN`), 0 unexplained. §3 (session-filter parity) not yet run.
+  `NaN`), 0 unexplained. §3 (session-filter parity): `load_session_quality_filter` and a
+  hand-parsed re-derivation agree on the same 44 sessions. All three sections pass — the
+  migration's acceptance checklist is complete.
 - **§4's checker was too strict** and needed a fix of its own: it flagged the known convention
   difference as a hard failure with no way to distinguish it from a real regression. Rewrote it
   to decompose mismatches into convention-explained (verified against a synthetic case matching

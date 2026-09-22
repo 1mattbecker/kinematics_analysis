@@ -958,7 +958,9 @@ outbound-metrics item below, not this item._
 > was added. §4 (`aggregate_tongue_movements` re-run on one real session matches its existing
 > `tongue_movs.parquet`): passed on `behavior_782394_2025-04-23_10-51-14`, all 3,761 movements,
 > 50 via the documented convention difference, 0 unexplained — see the outbound-metrics item
-> below for detail. §3 (session-filter parity) has not been run yet.
+> below for detail. §3 (session-filter parity): passed — `load_session_quality_filter` and a
+> hand-parsed re-derivation agree on the same 44 sessions. **All three sections green; this
+> item's acceptance checklist is complete.**
 >
 > **Consumers updated here** (`val_02`, `val_03`, `val_04` import cells, `data_loading.py`,
 > `build_all_tongue_movements.py`) now resolve on both the local venv (editable install
