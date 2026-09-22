@@ -930,9 +930,9 @@ Start from a clean definition, not from any of the three notebooks.
 ## Define the boundary between the library and this repo's `code/` modules
 
 _Logged 2026-09-15. **Decided and implemented 2026-09-17** on the library branch
-`library-boundary-outbound` (local clone) and on `wild` here. What remains is operational:
-merge the library PR, rebuild the capsule image, then re-run `eph_00`/`kin_00` to confirm
-`data_loading` still selects the same sessions._
+`library-boundary-outbound` (local clone) and on `wild` here. **Merged as PR #4 and confirmed
+on the rebuilt capsule 2026-09-22.** What remains is the fuller pipeline re-run under the
+outbound-metrics item below, not this item._
 
 > **Status 2026-09-17.** The criteria below (one test: would another AIND project doing tongue
 > kinematics want this, unchanged?) are now written into `CLAUDE.md` ("Library vs repo
@@ -950,18 +950,19 @@ merge the library PR, rebuild the capsule image, then re-run `eph_00`/`kin_00` t
 > are QC artefacts with no styling contract, presentation plotting stays here; nothing was
 > restyled. `annotate_movement_bouts` stays in `ephys_utils.py` until it has a second consumer.
 >
-> **After the PR merges and the image rebuilds, run `code/verify_library_migration.ipynb`.**
-> One-shot, Code-Ocean-only checklist: imports resolve on the real capsule, the session set from
-> `load_session_quality_filter` is byte-identical to a hand-parsed re-derivation, and
-> `aggregate_tongue_movements` re-run on one real session's intermediates reproduces the `out_*`
-> columns already in its `tongue_movs.parquet`. Passing it is the acceptance test for this item
-> and the outbound-metrics item below; it does not replace the full pipeline re-run + parity
-> check the outbound item still needs before `add_outbound.ipynb` is archived.
+> **PR #4 merged 2026-09-22, image rebuilt, verified with `code/verify_library_migration.ipynb`
+> on Code Ocean the same day.** §2 (imports resolve on the real capsule): passed, after fixing
+> one bug the check itself surfaced — `build_all_tongue_movements.py` had no
+> `if __name__ == "__main__":` guard, so the plain `import` in §2 ran its whole batch job as a
+> side effect (harmless: it wrote to a scratch temp path, nothing canonical) before the guard
+> was added. §4 (`aggregate_tongue_movements` re-run on one real session matches its existing
+> `tongue_movs.parquet`): passed on `behavior_782394_2025-04-23_10-51-14`, all 3,761 movements,
+> 50 via the documented convention difference, 0 unexplained — see the outbound-metrics item
+> below for detail. §3 (session-filter parity) has not been run yet.
 >
-> **Consumers updated here** (`val_02`, `val_03`, `val_04` import cells) resolve only against
-> the library branch — locally the venv's editable install now points at the clone; on Code
-> Ocean they need the PR merged and the image rebuilt. Until then those three notebooks' import
-> cells fail on the capsule with `ImportError`, which is the intended loud failure.
+> **Consumers updated here** (`val_02`, `val_03`, `val_04` import cells, `data_loading.py`,
+> `build_all_tongue_movements.py`) now resolve on both the local venv (editable install
+> repointed at the clone) and the rebuilt capsule.
 
 ### Why
 
@@ -1062,10 +1063,11 @@ kinematic features, but its column set (`kcols`) is chosen for this project's en
 
 ## Fold outbound metrics into the library's movement aggregation step
 
-_Logged 2026-09-11. **Library side done 2026-09-17** (branch `library-boundary-outbound`).
-Remaining: merge, rebuild the image, re-run the per-session pipeline so intermediates carry
-`out_*` from segmentation, then verify column parity against
-`all_tongue_movements_04022026.parquet` and archive `add_outbound.ipynb`._
+_Logged 2026-09-11. **Library side done and confirmed on real data 2026-09-22**
+(`library-boundary-outbound` merged as PR #4). Remaining: re-run the per-session pipeline so
+intermediates carry `out_*` from segmentation (today they still come from the
+`add_outbound.ipynb` backfill or an equivalent prior run), then the full-parquet parity check,
+then archive `add_outbound.ipynb`._
 
 > **Status 2026-09-17.** `compute_outbound_metrics` now lives in
 > `tongue_kinematics_utils` and `aggregate_tongue_movements` calls it, so `tongue_movs.parquet`
@@ -1081,6 +1083,15 @@ Remaining: merge, rebuild the image, re-run the per-session pipeline so intermed
 > that copy on 400 random movements with NaN frames; the only difference from the
 > `add_outbound` copy is those zero-length rows. The parity check after the pipeline re-run
 > should therefore be exact, not approximate.
+>
+> **Confirmed on real data 2026-09-22**, via `code/verify_library_migration.ipynb` §4, on
+> `behavior_782394_2025-04-23_10-51-14`: `aggregate_tongue_movements` re-run from that
+> session's frame-level `tongue_kins.parquet` reproduces the `out_*` columns already in its
+> `tongue_movs.parquet` on all 3,761 movements — 3,711 exactly, 50 via the documented
+> zero-length-outbound convention above, 0 unexplained. This is the strongest confirmation so
+> far that the migrated code is correct, but it is still one session out of 44; the remaining
+> risk is session-to-session variation (e.g. a session with an all-NaN movement, which the
+> synthetic tests cover but this real-data check hasn't hit yet), not the convention itself.
 
 ### Why
 

@@ -4,6 +4,24 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-22
 
+### Library boundary PR merged and verified on Code Ocean; outbound metrics confirmed on real data
+
+- **PR #4 merged** into `aind-dynamic-foraging-behavior-video-analysis`. Image rebuilt.
+- **`verify_library_migration.ipynb` run on the capsule.** §2 (imports) passed after the
+  `build_all_tongue_movements.py` `__main__` guard fix above. §4
+  (`aggregate_tongue_movements` real-data parity) passed on `behavior_782394_2025-04-23_10-51-14`:
+  3,761/3,761 movements match, 50 via the documented zero-length-outbound convention (`0.0` vs
+  `NaN`), 0 unexplained. §3 (session-filter parity) not yet run.
+- **§4's checker was too strict** and needed a fix of its own: it flagged the known convention
+  difference as a hard failure with no way to distinguish it from a real regression. Rewrote it
+  to decompose mismatches into convention-explained (verified against a synthetic case matching
+  the reported failure, and against a deliberately injected real mismatch to confirm it still
+  fails when it should) vs unexplained, and only raise on the latter.
+- **Local venv repointed** at the library clone (`./.venv/bin/pip install -e
+  ../aind-dynamic-foraging-behavior-video-analysis --no-deps`) — an earlier attempt at this had
+  silently failed; confirmed this time by resolving `TONGUE_QUALITY_STATS_FILENAME` through the
+  installed package and re-running the repo's own module imports.
+
 ### `build_all_tongue_movements.py` ran its whole batch job on plain `import`
 
 Found while verifying the library migration on Code Ocean: `verify_library_migration.ipynb`
