@@ -2,6 +2,50 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-23
+
+### `fip_03`: coherence section added, motion energy added to the spectra panel
+
+Both changes follow the first real Code Ocean run of the notebook.
+
+**Section 3b, coherence.** Section 3's cross-correlation put the DA/NE peak at lag 0.00 in 9 of
+10 sessions, which is the signature of a shared measurement artifact. Working through it:
+
+- The isosbestic cannot be used as a control — it is already regressed out upstream, visible in
+  the single variant name every channel carries, `dff-bright_mc-iso-IRLS`. There is no raw
+  variant in the asset.
+- An all-pairs cross-correlation over the five real channels ruled out a global artifact:
+  bilateral rAch is uncorrelated (+0.066) while bilateral dLight is +0.983 and DA x NE is +0.29.
+- Whole-session correlation is dominated by the slowest components present, so drift was the
+  leading hypothesis. It was wrong: high-passing at 0.05 Hz *raises* the peak (0.293 to 0.345).
+  Each channel drifts, but the drifts are unrelated to each other, so they diluted the estimate.
+- Coherence settles it. The relationship is a band-limited peak (0.369 at 0.176 Hz, roughly
+  0.12-0.45 Hz / 2-8 s timescales), at the null below 0.1 Hz and above ~0.5 Hz. Broadband
+  crosstalk between two spectrally similar green sensors would be flat, so this is not that.
+
+Significance is a cluster-based permutation test rather than a per-frequency threshold: across
+513 bins the pointwise 97.5% null flags 8-18 bins on genuinely independent signals (measured).
+Contiguous runs are scored by area above a cluster-forming threshold and compared with the
+largest cluster the circular-shift null produces anywhere in the spectrum. This also fixed a
+plotting bug — shading from `min` to `max` of a non-contiguous mask stretched the band across
+the whole axis whenever an isolated instrumental spike cleared threshold.
+
+The high-pass test that produced the 0.293 to 0.345 result is deliberately **not** kept as a
+cell; it answered its question and the coherence section measures the same thing at 0.02 Hz
+resolution. Its result is recorded in section 3's markdown. Sections 5 and 6 remain unfiltered;
+whether to high-pass them is an open question noted in `code/fip_todo.md`.
+
+The phase/delay half of the coherence analysis was dropped as well. Lag is section 3's
+measurement, and the extra resolution the phase method offers (~6 ms vs the 0.05 s
+cross-correlation grid) is below what differing dLight and GCaMP kinetics can support.
+
+**Section 2.** The spectra panel now plots motion energy alongside DA and NE, and the bold
+legend lines are the mean spectrum across sessions rather than empty placeholder plots.
+
+Validated statically as before, plus synthetic-data checks of each new estimator: the cluster
+test returns 0 clusters on independent signals and keeps a planted band while rejecting a
+planted 6.5 Hz tone.
+
 ## 2026-09-22
 
 ### `fip_03_da_ne_commonality.ipynb` — DA/NE variance partition against motion energy

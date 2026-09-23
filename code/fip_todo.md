@@ -7,6 +7,30 @@ Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
 
 ---
 
+## 2026-09-23
+
+From the first real Code Ocean run of `fip_03` (see `CHANGELOG.md` 2026-09-23):
+
+- **Ask Rachel two things.** What window length the `pearsonR` series uses — its DA x NE value
+  is +0.034 against section 3's +0.29, and a rolling window shorter than the ~2-8 s shared
+  component would explain the gap entirely. And what `bright` denotes in the variant name
+  `dff-bright_mc-iso-IRLS` (the rest reads as dF/F, motion-corrected against the isosbestic
+  by iteratively reweighted least squares).
+- **`NAc(L)-dLight` x `NAc(R)-dLight` = +0.983** across all 10 sessions, with `max|diff|` = 0.77
+  so they are not duplicates. Bilateral NAc DA at r = 0.98 is high enough to be worth raising;
+  subject 808054 is the one with per-session `misconnect_fixes` in curation.
+- **DA is recorded bilaterally and `pick_example` picks a hemisphere by tie-break** — both
+  dLight channels have identical sample counts, so it takes whichever sorts first. The two are
+  ~98% identical so section 5/6 results barely depend on it, but the choice should be explicit.
+- **Should sections 5 and 6 be high-passed?** Motion energy has its own slow structure
+  (engagement declining across a session). If DA and NE each track it independently, drift
+  inflates the *unique* components rather than the shared one. Run section 6 both ways and
+  compare; if the components move materially that difference belongs in section 7.
+- **One session has a channel labelled `no_fiber`**, and `NAc(L)-rAch` appears in 9 of 10
+  sessions. Curation gaps, not urgent.
+
+---
+
 ## 2026-09-22
 
 **`fip_03_da_ne_commonality.ipynb` added** (see `CHANGELOG.md` 2026-09-22). Validated statically
