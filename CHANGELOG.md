@@ -17,14 +17,19 @@ channel-diagnostic work that walks `nwb_list` directly, since it stays undefined
 path. `fu.load_curated_sessions` is kept verbatim inside the rebuild branch, per CLAUDE.md's
 rule on data-loading cells.
 
-`RUN_TAG` is part of the cache filename. It was briefly left out in favour of a single fixed
-name, and that broke on the first switch flip: a cache built under `TARGET="continuous"` holds
-a z-scored `y` with negative values, and `PoissonRegressor` rejects it with
-`"Some value(s) of y are out of the valid range of the loss 'HalfPoissonLoss'"`. A single
-filename would also have meant each flip overwriting the other target's cache, so switching
-back and forth cost a full NWB load every time. `FS` and `ONSET_KW` are still untracked --
-they are set-once, unlike the two run-level switches -- so the load cell prints the cache's
-timestamp each run to make a stale one visible.
+The cache holds **ingredients only** -- the two FIP traces, the raw motion-energy trace, the
+time grid, the event times and the labels. `me` and `y` are derived from `me_raw` in a short
+block that runs on both the cached and the rebuild path, so one file serves every setting of
+`TARGET` and `ME_TRANSFORM` and switching them never rebuilds.
+
+This replaced a first attempt that cached `y` itself and keyed the filename on `RUN_TAG`. That
+version broke on the first switch flip: a cache built under `TARGET="continuous"` holds a
+z-scored `y` with negative values, and `PoissonRegressor` rejects it with `"Some value(s) of y
+are out of the valid range of the loss 'HalfPoissonLoss'"`. Caching a derived value made the
+cache inherit that value's dependencies; caching the inputs instead removes the problem rather
+than naming around it, and the events target is now non-negative by construction. `FS` and
+`ONSET_KW` do affect the ingredients (`me_onsets` is computed at camera rate inside
+`process_session`), so those still require `REBUILD = True`.
 
 Verified by executing both branches against a stubbed `fu.load_curated_sessions` that raises
 if called: the cached path never reaches it, arrays round-trip identically, and the summary
