@@ -4,6 +4,25 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-23
 
+### `fip_03`: cache the per-session traces so the NWB load can be skipped
+
+`load_curated_sessions()` costs tens of GB and several minutes, and nothing past section 2
+needs it -- `sessions` holds only interpolated traces, a few tens of MB. Section 2 now pickles
+that to `/root/capsule/scratch/fip_03_sessions.pkl` and skips the load when it exists, so a
+fresh kernel reaches section 3 in seconds.
+
+One boolean (`USE_CACHE`, computed once in the load cell and read in the next) drives both
+cells, so they cannot disagree. `REBUILD = True` forces a reload, and is also required by the
+channel-diagnostic work that walks `nwb_list` directly, since it stays undefined on the cached
+path. The cache deliberately does not track `TARGET` / `ME_TRANSFORM` / `FS` / `ONSET_KW` --
+the simpler option, chosen over a hashed filename; the load cell prints the cache's timestamp
+each run so a stale one is visible. `fu.load_curated_sessions` is kept verbatim inside the
+rebuild branch, per CLAUDE.md's rule on data-loading cells.
+
+Verified by executing both branches against a stubbed `fu.load_curated_sessions` that raises
+if called: the cached path never reaches it, arrays round-trip identically, and the summary
+prints run either way.
+
 ### `fip_03`: coherence section added, motion energy added to the spectra panel
 
 Both changes follow the first real Code Ocean run of the notebook.
