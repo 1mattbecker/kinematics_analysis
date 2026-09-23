@@ -14,10 +14,17 @@ fresh kernel reaches section 3 in seconds.
 One boolean (`USE_CACHE`, computed once in the load cell and read in the next) drives both
 cells, so they cannot disagree. `REBUILD = True` forces a reload, and is also required by the
 channel-diagnostic work that walks `nwb_list` directly, since it stays undefined on the cached
-path. The cache deliberately does not track `TARGET` / `ME_TRANSFORM` / `FS` / `ONSET_KW` --
-the simpler option, chosen over a hashed filename; the load cell prints the cache's timestamp
-each run so a stale one is visible. `fu.load_curated_sessions` is kept verbatim inside the
-rebuild branch, per CLAUDE.md's rule on data-loading cells.
+path. `fu.load_curated_sessions` is kept verbatim inside the rebuild branch, per CLAUDE.md's
+rule on data-loading cells.
+
+`RUN_TAG` is part of the cache filename. It was briefly left out in favour of a single fixed
+name, and that broke on the first switch flip: a cache built under `TARGET="continuous"` holds
+a z-scored `y` with negative values, and `PoissonRegressor` rejects it with
+`"Some value(s) of y are out of the valid range of the loss 'HalfPoissonLoss'"`. A single
+filename would also have meant each flip overwriting the other target's cache, so switching
+back and forth cost a full NWB load every time. `FS` and `ONSET_KW` are still untracked --
+they are set-once, unlike the two run-level switches -- so the load cell prints the cache's
+timestamp each run to make a stale one visible.
 
 Verified by executing both branches against a stubbed `fu.load_curated_sessions` that raises
 if called: the cached path never reaches it, arrays round-trip identically, and the summary
