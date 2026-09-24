@@ -4,6 +4,23 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-24
 
+### Environment: Python 3.12 on the AIND capsule template (`env/py312` only)
+
+`environment/Dockerfile` moves from `jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04` to
+AIND's template base, `mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04`. The new
+`environment/py39-constraints.txt`, generated from `py39-freeze.txt`, holds every package at
+its 3.9-baseline version through `pip install -c`. Only Python, the OS and the Jupyter tooling
+change (JupyterLab 3.6 -> 4.1, ipywidgets 7 -> 8). All 187 constrained versions resolved for
+Linux + Python 3.12 before this commit.
+
+Other changes: apt packages are no longer pinned to Ubuntu 20.04 builds; `python3-tk` is dropped
+(conda-forge Python ships its own Tk); `git`, `curl` and `ca-certificates` are added, since the
+minimal base doesn't have them; and the `--ignore-requires-python` workaround for
+`rachel-analysis-utils` is removed. Not yet built on Code Ocean. `wavpack-numcodecs` compiles
+from source (as it already did on 3.9) and is the step most likely to fail. Validate with
+`env_00_reference_sessions.ipynb` against the `env_reference_py39` data asset before merging into
+`wild`.
+
 ### `env_00_reference_sessions`: baseline for the Python 3.12 environment migration
 
 New notebook for Stage 2 of the library's `PYTHON_311_UPGRADE_PLAN.md`. It runs
