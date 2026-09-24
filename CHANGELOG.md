@@ -2,6 +2,22 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-24
+
+### `env_00_reference_sessions`: baseline for the Python 3.12 environment migration
+
+New notebook for Stage 2 of the library's `PYTHON_311_UPGRADE_PLAN.md`. It runs
+`run_batch_analysis` on 1–2 reference sessions into `scratch/env_reference/py<version>/`, with
+`force_rerun=True` and no clips. It records the sessions, Python and key package versions
+(`reference_sessions.json`) and `pip freeze`.
+
+Run it twice. On the current 3.9 capsule it produces the baseline, which is then saved as a data
+asset. On the 3.12 duplicate capsule (`env/py312`), with `BASELINE_DIR` set, it reruns the same
+sessions and compares every `intermediate_data/*.parquet` file and `tongue_quality_stats.json`
+against the baseline. Numeric drift within `RTOL`/`ATOL` is reported as "close". pandas 3's
+`datetime64[ns] -> [us]` unit change is reported as a "note". Anything else is a "DIFF".
+Writes only under `scratch/env_reference/`. Code-Ocean-only, guarded by `IS_CO`.
+
 ## 2026-09-23
 
 ### `fip_03`: cache the per-session traces so the NWB load can be skipped
