@@ -21,6 +21,14 @@ from source (as it already did on 3.9) and is the step most likely to fail. Vali
 `env_00_reference_sessions.ipynb` against the `env_reference_py39` data asset before merging into
 `wild`.
 
+**2026-09-25, after the first build failed on PyYAML 6.0**, which has no 3.12 wheel and whose
+source build breaks under Cython 3: every resolved package was checked for a Linux 3.12 wheel.
+PyYAML (6.0.1), pyzmq (25.1.1) and MarkupSafe (2.1.3) got the smallest bump that has one.
+pymongo stays at 4.3.3 because `aind-data-access-api` pins it exactly; its C extensions are
+optional. The three AIND libraries are now pinned to their baseline commits instead of `@main`,
+and `aind-dynamic-foraging-models` to 0.16.0, so the comparison isn't affected by upstream
+changes made since the baseline. Set them back to `@main` when adopting.
+
 ### `env_00_reference_sessions`: baseline for the Python 3.12 environment migration
 
 New notebook for Stage 2 of the library's `PYTHON_311_UPGRADE_PLAN.md`. It runs

@@ -7,11 +7,21 @@
 #
 # Generated from py39-freeze.txt, keeping only `name==version` lines and leaving out:
 #   - the Jupyter stack (jupyterlab 3.6 doesn't fit the new base image; it moves to 4.x)
-#   - packages installed from git (@main or a SHA) and aind-dynamic-foraging-models (a dep of
-#     them), which float with those installs
+#   - packages installed from git, which the Dockerfile pins to their baseline commits instead
 # Every version here resolved for Linux + Python 3.12 on 2026-09-24.
 #
 # To upgrade a package deliberately, change or delete its line here.
+#
+# Bumped from the baseline because the 3.9 version has no Linux wheel for Python 3.12 and its
+# C extension fails to compile there (2026-09-25; found when PyYAML 6.0 broke the first build).
+# Each is the smallest bump that has a wheel, and none is used in numerical code:
+#   PyYAML 6.0 -> 6.0.1, pyzmq 25.0.0 -> 25.1.1, MarkupSafe 2.1.2 -> 2.1.3
+# Still built from source on 3.12:
+#   - pure Python, build fine: asciitree, moviepy, open-ephys-python-tools, zmq
+#   - pymongo 4.3.3: can't be bumped, because aind-data-access-api[docdb] (latest, 1.10.0) pins it
+#     exactly. Its C extensions are optional; if they fail to compile, pymongo installs pure
+#     Python and works (just slower).
+#   - wavpack-numcodecs 0.1.5: C code, compiles against build-essential as it already does on 3.9.
 aind-analysis-arch-result-access==1.2.0
 aind-data-access-api==1.10.0
 aind-ephys-utils==0.0.15
@@ -90,7 +100,7 @@ kiwisolver==1.4.7
 lazy-loader==0.6
 legacy-api-wrap==1.5
 llvmlite==0.43.0
-MarkupSafe==2.1.2
+MarkupSafe==2.1.3
 marshmallow==3.26.2
 matplotlib==3.9.4
 matplotlib-inline==0.1.6
@@ -148,8 +158,8 @@ python-dateutil==2.8.2
 python-dotenv==1.2.1
 python-json-logger==2.0.7
 pytz==2026.3.post1
-PyYAML==6.0
-pyzmq==25.0.0
+PyYAML==6.0.1
+pyzmq==25.1.1
 quantities==0.16.2
 requests==2.28.2
 requests-toolbelt==1.0.0
@@ -199,3 +209,5 @@ ypy-websocket==0.8.2
 zarr==2.18.2
 zipp==3.15.0
 zmq==0.0.0
+# Added by hand (2026-09-25): a dependency of basic-analysis, pinned so it doesn't move with it.
+aind-dynamic-foraging-models==0.16.0
