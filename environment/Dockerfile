@@ -42,9 +42,9 @@ RUN pip install -U --no-cache-dir \
     wavpack-numcodecs==0.1.5 \
     zarr==2.18.2 \
     aind_analysis_arch_result_access --upgrade \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@main#egg=aind-dynamic-foraging-behavior-video-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@4dccc525947241fd5278927de5cf1ad7fe800e4d#egg=aind-dynamic-foraging-basic-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@f04420e073b280579ff822c9754c32e453710043#egg=aind-dynamic-foraging-data-utils \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@de27558a96a1104757082a565c6b688fd4d0dcff#egg=aind-dynamic-foraging-behavior-video-analysis \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \
     scikit-image==0.24.0 \
