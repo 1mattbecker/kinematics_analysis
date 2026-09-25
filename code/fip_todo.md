@@ -1,9 +1,60 @@
 # fip_* to-do
 
 Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
-`fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`). Kept separate from
-`TODO.md`/`REORG.md`, which track the `kin_*`/`eph_*` port plan. Newest first, dated
-`YYYY-MM-DD`.
+`fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`,
+`fip_03_da_ne_commonality.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
+`kin_*`/`eph_*` port plan. Newest first, dated `YYYY-MM-DD`.
+
+---
+
+## 2026-09-23
+
+From the first real Code Ocean run of `fip_03` (see `CHANGELOG.md` 2026-09-23):
+
+- **Ask Rachel two things.** What window length the `pearsonR` series uses — its DA x NE value
+  is +0.034 against section 3's +0.29, and a rolling window shorter than the ~2-8 s shared
+  component would explain the gap entirely. And what `bright` denotes in the variant name
+  `dff-bright_mc-iso-IRLS` (the rest reads as dF/F, motion-corrected against the isosbestic
+  by iteratively reweighted least squares).
+- **`NAc(L)-dLight` x `NAc(R)-dLight` = +0.983** across all 10 sessions, with `max|diff|` = 0.77
+  so they are not duplicates. Bilateral NAc DA at r = 0.98 is high enough to be worth raising;
+  subject 808054 is the one with per-session `misconnect_fixes` in curation.
+- **DA is recorded bilaterally and `pick_example` picks a hemisphere by tie-break** — both
+  dLight channels have identical sample counts, so it takes whichever sorts first. The two are
+  ~98% identical so section 5/6 results barely depend on it, but the choice should be explicit.
+- **Should sections 5 and 6 be high-passed?** Motion energy has its own slow structure
+  (engagement declining across a session). If DA and NE each track it independently, drift
+  inflates the *unique* components rather than the shared one. Run section 6 both ways and
+  compare; if the components move materially that difference belongs in section 7.
+- **One session has a channel labelled `no_fiber`**, and `NAc(L)-rAch` appears in 9 of 10
+  sessions. Curation gaps, not urgent.
+
+---
+
+## 2026-09-22
+
+**`fip_03_da_ne_commonality.ipynb` added** (see `CHANGELOG.md` 2026-09-22). Validated statically
+and against synthetic data; never run on Code Ocean. Open items:
+
+- **Run it on Code Ocean.** Run `fip_02` first as a smoke test — no `fip_*` notebook has executed
+  against real data (item 4 below), so the first real run of `fip_03` will surface any
+  `fip_utils` bug its predecessors would have found. Expect ~15 min after
+  `load_curated_sessions()`. Confirm §2 prints 10 sessions / 1 subject.
+- **Sweep the two switches.** Re-run with `ME_TRANSFORM = "raw"` and compare §6's partition
+  against the `log1p` run; if the three components move materially, motion energy's right tail is
+  driving the split and §7 should say so. Then re-run with `TARGET = "events"` and confirm the
+  Poisson path reports D² in place of R² throughout.
+- **Animal-level inference.** The binding constraint is that motion energy exists for 10 sessions
+  from one animal. Two routes: swap the behavioral target to lick/choice events from `df_trials`
+  (~172 curated sessions, 20 subjects), which needs a different event source in §2 and a
+  bootstrap over animals in §6; or run `aind-motion-energy` (capsule 5110154) over more of the
+  20 subjects' behavior-video assets to widen the existing path.
+- **Figure destination.** §1 writes to `/root/capsule/scratch/figures/fip`, which a reproducible
+  run does not preserve. Anything headed for a paper figure needs copying to `/results`.
+- **Open parameter choices**, all with defaults in place and none yet checked against real data:
+  the lag basis (`N_BASIS = 8`, log-warped over −2 to +5 s), block CV geometry (`N_BLOCKS = 5`,
+  `EMBARGO_S = 7.0`), and whether `fu.pick_example` silently taking one fiber per region is
+  acceptable when a session has two dLight fibers.
 
 ---
 

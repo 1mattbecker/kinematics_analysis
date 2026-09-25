@@ -2,7 +2,267 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
-## 2026-09-17
+## 2026-09-25
+
+### Environment: Python 3.12 adopted (`env/py312` -> `wild`)
+
+Validation in a duplicate capsule, on `env/py312`:
+- `env_00_reference_sessions` outputs were bit-for-bit identical to the 3.9 baseline (2 sessions,
+  17 parquet files each, plus quality stats).
+- Every module in `code/` imports.
+- `eph_01`, `eph_09`, `kin_02`, `kin_03`, `kin_07` and `fip_01` run end to end, and `kin_07`'s
+  live docDB query works.
+
+For adoption, the three AIND libraries go back from their baseline SHAs to `@main`, as before
+the migration. Since the baseline, upstream changed only `compute_side_bias` in basic-analysis
+(a failed logistic fit now gives NaN instead of raising) and a `hdmf_zarr<0.14` cap in
+data-utils. `aind-dynamic-foraging-models` stays at 0.16.0 in `py39-constraints.txt`.
+`CLAUDE.md` keeps the 3.9-syntax rule until every active branch has migrated.
+
+## 2026-09-24
+
+### Environment: Python 3.12 on the AIND capsule template (`env/py312` only)
+
+`environment/Dockerfile` moves from `jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04` to
+AIND's template base, `mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04`. The new
+`environment/py39-constraints.txt`, generated from `py39-freeze.txt`, holds every package at
+its 3.9-baseline version through `pip install -c`. Only Python, the OS and the Jupyter tooling
+change (JupyterLab 3.6 -> 4.1, ipywidgets 7 -> 8). All 187 constrained versions resolved for
+Linux + Python 3.12 before this commit.
+
+Other changes: apt packages are no longer pinned to Ubuntu 20.04 builds; `python3-tk` is dropped
+(conda-forge Python ships its own Tk); `git`, `curl` and `ca-certificates` are added, since the
+minimal base doesn't have them; and the `--ignore-requires-python` workaround for
+`rachel-analysis-utils` is removed. Not yet built on Code Ocean. `wavpack-numcodecs` compiles
+from source (as it already did on 3.9) and is the step most likely to fail. Validate with
+`env_00_reference_sessions.ipynb` against the `env_reference_py39` data asset before merging into
+`wild`.
+
+**2026-09-25, after the first build failed on PyYAML 6.0**, which has no 3.12 wheel and whose
+source build breaks under Cython 3: every resolved package was checked for a Linux 3.12 wheel.
+PyYAML (6.0.1), pyzmq (25.1.1) and MarkupSafe (2.1.3) got the smallest bump that has one.
+pymongo stays at 4.3.3 because `aind-data-access-api` pins it exactly; its C extensions are
+optional. The three AIND libraries are now pinned to their baseline commits instead of `@main`,
+and `aind-dynamic-foraging-models` to 0.16.0, so the comparison isn't affected by upstream
+changes made since the baseline. Set them back to `@main` when adopting.
+
+**2026-09-25, notebook kernels hanging at startup in VS Code** (eph_01, kin_07; imports worked
+in a terminal): `debugpy` was still 1.6.6 from the baseline, which predates Python 3.12 support.
+It had installed only because it ships a generic pure-Python wheel, and ipykernel loads it at
+every kernel start. It's now 1.8.20. `ipykernel` is held at 6.29.5 (last 6.x) instead of
+floating to 7.1. Both are notebook tooling. A scan for other packages with compiled wheels only
+for Python <= 3.11 found pymongo (compiled from source, C extensions confirmed working) and
+pyrsistent (pure-Python fallback, Jupyter-only).
+
+### `env_00_reference_sessions`: baseline for the Python 3.12 environment migration
+
+New notebook for Stage 2 of the library's `PYTHON_311_UPGRADE_PLAN.md`. It runs
+`run_batch_analysis` on 1–2 reference sessions into `scratch/env_reference/py<version>/`, with
+`force_rerun=True` and no clips. It records the sessions, Python and key package versions
+(`reference_sessions.json`) and `pip freeze`.
+
+Run it twice. On the current 3.9 capsule it produces the baseline, which is then saved as a data
+asset. On the 3.12 duplicate capsule (`env/py312`), with `BASELINE_DIR` set, it reruns the same
+sessions and compares every `intermediate_data/*.parquet` file and `tongue_quality_stats.json`
+against the baseline. Numeric drift within `RTOL`/`ATOL` is reported as "close". pandas 3's
+`datetime64[ns] -> [us]` unit change is reported as a "note". Anything else is a "DIFF".
+Writes only under `scratch/env_reference/`. Code-Ocean-only, guarded by `IS_CO`.
+
+## 2026-09-23
+
+### `fip_03`: cache the per-session traces so the NWB load can be skipped
+
+`load_curated_sessions()` costs tens of GB and several minutes, and nothing past section 2
+needs it -- `sessions` holds only interpolated traces, a few tens of MB. Section 2 now pickles
+that to `/root/capsule/scratch/fip_03_sessions.pkl` and skips the load when it exists, so a
+fresh kernel reaches section 3 in seconds.
+
+One boolean (`USE_CACHE`, computed once in the load cell and read in the next) drives both
+cells, so they cannot disagree. `REBUILD = True` forces a reload, and is also required by the
+channel-diagnostic work that walks `nwb_list` directly, since it stays undefined on the cached
+path. `fu.load_curated_sessions` is kept verbatim inside the rebuild branch, per CLAUDE.md's
+rule on data-loading cells.
+
+The cache holds **ingredients only** -- the two FIP traces, the raw motion-energy trace, the
+time grid, the event times and the labels. `me` and `y` are derived from `me_raw` in a short
+block that runs on both the cached and the rebuild path, so one file serves every setting of
+`TARGET` and `ME_TRANSFORM` and switching them never rebuilds.
+
+This replaced a first attempt that cached `y` itself and keyed the filename on `RUN_TAG`. That
+version broke on the first switch flip: a cache built under `TARGET="continuous"` holds a
+z-scored `y` with negative values, and `PoissonRegressor` rejects it with `"Some value(s) of y
+are out of the valid range of the loss 'HalfPoissonLoss'"`. Caching a derived value made the
+cache inherit that value's dependencies; caching the inputs instead removes the problem rather
+than naming around it, and the events target is now non-negative by construction. `FS` and
+`ONSET_KW` do affect the ingredients (`me_onsets` is computed at camera rate inside
+`process_session`), so those still require `REBUILD = True`.
+
+Verified by executing both branches against a stubbed `fu.load_curated_sessions` that raises
+if called: the cached path never reaches it, arrays round-trip identically, and the summary
+prints run either way.
+
+### `fip_03`: coherence section added, motion energy added to the spectra panel
+
+Both changes follow the first real Code Ocean run of the notebook.
+
+**Section 3b, coherence.** Section 3's cross-correlation put the DA/NE peak at lag 0.00 in 9 of
+10 sessions, which is the signature of a shared measurement artifact. Working through it:
+
+- The isosbestic cannot be used as a control — it is already regressed out upstream, visible in
+  the single variant name every channel carries, `dff-bright_mc-iso-IRLS`. There is no raw
+  variant in the asset.
+- An all-pairs cross-correlation over the five real channels ruled out a global artifact:
+  bilateral rAch is uncorrelated (+0.066) while bilateral dLight is +0.983 and DA x NE is +0.29.
+- Whole-session correlation is dominated by the slowest components present, so drift was the
+  leading hypothesis. It was wrong: high-passing at 0.05 Hz *raises* the peak (0.293 to 0.345).
+  Each channel drifts, but the drifts are unrelated to each other, so they diluted the estimate.
+- Coherence settles it. The relationship is a band-limited peak (0.369 at 0.176 Hz, roughly
+  0.12-0.45 Hz / 2-8 s timescales), at the null below 0.1 Hz and above ~0.5 Hz. Broadband
+  crosstalk between two spectrally similar green sensors would be flat, so this is not that.
+
+Significance is a cluster-based permutation test rather than a per-frequency threshold: across
+513 bins the pointwise 97.5% null flags 8-18 bins on genuinely independent signals (measured).
+Contiguous runs are scored by area above a cluster-forming threshold and compared with the
+largest cluster the circular-shift null produces anywhere in the spectrum. This also fixed a
+plotting bug — shading from `min` to `max` of a non-contiguous mask stretched the band across
+the whole axis whenever an isolated instrumental spike cleared threshold.
+
+The high-pass test that produced the 0.293 to 0.345 result is deliberately **not** kept as a
+cell; it answered its question and the coherence section measures the same thing at 0.02 Hz
+resolution. Its result is recorded in section 3's markdown. Sections 5 and 6 remain unfiltered;
+whether to high-pass them is an open question noted in `code/fip_todo.md`.
+
+The phase/delay half of the coherence analysis was dropped as well. Lag is section 3's
+measurement, and the extra resolution the phase method offers (~6 ms vs the 0.05 s
+cross-correlation grid) is below what differing dLight and GCaMP kinetics can support.
+
+**Section 2.** The spectra panel now plots motion energy alongside DA and NE, and the bold
+legend lines are the mean spectrum across sessions rather than empty placeholder plots.
+
+Validated statically as before, plus synthetic-data checks of each new estimator: the cluster
+test returns 0 clusters on independent signals and keeps a planted band while rejecting a
+planted 6.5 Hz tone.
+
+## 2026-09-22
+
+### `fip_03_da_ne_commonality.ipynb` — DA/NE variance partition against motion energy
+
+New notebook, fourth in the `fip_*` series. Takes `fip_02`'s finding that DA and NE-proxy
+transients coincide above a circular-shift null and asks how the motion-energy variance the two
+signals explain splits into DA-unique, NE-unique and shared. Runs linearly: load/align (§2),
+cross-correlation with a circular-shift null (§3), event-locked amplitude coupling (§4), a lagged
+ridge encoding model with contiguous-block CV (§5), commonality analysis with a bootstrap over
+sessions (§6), and what the partition can support (§7).
+
+Decisions worth recording:
+
+- **Session is the sampling unit and there is one animal.** Motion energy exists for 10 of 172
+  curated sessions, all subject 808054 (verified against `.codeocean/datasets.json`). No
+  animal-level test is possible; §6's bootstrap intervals describe sessions within one animal.
+  §8 records the lick/choice-target route to real animal-level inference.
+- **Two run-level switches**, `TARGET` (`"continuous"` | `"events"`) and `ME_TRANSFORM`
+  (`"log1p"` | `"raw"`), each resolved in exactly one place and stamped into every saved
+  filename. Prose, section order and figure count do not branch.
+- **Bandwidth is measured, not matched.** Both channels share an acquisition, clock and upstream
+  dF/F, so the only remaining asymmetry is dLight-vs-GCaMP kinetics, which resampling cannot fix.
+  Figure 1b reports each channel's median power frequency instead; §7 carries that into the
+  reading of the unique components.
+- **One ridge penalty per session**, selected on the joint design and reused for the DA-only and
+  NE-only fits, so the nested-model comparison is not confounded by different regularization.
+- **Held-out scores use the training-fold mean as the null**, with a `EMBARGO_S = 7 s` gap either
+  side of each test block because the lagged design reaches across block boundaries.
+- Uses `plotstyle.py`, unlike `fip_00`–`fip_02`, which use bare matplotlib. Figures go to
+  `/root/capsule/scratch/figures/fip`, which a reproducible run does not preserve.
+- No new module: `lagged_design`, `block_cv_score`, `select_alpha`, `commonality`, `event_amps`
+  and `median_freq` are notebook-local. `encoding_methods.py` was not reusable — it fits only
+  univariate `y ~ 1 + x` per group with no R² and no cross-validation.
+
+Validated statically (`nbformat`, `nbconvert`+`py_compile`, `pyflakes`, a 3.10+ syntax scan) and
+by dry-running the notebook's own model cells on synthetic data: a planted DA-private driver is
+recovered as DA-unique 0.49 / NE-unique 0.00 / shared 0.20; an unrelated AR(1) target scores
+R² = −0.004, so block CV with the embargo does not manufacture signal; a kernel planted at +1.0 s
+is recovered at +0.75 s (one basis bump); the Poisson path returns a finite positive D². Not yet
+run against real data on Code Ocean.
+
+### `run_batch_analysis.py` re-pointed at a fresh full pipeline re-run
+
+Re-points the capsule's Reproducible Run entrypoint (`code/run` → `run_batch_analysis.py`) to
+re-run the existing `pred_csv_list_20250113.json` session list through the migrated library
+into a new `session_analysis_fall2026` output dir, leaving `session_analysis_mlk` untouched,
+then pool the result into a freshly dated `all_tongue_movements_MMDDYYYY.parquet`.
+`build_all_tongue_movements()` gained `base`/`out` parameters (default-backward-compatible) so
+this could reuse it instead of duplicating the pooling logic. A first pass reconstructed the
+session list from each mlk session's own recorded `pred_csv` instead of trusting the January
+2025 JSON list; reverted to the minimal version above on request — the JSON list is known
+current. Not yet run — staged for the next Code Ocean session.
+
+### Library boundary PR merged and verified on Code Ocean; outbound metrics confirmed on real data
+
+- **PR #4 merged** into `aind-dynamic-foraging-behavior-video-analysis`. Image rebuilt.
+- **`verify_library_migration.ipynb` run on the capsule.** §2 (imports) passed after the
+  `build_all_tongue_movements.py` `__main__` guard fix above. §4
+  (`aggregate_tongue_movements` real-data parity) passed on `behavior_782394_2025-04-23_10-51-14`:
+  3,761/3,761 movements match, 50 via the documented zero-length-outbound convention (`0.0` vs
+  `NaN`), 0 unexplained. §3 (session-filter parity): `load_session_quality_filter` and a
+  hand-parsed re-derivation agree on the same 44 sessions. All three sections pass — the
+  migration's acceptance checklist is complete.
+- **§4's checker was too strict** and needed a fix of its own: it flagged the known convention
+  difference as a hard failure with no way to distinguish it from a real regression. Rewrote it
+  to decompose mismatches into convention-explained (verified against a synthetic case matching
+  the reported failure, and against a deliberately injected real mismatch to confirm it still
+  fails when it should) vs unexplained, and only raise on the latter.
+- **Local venv repointed** at the library clone (`./.venv/bin/pip install -e
+  ../aind-dynamic-foraging-behavior-video-analysis --no-deps`) — an earlier attempt at this had
+  silently failed; confirmed this time by resolving `TONGUE_QUALITY_STATS_FILENAME` through the
+  installed package and re-running the repo's own module imports.
+
+### `build_all_tongue_movements.py` ran its whole batch job on plain `import`
+
+Found while verifying the library migration on Code Ocean: `verify_library_migration.ipynb`
+imports `build_all_tongue_movements` purely to check that its imports resolve, but the script
+had no `if __name__ == "__main__":` guard — the session loop, quality filter, concatenation and
+`to_parquet` write all ran at module import time. The import check silently ran the full batch
+job and wrote to `scratch/temp/`. No canonical file was touched (`OUT` is a scratch path), but
+the side effect was real and unintended.
+
+Fixed: the loop is now `build_all_tongue_movements()`, called only under
+`if __name__ == "__main__":`. `%run build_all_tongue_movements.py` (used by
+`tongue_movements_all.ipynb` cell 1) sets `__name__ == "__main__"` the same as running the
+script directly, so that notebook's behavior is unchanged; a plain `import
+build_all_tongue_movements` now loads the helpers with no side effect, which is what the
+verification notebook needed all along.
+
+### Library boundary decided; outbound metrics and the quality-stats contract moved into the library
+
+Two `TODO.md` items closed on the library side (branch `library-boundary-outbound` in the local
+clone of `aind-dynamic-foraging-behavior-video-analysis`; needs a PR, then an image rebuild).
+
+- **Boundary rule** written into `CLAUDE.md` ("Library vs repo boundary") and the library
+  `README.md` ("Scope"): the library owns whatever produces or annotates the per-session
+  intermediates and is generic to tongue-kinematics sessions; this repo owns analysis built on
+  top of them. Layering docstrings added to `tongue_kinematics_utils`, `tongue_lickometer_utils`
+  and `tongue_ephys` in the library and to `ephys_utils.py` here. Library plotters are QC
+  artefacts with no styling contract; presentation plotting stays here.
+- **Library de-duplication.** `tongue_lickometer_utils` keeps `detect_licks`,
+  `calculate_metrics`, `calculate_metrics_witheventkeys` (the `tongue_kinematics_utils` copies,
+  a 225x slower row loop and a meaningless `tn`, are deleted). `tongue_kinematics_utils` keeps
+  `load_keypoints_from_csv`, `mask_keypoint_data`, `filter_timestamps_refractory`.
+  `extract_clips_ffmpeg_encode` (frame-accurate re-encode) moved to `video_clip_utils` next to
+  the `-c copy` variant. Import cells of `val_02`, `val_03`, `val_04` updated accordingly.
+- **Outbound metrics.** `compute_outbound_metrics` is now a library function and
+  `aggregate_tongue_movements` calls it, so `tongue_movs.parquet` carries `out_*` from
+  segmentation. The pooled parquet was found to follow the `tongue_movements_all` copy's
+  convention (`out_duration = 0.0`, not NaN, when the endpoint is the first frame: 18,515 rows),
+  and the library reproduces that copy exactly. `add_outbound.ipynb` and
+  `tongue_movements_all.ipynb` import it instead of defining it; the backfill stays until the
+  per-session pipeline is re-run.
+- **`tongue_quality_stats.json` contract.** Schema documented on
+  `TONGUE_QUALITY_STATS_FILENAME` in `tongue_analysis.py`, with `load_tongue_quality_stats` and
+  `get_quality_summary`; `data_loading.load_session_quality_filter` and
+  `build_all_tongue_movements.py` read through them instead of parsing the JSON by hand.
+- Library gets its first real tests (10, passing on Python 3.9).
+- `TODO.md`: the `val_02` repair item retired (run on Code Ocean) and replaced by
+  "Recharacterize lickometer validation from the ground up".
 
 ### `val_04_lickometer_qc` rewritten around candidate missed licks; `val_05_lickometer_qc_methods` and `lickometer_qc.py` added
 

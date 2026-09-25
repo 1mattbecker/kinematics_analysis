@@ -1,6 +1,16 @@
 """
 Shared ephys analysis utilities for kinematics × ephys notebooks.
 
+Layering: this module sits *on top of* the library's
+``ephys.tongue_ephys`` (session lookup, intermediate loading, event tables,
+raster/PSTH primitives). What lives here is specific to the LC-NE
+RT-encoding question and free to churn: ``AnalysisConfig``, spike counting
+into windows, per-trial feature tables, session bundles and
+``all_counts_df``. The bout helpers (``annotate_movement_bouts``,
+``classify_bout_times``) are generic enough for the library but have one
+consumer (``eph_07``); promote them when a second appears. See CLAUDE.md,
+"Library vs repo boundary".
+
 Depends on:
   aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys
     (find_session_dir, load_intermediate_data, get_events_dict, build_event_df)
