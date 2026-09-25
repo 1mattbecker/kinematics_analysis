@@ -1,0 +1,1264 @@
+# TODO — kinematics_analysis
+
+Deferred work items. Newest first. Dates are YYYY-MM-DD.
+
+---
+
+## Move analysis inputs out of `/root/capsule/scratch` into data assets
+
+_Logged 2026-09-25, during the Python 3.12 migration (library `PYTHON_311_UPGRADE_PLAN.md`,
+Stage 2)._
+
+**Why.** Scratch belongs to a single capsule. It isn't in git, isn't copied when a capsule is
+duplicated, and records nothing about where its files came from. The 3.12 duplicate capsule
+started with an empty scratch, so `eph_09` failed on `SCRATCH / "combined_unit_tbl.pkl"`.
+Nothing in this repo writes that file, so its origin is unrecorded. It has been the main unit
+table for every eph notebook since 2026-01-13 (`3dda68b`).
+
+**Stopgap, 2026-09-25.** The old capsule's scratch was saved as a data asset. For the 3.12
+spot-checks, its files are symlinked or copied into the duplicate's `/root/capsule/scratch/`, so
+the notebooks run unchanged on byte-identical inputs. No notebook paths were changed as part of
+the migration.
+
+**Do after the 3.12 migration is adopted (not during it),** one input at a time, each as its own
+commit with a CHANGELOG entry:
+
+- [ ] **Unit table: switch to the official
+      `/root/capsule/data/LCrecordings_combined_units/combined_unit_tbl.pkl`.**
+  1. Attach the `LCrecordings_combined_units` asset; it isn't in `.codeocean/datasets.json`
+     today.
+  2. `md5sum` it against the current `scratch/combined_unit_tbl.pkl` (from the saved scratch
+     asset). **Identical:** only the path changes, with no provenance or results impact.
+     **Different:** rerun `eph_01`–`eph_09` on both, record which results move, and note the
+     switch in the CHANGELOG as a data change.
+  3. Point the 10 notebooks that read `SCRATCH / "combined_unit_tbl.pkl"` at the asset
+     (`eph_00`–`eph_09`; `eph_08`/`eph_09` also read the separate upstream table under
+     `LC-NE_scratch_data_1/combined/combine_unit_tbl/` for waveform CCF coordinates. That one
+     is correct and stays).
+  4. Fix `CLAUDE.md` "Code Ocean data": it names this file as the primary reference, but the
+     code doesn't read it.
+- [ ] **`session_analysis_mlk/`** (22 notebooks: tongue-QC session outputs, read through
+      `load_session_quality_filter`). Save it as a data asset, or regenerate it into one with
+      `run_batch_analysis`, and repoint.
+- [ ] **`all_tongue_movements_04022026`** (8 `kin_` notebooks). A data asset with this name is
+      already attached; check it's the same file and repoint.
+- [ ] **`pred_csv_list_20250113.json`** (`run_batch_analysis.py`, `kin_00`, `attach_data`,
+      `env_00_reference_sessions`). Small, so commit it to the repo (e.g. `metadata/`) or add it
+      to an asset.
+- [ ] Lower-traffic inputs, handle as each notebook is next touched:
+      `features_combined_beh_all.pkl` (`eph_06`), `labeled_clips/` (`val_02`, `val_03`),
+      `predictions_pixel_error.csv` (`pixel_error`), and the `session_analysis_*` variants in
+      `test_session_*` notebooks.
+- [ ] Outputs written to scratch (figures, `temp/`, caches, `env_reference/`) can stay there. Only
+      *inputs* need to move.
+
+---
+
+## Port plan for the five HOLD notebooks (overview)
+
+_Logged 2026-09-11. Revised 2026-09-11 after a full cell-by-cell audit of all five HOLD
+notebooks against the current `kin_*` / `eph_*` series._
+
+Read this section before picking up any of the six port items below it. The five HOLD
+notebooks (listed in the archive table in `code/archive/README.md`) are **not** five
+independent ports — their unreplicated content
+clusters into five scientific questions that cut across notebooks, with real duplication
+between them. Porting notebook-by-notebook would reproduce that duplication in the new
+series.
+
+### The question clusters → target notebooks
+
+| Target | Question it answers | Source material |
+|---|---|---|
+| `kin_02_latency` *(extend)* — **done** | …and does the ordinal effect decompose as RT = RT₁ + (k−1)·Δt? | `tongue_latency` 15, 17, 18, 26; also 5, 8, 9, 14 (§11, single-session illustration — reassigned from `kin_05` below on 2026-09-14) |
+| `kin_05_nonlick_movements` *(new)* — **done** | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? | `tongue_kinematics` 35–70; `cueresponse` 43; ~~`tongue_latency` 3, 5, 8, 9~~ (5, 8, 9 already ported into `kin_02` §11; 3 is a superseded draft of 5, not needed) |
+| `kin_06_lick_geometry_choice` *(new)* — **done** | Does where the tongue goes carry choice information? | `cueresponse` 19, 49–56, 93–95; `tongue_kinematics` 60 |
+| `kin_07_value_encoding` *(new)* — **done** | Do behavioral-model latents (Q, RPE) explain tongue kinematics? | `cueresponse` 17–28; `tongue_kinematics` 111–138 |
+| `eph_07_bout_encoding` *(new)* — **done** | Do LC units respond differently to within-trial vs ITI movement bouts? | `intertrialmovs` 10–32 |
+| `eph_09_structural_axes` *(new)* — **done** | Does the RT-encoding spatial gradient align with waveform / MERFISH / projection-target axes? | `spatial_axis_..._update` 13–38 |
+
+Plus one new flat module, `spatial_axes.py` (see the items below). The bout-segmentation
+helpers fold into the existing `ephys_utils.py` rather than getting a module of their own —
+see the `eph_07` item for why.
+
+### Two findings that change the previous plan
+
+1. **`kin_07_value_encoding` is a topic this repo does not track at all.** Both
+   `cueresponse` (cells 17–28) and `tongue_kinematics` (cells 111–138) carry a
+   kinematics-vs-behavioral-model-latents analysis — `q_diff`, `q_sum`, `chosen_prob`,
+   previous-trial `rpe`, screened with Spearman / mutual information / RidgeCV R² / random-forest
+   importances. **No `kin_*` or `eph_*` notebook uses behavioral model latents** (`eph_06` uses
+   Sue's model outputs, but against ephys, not kinematics). Because this content lives in *two*
+   HOLD notebooks, `kin_07` gates **two** archivals — so on the previous plan neither
+   `tongue_kinematics` nor `cueresponse` could actually be retired.
+
+2. **`cueresponse` is not just "spatial geometry."** Cells 43–56 are a coherent
+   choice-prediction analysis: donut of pre-lick movement counts, ridge-logistic regression
+   (+ permutation importance, AUC) predicting left/right lick from pre-lick kinematics, violins
+   of last-pre-lick excursion angle by lick direction, and binned P(right lick) vs `endpoint_y`
+   and `excursion_angle_deg`. The landmark figures are the setup for that question, not the
+   point of it.
+
+### Why the boundaries are drawn where they are
+
+- **The RT decomposition goes *into* `kin_02`, not into a separate notebook.** An earlier
+  draft of this file floated `kin_05_latency_decomposition`. Don't. The decomposition
+  *is the explanation* for the ordinal effect `kin_02` §4 already shows — it is the
+  culmination of that notebook's existing line of questioning, not a new topic.
+- **Lick↔movement correspondence and preparatory non-lick movements merge into one notebook.**
+  Establishing that non-lick movements are real events (not lickometer misses) is the premise
+  for asking where in the trial they occur. Split across two notebooks, neither stands alone.
+
+### Known duplication between sources — port once
+
+- `tongue_kinematics` cell 60 **==** `cueresponse` cell 95 (max-excursion-from-jaw scatter,
+  lick vs non-lick). Port once, into `kin_06`.
+- `tongue_latency` cells 10 and 37 **≈** `cueresponse` cell 42 (the 2×2 lick-latency-by-ordinal
+  panel). Superseded by `kin_02` §4 — do not port.
+- `intertrialmovs` cells 14, 15, 19, 22 are four near-identical population-PETH cells.
+  Consolidate to one; keep the **cell 15** variant (session-wide z-scoring), which is the
+  most defensible normalization.
+- `tongue_kinematics` cells 78–79 (lick-detection FP/FN parameter sweep) are already covered
+  by `val_02_lickometer.ipynb`, which is KEEP. **No port needed.**
+
+### Orphan code that needs a home before its notebook is archived
+
+Same category as `compute_outbound_metrics` (see the outbound item below) — analysis logic
+living only in a notebook cell. Unlike the outbound case there is no duplicate to reconcile;
+there is exactly one copy, and it is inside a notebook slated for archiving.
+
+- `annotate_movement_bouts` — defined only at `intertrialmovs` cell 10; called 6× in that
+  same notebook and referenced nowhere else in the repo. Verified **absent from the library
+  on all three branches** (`main`, `LC_manuscript`, `video_alignment`), searching both the
+  function name and the `mov_bout_*` columns it emits. → `ephys_utils.py`.
+- ~~`plot_standard_lick_landmarks` — defined only at `cueresponse` cell 19.~~ **done
+  2026-09-15** — landed in `kin_06` §3, restyled onto `plotstyle`'s palette. Left in the
+  notebook, not promoted to `plotstyle.py`: still exactly one consumer, and `plotstyle.py`
+  holds style, not domain plotting.
+
+### Data-availability constraints (drives what is local-testable vs Code Ocean-only)
+
+`all_tongue_movements_04022026.parquet` carries 49 columns. What matters for these ports:
+
+- **Present, so pooled across sessions:** `has_lick`, `lick_count`, `lick_latency`, `event`,
+  `movement_before_cue_response`, `cue_response`, `cue_response_movement_number`,
+  `movement_number_in_trial`, `movement_latency_from_go`, `start_time`, `end_time`, `trial`,
+  `session`, `goCue_start_time_in_session`, `endpoint_x/y`, `excursion_angle_deg`,
+  `max_x_from_jaw`, `max_y_from_jaw`, `max_x_from_jaw_y`, `out_*`. **Caveat, found during the
+  `kin_06` port:** `endpoint_x/y` and the `max_*_from_jaw` columns are *absolute pixel
+  positions*, not jaw-relative — the jaw-relative distances are `max_x_distance` /
+  `max_y_distance`. Being in the parquet does not make them pooled-safe: each session carries
+  its own camera/jaw offset (per-session mean `endpoint_y` spans ~80 px across the 44
+  sessions, against a ~51 px within-session SD). `kin_06` §2.1 recovers each session's jaw
+  position from the absolute/distance column pairs and works in a jaw-centered frame — reuse
+  `estimate_jaw_position()` from there rather than pooling these columns raw.
+- **Absent:** `nearest_movement_id` (licks-without-movements needs per-session
+  `nwb_df_licks.parquet`), **spout** landmark positions (per-session keypoint means — an
+  earlier revision of this line called the `max_*_from_jaw` columns jaw-relative and therefore
+  pooled-safe; they are not, see the caveat above. The *jaw* is recoverable from the pooled
+  parquet, the spouts are not),
+  and any behavioral-model latent (`q_*`, `chosen_prob`, `rpe`).
+
+Consequence: `kin_02` ext is fully local-testable; `kin_05` and `kin_06` are mostly pooled with
+one CO-only section each; `kin_07`, `eph_07`, `eph_09` are Code Ocean-only.
+
+### Recommended order (value ÷ risk) and archiving gates
+
+1. `kin_02` extension — pure pooled parquet, no new dependencies, fully local-testable. — **done**
+2. `kin_05_nonlick_movements` — mostly pooled, one CO-only section (turned out to be two
+   partial CO-only splits, within §3 and §5 — see the item below). — **done**
+3. `eph_07_bout_encoding` (+ bout helpers into `ephys_utils.py`) — clear spec, reuses
+   `eph_00`'s helpers. — **done**
+4. `spatial_axes.py` + `eph_09_structural_axes`, then refactor `eph_08` onto the module. —
+   **done.** Written 2026-09-15; both notebooks run on Code Ocean 2026-09-16 and `eph_08`
+   reproduces the reference figure (r=0.18, p=0.0681, n=99). The capsule image was rebuilt
+   with `scanpy==1.10.3` and the MERFISH block ran 2026-09-16. Nothing here is outstanding.
+5. `kin_06_lick_geometry_choice` — mostly pooled; two Code Ocean-only sections (§3–§4,
+   which need per-session **spout** keypoints — the jaw turned out to be recoverable from
+   the pooled parquet, see the item below). — **done**
+6. `kin_07_value_encoding` — last; new dependency on `get_mle_model_fitting`. —
+   **done.** Written 2026-09-15, run on Code Ocean 2026-09-16. Dependency confirmed live
+   (40 of 44 sessions have a fit; ~48 s for the full sweep), so the notebook pools
+   rather than running single-session as both sources do.
+
+**All gates met — all five HOLD notebooks archived 2026-09-16.**
+
+| HOLD notebook | Gate | Archived |
+|---|---|---|
+| `tongue_latency.ipynb` | `kin_02` §8–§11 | ✅ |
+| `tongue_kinematics_ephys_intertrialmovs.ipynb` | `eph_07` | ✅ |
+| `spatial_axis_comparison_rt_encoding_update.ipynb` | `eph_09` (run, good) | ✅ |
+| `tongue_kinematics.ipynb` | `kin_05` + `kin_07` (run, good) | ✅ |
+| `tongue_kinematics_cueresponse.ipynb` | `kin_06` + `kin_07` (run, good) | ✅ |
+
+Verified before moving: **no executable dependency** on any of the five from anything in
+`code/` — every apparent hit was either the library module `tongue_kinematics_utils` (a
+substring match, not the notebook) or a provenance line in a docstring/comment.
+
+`spatial_axis_comparison_rt_encoding_update.ipynb` is fully superseded: eph_09 covers its
+§1–§3 (units/RT encoding), §4 (CCF+mesh), §6 (RT axis), §7 (structural axes), §8 (comparison),
+§9 (arrows+cones) and §9b (projection scatters); §5's axis machinery became `spatial_axes.py`;
+§9b's abs-`T_rt` panel is `eph_08` §5; §12's commented-out registry sketch is answered by
+eph_09 using `PerUnitStatsRegistry` properly in §2.
+
+**This closes the HOLD-port work begun 2026-09-11.** `code/` went from 34 notebooks to 29
+(30 once `val_03_missed_licks.ipynb` landed later the same day).
+
+---
+
+## Extend `kin_02_latency` with the RT + IMI decomposition
+
+_Logged 2026-09-11. Done 2026-09-14 — landed as `kin_02_latency.ipynb` §8–§10, executed
+end-to-end locally against `data/for_local/all_tongue_movements_04022026.parquet`
+(44 sessions, k=1..4). Nothing deferred; `kin_02` no longer gates on this item —
+`tongue_latency.ipynb` archiving still waits on `kin_05_nonlick_movements`._
+
+**Flag from the port:** §10's `std_aligned` and `std_raw` (source `tongue_latency`
+cell 17 §6) are mathematically identical, not just empirically close — de-shifting a
+k group by its own constant `(k−1)·Δt` cannot change that group's standard deviation.
+The source notebook's "raw vs aligned" framing for this comparison doesn't test what
+it appears to test. Ported both columns for continuity but added a note in the
+notebook explaining the identity, and dropped the redundant duplicate line from the
+plot itself.
+
+**Correctness fix, same day.** §3's original filter (`dropna` on `cue_response_movement_number`
++ `movement_latency_from_go` only) never restricted to `movement_number_in_trial ==
+cue_response_movement_number`. Since `cue_response_movement_number` is a trial-level constant,
+grouping by k pooled in *every* movement from a k-labeled trial, not just the k-th one — only
+~11% of the rows plotted in §4–§7 were actually the cue-response movement (checked directly:
+6,958 / 57,925 at k=1, similarly ~11% at k=2–4). Fixed by splitting §3 into `movements_valid`
+(all movements in trials with a valid k, unrestricted — needed by §8's Δt estimate, which
+requires the whole up-to-cue-response movement sequence) and `df` (only the actual cue-response
+movement, one row per trial — what §4–§7 use). §8's `lat_df` was re-pointed at `movements_valid`
+accordingly. Re-executed end-to-end; §4–§7's numbers changed substantively (e.g. k=1 log-normality
+n dropped from 57,925 to 6,958), §8–§10 were unaffected (Δt and per-trial counts already matched,
+since §8 had its own independent restriction). Also added a second section, **§11 — single-session
+illustration**, porting the example-trial and raster/colored-histogram figures from `tongue_latency`
+cells 5, 8, 9, 14 (one example session, `behavior_716325_2024-05-31_10-31-14`, matching the
+source's own choice) — checked `kin_00`/`kin_01`/`kin_03` first for duplicates (none: `kin_00`'s
+rasters are unrelated QC/spatial-radius figures, `kin_01`/`kin_03`'s "raster" hits were the
+`rasterized=True` matplotlib flag, not raster plots). The example-trial tongue-position trace
+(cell 5) needs per-frame `tongue_kins.parquet`, not in the pooled parquet — Code Ocean only,
+written but unexecuted; the two rasters and the colored-histogram panel run locally on the pooled
+parquet filtered to the example session.
+
+### Why
+
+`kin_02_latency.ipynb` absorbed the clean parts of `tongue_latency.ipynb` — latency
+distributions by ordinal (§4), k=1 log-normality (§5), session-level summaries (§6),
+cross-ordinal correlation (§7). It shows *that* lick latency grows with the cue-response
+movement ordinal k, but never explains *why*.
+
+The explanation is the "nice story" left behind in `tongue_latency`: reaction time modeled as
+a first-movement latency plus a sequence of inter-movement intervals,
+**RT ≈ RT₁ + (k−1)·Δt**. This is the natural culmination of `kin_02`'s existing line of
+questioning, which is why it belongs in `kin_02` rather than in a new notebook.
+
+### What to do
+
+Append to `kin_02` as §8–§10, continuing from the existing §7:
+
+- **§8 — Δt estimate and de-shift.** Median within-trial inter-movement interval as Δt
+  (`tongue_latency` cell 15, §1–3); overlay `lick_latency` distributions by k, then de-shift
+  each by `(k−1)·Δt` and show they collapse. KDE variant is cell 17.
+- **§9 — Does the collapse hold?** KS tests of each de-shifted k against k=1
+  (`tongue_latency` cell 15 §4, cell 17 §4).
+- **§10 — Noise propagation.** SD of latency vs k, raw and aligned, with bootstrap 95% CI
+  (`tongue_latency` cell 17 §6 and cell 18 — `bootstrap_std_ci`). Then the cross-session
+  grand mean ± SEM by cue-response movement number (cell 26), which is the population version
+  of the same claim and should use session as the sampling unit.
+
+Carry over the notebook's own caveat (`tongue_latency` cell 19, markdown): the residual
+mismatch at k=1 and k=2 is attributed to *further* covert preparatory movements visible as a
+secondary bump in those distributions. State it as the open question it is — `kin_05` is where
+that claim gets tested.
+
+### Notes
+
+- Uses `lick_latency` (lickometer RT) conditioned on `cue_response_movement_number`, which is a
+  **different quantity** from the `movement_latency_from_go` that `kin_02` §4–§7 already plot.
+  Make the distinction explicit in the prose or the two halves of the notebook will read as
+  contradictory.
+- Reuse `kin_02`'s existing pooled-parquet load path. No spike data, no new dependency —
+  this item is fully testable locally against `data/for_local/`.
+
+---
+
+## Create `kin_05_nonlick_movements.ipynb`
+
+_Logged 2026-09-11. Done 2026-09-14 — landed as `kin_05_nonlick_movements.ipynb` §3–§8,
+executed end-to-end locally (§4 excepted) against
+`data/for_local/all_tongue_movements_04022026.parquet` (246,359 movements, 44 sessions).
+`tongue_kinematics.ipynb` archiving now gates on `kin_07` alone._
+
+**Correction from the port: §3 needed a partial CO-only split, not just §4.** The
+"§3–§8 pooled, only §4 CO-only" reading below undercounted the CO-only surface by one.
+Checked directly against the source (`tongue_kinematics` cell 35, not just its
+data-availability summary): part (a) of §3, "licks without movement," computes
+`nwb.df_licks['nearest_movement_id'].isna().sum()` — needs the per-session column, which
+is confirmed absent from the pooled parquet's 49 columns. Parts (b) and (c) use
+`tongue_movements['lick_count']`/`['has_lick']`, genuinely pooled. Landed §3 split
+accordingly: (b)/(c) run and print locally (8,585/151,404 = 5.67% movements with >1
+lick; 94,955/246,359 = 38.54% movements without licks); (a) sits under the same
+Code-Ocean guard as §4, written but unexecuted, with the expected
+`nwb_df_licks.parquet` schema documented in the notebook.
+
+**Same finding recurs at §5.** Cell 43 (the `lick_count > 1` tally) is pooled, but cell
+44 (the multi-lick example-trace figure) needs per-frame `tongue_segmented` plus
+per-session `nwb.df_licks` — also CO-only, which the "§5 — cells 43, 44 — pooled" line
+below doesn't distinguish. Landed §5 as the pooled `lick_count` distribution + per-session
+rate (cell 43's tally is already covered by §3b, not re-run) rather than adding a third
+CO-only guarded block for a qualitative single-session aside on an already-rare event.
+
+**Bug fix in the port, not present in the source.** The per-trial structure (cells
+64–68) grouped by `trial` alone in the source, which is only correct because that
+notebook runs on a single session — `trial` numbers repeat across sessions in the pooled
+parquet. §7 groups by `(session, trial)` instead; the naive group-by would have silently
+pooled movement counts from unrelated trials that happen to share a number.
+
+§8 uses the pooled `movement_before_cue_response` column directly rather than
+reconstructing it from `nearest_movement_id` per-session, as the source did — the
+reconstruction is unnecessary once the flag is already in the pooled parquet.
+
+### Why
+
+The lickometer and the video-derived movement stream do not describe the same set of events,
+and the mismatch is the whole point: movements without licks are the candidate "covert
+preparatory" movements that `kin_02`'s RT decomposition invokes but cannot test.
+
+`kin_01` §5 currently compares lick vs no-lick movements on exactly two features
+(`out_peak_velocity`, `out_duration`), pooled. Nothing in `kin_*` covers the correspondence
+itself, the per-trial structure, or the pre-cue-response timing.
+
+**Framing warning.** This is *not* a QC filter and must not be written as one. Per the
+established noise definition, lickometer agreement, confidence, and duration are **not** valid
+noise criteria — QC noise means confident misdetection of the wrong body part, which is
+`kin_00`'s job. `kin_05` asks a definitional question (what are these events?), not a
+filtering one. Keeping it out of `kin_00` is deliberate.
+
+### What to do
+
+One linear arc, roughly:
+
+- **§3 — Three-way correspondence tally** (`tongue_kinematics` cell 35): licks without
+  movements, movements with >1 lick, movements without licks, as counts and percentages.
+- **§4 — Licks without movements** (`tongue_kinematics` cells 37, 39): tongue trace around
+  unmatched licks, single and in sequences. **Code Ocean only** — needs per-session
+  `nwb_df_licks.parquet` (`nearest_movement_id`), which is not in the pooled parquet. Gate it
+  the way `kin_00` gates its trajectory/video sections.
+- **§5 — Movements with multiple licks** (`tongue_kinematics` cells 43, 44): pooled via
+  `lick_count > 1`.
+- **§6 — Kinematic profile of non-lick movements** (`tongue_kinematics` cells 50, 59):
+  duration and total-distance distributions, lick vs non-lick, including the fine-grained
+  sub-50 ms histogram. Extends `kin_01` §5 to more features — cross-reference rather than
+  duplicate.
+- **§7 — Per-trial structure** (`tongue_kinematics` cells 64, 65, 67, 68): counts of lick vs
+  non-lick movements per trial, percent non-lick, and their correlation.
+- **§8 — Preparatory timing** (`tongue_kinematics` cells 69, 70; `cueresponse` cell 43):
+  prevalence of ≥1 and ≥2 non-lick movements *before* the cue-response lick, via the pooled
+  `movement_before_cue_response` column, plus the donut of trials by pre-lick movement count.
+- ~~§9 — Illustrative single-trial and raster figures~~ **already ported, 2026-09-14** —
+  landed as `kin_02_latency` §11 instead (one example trial's tongue position coloured by
+  `has_lick`, CO-only; the trial raster coloured by movement type and by movement ordinal,
+  both local). Don't re-port here.
+
+### Notes
+
+- `tongue_latency` cells 6/8 carry a `coerce_bool` helper written because `astype(bool)` on a
+  string column turns any non-empty string True. `kin_02` §11 needed it (`cue_response` is
+  object-dtype with `True`/`False`/`None`); check the pooled dtypes here too rather than
+  porting reflexively.
+- ~~Sections §3–§8 are pooled and therefore locally testable; only §4 is CO-only.~~
+  **Wrong, see the Done note above** — §3's "licks without movement" tally and §5's
+  example-trace figure are also CO-only (both need per-session `nwb.df_licks` /
+  `nearest_movement_id`); everything else in §3, §5–§8 is pooled.
+
+---
+
+## Create `kin_06_lick_geometry_choice.ipynb`
+
+_Logged 2026-09-11. Done 2026-09-15 — landed as `kin_06_lick_geometry_choice.ipynb` §3–§9
+(35 cells), executed end-to-end locally against
+`data/for_local/all_tongue_movements_04022026.parquet` (246,359 movements, 44 sessions).
+§3–§4 are Code Ocean-only, written but unexecuted. `tongue_kinematics_cueresponse.ipynb`
+now gates on `kin_07` alone; **not** archived this session._
+
+**Correction from the port: `max_*_from_jaw` is not jaw-relative.** The "What to do"
+list below (and the overview's data-availability note, now fixed) treats §5 as
+pooled-safe because `max_x_from_jaw` / `max_y_from_jaw` are jaw-relative. They are not —
+they are the *absolute* pixel coordinates of the point farthest from the jaw; the
+distances are `max_x_distance` / `max_y_distance`. Neither those nor `endpoint_x/y` are
+pooled-safe raw, since each session carries its own camera/jaw offset.
+
+**Revised again: the notebook now prefers the real jaw keypoint over reconstructing it.**
+`get_jaw_positions()` (§2.1) tries `kps_raw_jaw.parquet` for every session first — the same
+asset §3's landmarks use — and only falls back to the algebraic reconstruction
+(`estimate_jaw_position()`) where that file is missing, which locally means **all 44**
+sessions (no `kps_raw_*.parquet` exists in `data/for_local/`). Checked first whether a
+better local proxy existed instead: neither `startpoint_x/y` nor the movement bounding-box
+columns (`min_x/y`, `max_x/y`) sit at a fixed point — all have 11–39 px within-session SD,
+far noisier than the algebraic method's own ~0.1 px internal residual — so there is no
+local column better than the reconstruction; the real keypoint is Code-Ocean-only.
+
+The fallback logic is unchanged from the previous revision: `jaw_x = median(max_x_from_jaw
+- max_x_distance)` is exact up to tracking noise (the tongue protrudes in one fixed
+x-direction, so there's only one candidate per row); `jaw_y` has no fixed sign (excursions
+go to either spout), so each row gives *two* candidates, `max_y_from_jaw ± max_y_distance`,
+and a 1-D grid search finds the value minimizing the median distance to the nearer one.
+
+**What changed: validation is now automatic, not deferred to one example session.** For
+every session where both a keypoint and an algebraic estimate exist, `get_jaw_positions()`
+reports the distance between them directly — this is the real check that §3's old
+single-session cross-check only sampled once. On Code Ocean this should resolve most or
+all of the "jaw_y is unverified" caveat immediately; locally it can't run at all (0 of 44
+sessions have a keypoint file), so `jaw_y` for this run is still the unverified fallback.
+
+**Why this got revisited:** investigating a user-reported anomaly in §9 (a few "wrong-sign"
+cue-response endpoints, changed-mind trials pulling one marginal negative) surfaced that
+**41 of 44 sessions show `|left-lick excursion| > right-lick excursion`** by a median of
+13 px (up to 57 px) in the algebraic frame — plausibly real spout geometry (right spout
+closer to the jaw's rest position for most animals), but only the keypoint-vs-algebraic
+comparison above can rule out a reconstruction artifact instead. Worth checking this
+asymmetry specifically once `get_jaw_positions()` runs on real data.
+
+§5–§9 run in the resulting jaw-centered frame regardless. The **spouts** stay Code
+Ocean-only, which is why §3–§4 do — the split is jaw-vs-spout, not
+jaw-relative-vs-absolute as assumed below.
+
+**Statistics: the source's evaluation could not be ported as-is.** `cueresponse` cell 47
+calls `train_test_split(random_state=42)` on one session's trials; on pooled data that
+leaks session identity across the split. §8 reports two evaluations instead —
+`GroupKFold` with session as the group (held-out-session AUC **0.835 ± 0.100**) and
+per-session fits (median AUC **0.943** over 39 qualifying sessions) — plus a
+within-session shuffled-label null (mean 0.530, observed p = 0.005 at 200 permutations).
+Class balance is 57.9% left / 42.1% right. Permutation importance puts `last_angle`
+(ΔAUC 0.168), `mean_distance` (0.098) and `mean_angle` (0.070) on top, with both
+peak-velocity terms and `session_time` at ~0.
+
+**Block-structure caveat quantified, not just recorded** (§8.4–§8.5). P(stay) = 0.910 and
+**previous choice alone reaches AUC 0.907** — better than kinematics. Kinematics still
+reads AUC 0.815 / 0.772 *within* each previous-choice stratum, so it is not simply
+re-encoding choice history, but the two are not separated here. Separating them needs
+block-aware regressors → `kin_07`.
+
+**`plot_standard_lick_landmarks` landed in `kin_06`, not `plotstyle.py`** — restyled onto
+the project palette, still one consumer, so not pre-promoted per the note below.
+
+### Why
+
+`kin_*` carries `endpoint_*`, `excursion_angle_deg` and the `max_*_from_jaw` columns, but never
+plots them in the anatomical frame that makes them interpretable (jaw and spout landmarks), and
+never asks the question that frame sets up: **does the direction of a preparatory tongue
+movement predict which spout the animal goes on to lick?**
+
+This is the content the old `REORG.md` summarized as "cue-response spatial geometry", which
+undersells it — the geometry is the setup, the choice prediction is the result.
+
+### What to do
+
+- **§3 — Landmark frame** (`cueresponse` cells 19, 94): `plot_standard_lick_landmarks` helper
+  (promote it out of the notebook), plus the jaw↔spout distance printout that establishes the
+  scale. **CO-only** — needs per-session keypoint means.
+- **§4 — Endpoints by event type** (`cueresponse` cell 93): cue-response movement endpoints
+  coloured by left/right lick event, over the landmarks.
+- **§5 — Lick vs non-lick excursion geometry** (`tongue_kinematics` cell 60 == `cueresponse`
+  cell 95 — port once): max excursion from jaw, with and without licks. ~~Jaw-relative, so~~
+  **poolable across sessions** even though §3–§4 are not — but *not* because the columns are
+  jaw-relative (they aren't; see the Done note above). Poolable because the notebook
+  reconstructs the per-session jaw origin first.
+- **§6 — Non-lick endpoints by movement ordinal** (`cueresponse` cells 54, 56).
+- **§7 — Does pre-lick direction predict choice?** (`cueresponse` cells 49, 55): violins of
+  last-pre-lick `excursion_angle_deg` by subsequent lick direction; binned P(right lick) vs
+  pre-lick `endpoint_y` and vs `excursion_angle_deg`.
+- **§8 — Ridge-logistic decode** (`cueresponse` cells 44, 47, 48): predict left/right from
+  last-pre-lick kinematics, report AUC + classification report, with both absolute standardized
+  coefficients and permutation importance.
+- **§9 — Pre-lick → cue-response endpoint displacement** (`cueresponse` cells 50, 51, 52):
+  paired per-trial `endpoint_y`, pre-lick vs cue-response, against the jaw midline.
+
+### Notes
+
+- `cueresponse` runs on a single session. Re-do §5–§9 pooled where the columns allow it
+  (all of `endpoint_*`, `excursion_angle_deg`, `movement_before_cue_response`, `event` are in
+  the pooled parquet) — pooling turns the logistic decode from anecdote into a result.
+  Use session as the sampling unit for any population claim.
+- The `event` column encodes lick side as `right_lick_time` / `left_lick_time`.
+
+---
+
+## Create `kin_07_value_encoding.ipynb`
+
+_Logged 2026-09-11. **Written 2026-09-15** as `kin_07_value_encoding.ipynb` (40 cells,
+§1–§8). All of §3–§7 below landed — nothing was deferred. `tongue_kinematics.ipynb` and
+`tongue_kinematics_cueresponse.ipynb` are now both fully replicated; **neither archive
+gate closes until this notebook actually runs on Code Ocean**, which is the one remaining
+task on this item._
+
+**What ran and what did not.** The notebook was executed end-to-end locally: every
+Code-Ocean gate took its skip path, no errors, 23 code cells. Only **§6.1** (the kinematic
+covariance structure) produced real output — everything from §3.4 on needs per-session
+`nwb_df_trials.parquet`. The §6 screen machinery was verified separately against a
+**synthetic** latent built as a known function of one kinematic column (real kinematics,
+14,039 cue-response trials, 44 sessions; a hard target — the planted driver has
+ρ = 0.92–0.97 twins): all four methods ranked it first at two noise levels, and the
+pure-noise control returned q = 0.99 and held-out R² = −0.001. The screen is wired
+correctly; the real data path is not yet exercised.
+
+**Dependency status (checked before writing anything).** `get_mle_model_fitting` resolves,
+but `han_pipeline.get_mle_model_fitting` — the path both sources import — is now a
+**deprecated shim** forwarding to `df_mle_model_fitting.get_mle_model_fitting`; the
+notebook prefers the new path with a fallback. Coverage measured over all 44 sessions in
+~48 s: **40 have a `QLearning_L2F1_CKfull_softmax` fit**; the four sessions of subject
+**751004** (2024-12-20 … 2024-12-23) have no MLE records at all.
+
+**Flag — the "port once, defined identically" note below is wrong.** The two copies of
+`attach_model_latents_to_trials` differ in the **sign of `q_diff`** (`cueresponse` cell 13:
+`R − L`; `tongue_kinematics` cell 115: `L − R`), which flips every correlation involving
+it, and in where `q_diff_c` is derived. Ported once as `R_value − L_value`, matching
+`kin_06`'s "+y toward the animal's right" convention. See `CHANGELOG.md` 2026-09-15 (7)
+for the full decision list (restored alignment assertions, the two left/right-convention
+checks, `q_sum` added as the vigour control, why no jaw-reconstruction code was duplicated
+from `kin_06`).
+
+**Open follow-ups, in priority order:**
+
+1. **Run it on Code Ocean.** Read §8's ordered checklist first — §3.5's L/R check must
+   print SUPPORTED and §3.4's `latent_index_mode` must be "responded" for every session
+   before anything downstream is worth reading.
+2. **Then archive both HOLD notebooks** (a separate pass; see the gate table above).
+3. **Block-aware regressors are still not done, and this is now the second notebook to
+   defer them.** `kin_06` §8.5 hands the problem here; `kin_07` §6 conditions on nothing
+   either. Value covaries with block structure, choice side and time in session, and
+   `kin_06` §8.4 shows the previous-choice confound is strong in this dataset
+   (P(stay) = 0.910). A partial-correlation or within-choice-stratum version of the §6
+   screen is the obvious next step and deserves its own item once §6 has real output to
+   condition.
+4. `excursion_angle_deg` is circular and is treated linearly throughout, as both sources do.
+5. One agent (`QLearning_L2F1_CKfull_softmax`), taken from the sources with no
+   model-comparison step; that question lives in `model_quality.ipynb`.
+6. Sessions are treated as exchangeable across-session, but come from 13 subjects with 1–4
+   sessions each. A subject-level random effect would be more correct than the Wilcoxon.
+
+### Why
+
+**No notebook in the `kin_*` or `eph_*` series uses behavioral-model latents against
+kinematics.** `eph_06` compares RT encoding to Sue's model outputs, but that is ephys.
+The kinematics-side question — does action value or reward-prediction error show up in how the
+tongue moves? — exists only in the two HOLD notebooks, in two partly-overlapping copies.
+
+This item gates **two** archivals (`tongue_kinematics` and `cueresponse`), which is why it
+cannot simply be dropped even though it is the largest new dependency.
+
+### What to do
+
+- **§3 — Attach model latents.** `attach_model_latents_to_trials` (defined identically at
+  `tongue_kinematics` cell 115 and `cueresponse` cell 13 — port once) over
+  `get_mle_model_fitting` from `aind_analysis_arch_result_access.han_pipeline`; merge onto
+  movements by `trial`. Derive `q_diff`, `q_sum`, `q_diff_c`, `chosen_prob`.
+- **§4 — Trajectories and endpoints coloured by value** (`cueresponse` cells 18, 20, 26):
+  tongue trajectories coloured by `q_diff` over the landmark frame; 2-D endpoint scatter
+  coloured by `q_diff_c`.
+- **§5 — Binned kinematics vs value** (`cueresponse` cells 21, 26, 27): binned scatter with
+  regression for the pairs the source pins — `q_diff`×`max_x_from_jaw_y`,
+  `q_diff_c`×`max_x_from_jaw_y_distance`, `q_diff_c`×`max_x_from_jaw`,
+  `chosen_prob`×`max_x_from_jaw_y_distance`.
+- **§6 — Systematic screen** (`tongue_kinematics` cell 135): all kinematic × all model columns,
+  four ways — Spearman ρ, mutual information, RidgeCV predictive R², random-forest importances —
+  as the 2×2 summary figure. This is the cell that earns the notebook; the pinned pairs in §5
+  should fall out of it rather than being asserted.
+- **§7 — Previous-trial RPE** (`tongue_kinematics` cell 137): shift `rpe` by one trial, merge
+  at movement level, repeat the Spearman + MI screen. Tests whether the *outcome* of the last
+  trial changes this trial's movement, which is the LC-relevant version of the question.
+
+### Notes
+
+- **Code Ocean only** and the heaviest new dependency of the six items — `get_mle_model_fitting`
+  hits the upstream pipeline. Confirm it still resolves before committing to the port.
+- Both source copies are single-session. Decide early whether to pool; if pooling, model fits
+  must be fetched per session, which is the main cost driver here.
+- Scope risk is real. If the port stalls, land §3–§5 (which is all `cueresponse` needs) and
+  leave §6–§7 for a follow-up — but note that `tongue_kinematics` cannot be archived until
+  §6–§7 land.
+
+---
+
+## Create `eph_07_bout_encoding.ipynb`
+
+_Logged 2026-09-11. Landed 2026-09-15 as `eph_07_bout_encoding.ipynb` — bout helpers
+(`annotate_movement_bouts`, `classify_bout_times`, `get_session_bout_times`) in
+`ephys_utils.py`, thresholds pinned and parameterized as specified below. Only the
+bout-helper verification (§4) executed, against
+`data/for_local/all_tongue_movements_04022026.parquet` (44 sessions, 246,359
+movements → 31,081 bouts; pinned thresholds give 14,368 go-responsive / 9,297 ITI
+bouts pooled). Everything from §5 on (single-unit raster, population PETH, per-unit
+encoding comparison, qualitative figures, lick-bout robustness check) is Code Ocean
+only — written and reasoned through, not executed. `eph_07` is now the sole remaining
+gate on archiving `tongue_kinematics_ephys_intertrialmovs.ipynb`; archiving itself
+was deliberately left for a separate step, after review of this port. See
+`CHANGELOG.md` for the full list of design decisions (why the per-unit go-responsive
+class was rebuilt on the primary movement-bout definition rather than porting source
+cell 29's hybrid definition verbatim; why the lick-derived robustness check
+reclassifies lick-bout starts the same way as movement-bout starts rather than
+reproducing cell 26's mixed definition)._
+
+### Why
+
+`tongue_kinematics_ephys_intertrialmovs.ipynb` (43 cells) is a distinct ephys analysis with no
+equivalent in the new `eph_*` series: it groups movements into **bouts** and compares LC unit
+responses to **within-trial (go-response) bouts vs inter-trial-interval (ITI) bouts** —
+bout-aligned rasters/PETHs, population overlays and waterfalls, and a per-unit go-responsive vs
+ITI Δhz comparison. It is the ephys counterpart to the covert-preparatory-movement story that
+`kin_02` and `kin_05` tell on the behavior side.
+
+The notebook already imports the refactored `data_loading` and `ephys_utils`, so it is partway
+to the new structure.
+
+### The two bout definitions — pick deliberately
+
+The source notebook runs the comparison **twice**, on two different notions of bout:
+
+1. **Movement-derived** (cells 10–24): `annotate_movement_bouts` on `movs["start_time"]` with
+   a 0.5 s gap threshold. This is the definition that depends on the orphan function.
+2. **Lick-derived** (cells 26–32): `licks["bout_start"]`, produced upstream by
+   `aind_dynamic_foraging_basic_analysis.licks.lick_analysis`, read from the per-session
+   `nwb_df_licks.parquet`.
+
+Choose one as the notebook's primary and keep the other as a robustness check — don't port both
+at equal weight. The movement-derived definition is the better primary: it is the one that
+matches the behavioral story, and it does not inherit the lickometer's blind spot for non-lick
+movements (which is exactly what `kin_05` establishes).
+
+### What to do
+
+- **Bout helpers → `ephys_utils.py`** (do this first): `annotate_movement_bouts` (from
+  `intertrialmovs` cell 10, the only copy in the repo — see the orphan-code note in the
+  overview) plus the within-trial / ITI classifier currently copy-pasted into four
+  `get_session_bout_times` variants. Parameterize the thresholds rather than hardcoding:
+  `GAP_THRESHOLD_S=0.5`, `GO_RESPONSE_WINDOW_S`, `ITI_MIN_POST_CUE_S`, `ITI_MIN_PRE_NEXT_S` —
+  the source uses **different values** in different cells (2.0/2.0/1.0 at cell 12 vs
+  1.0/2.0/0.5 at cell 29), so pin one set in the notebook and state it.
+
+  *Why `ephys_utils.py` and not a new `bout_utils.py`:* an earlier draft of this file
+  proposed a separate module on the grounds that bout segmentation is behavioral (it touches
+  `start_time` and go cues, never spikes) and so doesn't belong in an ephys module. That
+  contradicts what `ephys_utils.py` already does — `build_trial_features(movs, licks,
+  df_trials)` is also pure behavior, deriving per-trial RTs and `first_move_*` /
+  `cue_response_*` columns with no spikes involved. The established convention here is that
+  **behavior-derived features existing to serve ephys alignment live in `ephys_utils.py`**,
+  and bout segmentation is the same category. `eph_07` already imports from `ephys_utils`,
+  so this adds no new import surface. A module with one consumer is overhead: the smallest
+  existing module, `ccf_utils.py` at 58 lines, earns its place with two consumers.
+- **`eph_07`**: bout segmentation → within-trial vs ITI event times → reuse `eph_00`'s
+  `make_rp_and_events` / `compute_psth` / `smooth_vector` / `plot_psth` helpers for the
+  single-unit raster + PETH pair (cell 12), then the population heatmap, mean±SEM overlay
+  (cell 16/20), and waterfall (cell 17). **Consolidate cells 14/15/19/22 into one** — keep the
+  cell 15 variant, which z-scores against session-wide firing statistics rather than a
+  pre-event baseline.
+- Include the go-cue-aligned third condition (cell 24) as the reference the two bout conditions
+  are read against, and the ITI-bouts-per-session count distribution (cell 18) plus the
+  `MIN_BOUTS` session filter (cell 19) as the sampling-adequacy check.
+- Per-unit encoding comparison (cells 29, 30, 31): paired go-responsive vs ITI Δhz with
+  Wilcoxon, baseline-vs-response paired plots per class with per-unit significance, and the
+  go-responsive vs ITI scatter. Register through `per_unit_stats_registry` /
+  `encoding_methods` so it composes with `eph_01`–`eph_04`.
+- Keep the event-raster and single-trial timeseries figures (cells 35, 36) as the qualitative
+  setup. **Drop cell 37** (video-clip extraction) — that is a one-off, and the clip helpers are
+  library-owned.
+
+### Notes
+
+- Bout event times can come from the pooled `all_tongue_movements` parquet — it carries
+  `start_time`, `trial`, `session` and `goCue_start_time_in_session`. Align to spikes via the
+  cached `filtered_ephys.pkl`.
+- `annotate_movement_bouts` is a long-term **library** candidate — it is general movement
+  segmentation, sibling to `annotate_movement_timing` and `add_lick_metadata_to_movements`
+  which already live in `tongue_kinematics_utils.py`. Premature now: the definition is not
+  settled (two bout definitions, thresholds varying across cells). Let `eph_07` exercise it
+  first. Same staging as the outbound-metrics item; the placement criteria are the subject of
+  the module-boundary item below.
+- If a `kin_*` notebook later wants bouts, note that importing them from `ephys_utils` drags
+  in `tongue_ephys` at module level to do pure behavior. That works, but it is the signal to
+  revisit placement — fold it into the module-boundary item rather than splitting reflexively.
+
+---
+
+## Create `spatial_axes.py` and `eph_09_structural_axes.ipynb`
+
+_Logged 2026-09-11. **Complete 2026-09-16.** Written 2026-09-15; `eph_08` replicated the
+reference figure on Code Ocean 2026-09-16 (see "Replication" below) and `eph_09` ran
+end-to-end there the same day, MERFISH block included, after the image rebuild picked up
+`scanpy==1.10.3`. Both external assets were confirmed mounted before starting._
+
+### Status: what landed, and what is still unverified
+
+Landed: `code/spatial_axes.py`; `code/eph_09_structural_axes.ipynb` (34 cells); `eph_08`
+refactored onto the module; `scanpy` in the Dockerfile. **All of it has now run on Code
+Ocean** — the list below is kept as a record of what was checked and how, not as open work.
+
+**Verified locally** — `spatial_axes.py` is pure numpy/sklearn and was checked against
+synthetic data with known planted axes (30 assertions, all passing): linear/CCA/LDA all
+recover a planted direction, `compare_bootstrap_directions` returns ~0° for identical axes
+and ~90° for orthogonal ones, `cone_half_angle` widens monotonically with noise and as n
+falls, and the module's CCA pair is **bit-identical** to the inline copies deleted from
+`eph_08` (same axis, same bootstrap cloud, same cone, same projections, same seed).
+Both notebooks execute clean locally through their skip paths.
+
+**Was NOT verified — all four items closed by the Code Ocean runs of 2026-09-16:**
+
+1. ~~**`eph_08` output equivalence on real data.**~~ **Done 2026-09-16** — `eph_08`
+   reproduces the reference figure exactly (r=0.184 displayed as 0.18, **p=0.0681**, n=99).
+   It took two fixes; see "Replication of the reference figure" below.
+2. ~~**Everything in `eph_09` past §1.**~~ **Done 2026-09-16** — the user ran `eph_09`
+   end-to-end on Code Ocean and reported it good. The merge, the `baseline_spike_count`
+   column and the `retro_ccf` fields all resolved without debugging.
+3. ~~**The MERFISH block specifically** needs the rebuilt image.~~ **Done 2026-09-16** — the
+   image was rebuilt and the MERFISH axis ran, so `HAS_MERFISH` is now `True` on Code Ocean.
+   If a future rebuild loses `scanpy` the block degrades to `HAS_MERFISH = False` with a
+   `Could not load MERFISH data` message — that is the guard working, not a bug.
+4. ~~**`scanpy==1.10.3` against the pinned block.**~~ **Held 2026-09-16** — the rebuild
+   succeeded, so the `scipy==1.13.0` tripwire re-asserted in that layer did not fire and
+   scanpy did not move shared packages. Isolated `RUN` layers separate pip's *resolution*,
+   not the environment, so keep the tripwire: if a later build fails there, resolve it
+   rather than dropping the pin.
+
+### Decisions taken during the port (revisit if you disagree)
+
+- **RT stats go through `AnalysisSpec` / `fit_encoding` / `PerUnitStatsRegistry`**, not a
+  third inline copy of `build_rt_encoding_stats`. This answers source cell 40's
+  commented-out registry sketch properly, and makes `eph_09`'s `T_rt` the same quantity
+  `eph_01`–`eph_04` use. Session/unit QC likewise goes through `data_loading`.
+- **No RT trial window** (`trial_query=""`, `min_trials=50`), matching the source and
+  `eph_08` rather than `eph_01`'s `RT_QUERY` (0.05–1.0 s). The axes therefore describe the
+  same units `eph_08`'s poster figure projects. `RT_QUERY` is defined in §2 for a
+  sensitivity check — **worth running once**, since the two conventions could give
+  different axes and only one can be the headline number.
+- **Okabe-Ito colors** (via `plotstyle`) instead of the source's palette. The source used
+  the upstream red/orange/green/purple/peach to match his figures; swap `COLORS` back in §1 if you
+  need a side-by-side with those.
+- **Axis labels** on the three-plane figure say `ML/AP/DV (mm)` rather than the source's
+  `dim 0` / `dim 1`.
+
+### Fixed 2026-09-15 (second pass): `all_counts_df` was read from a path that does not exist
+
+First Code Ocean run of `eph_08` failed at its §2 with
+`FileNotFoundError: /root/capsule/scratch/all_counts_df.parquet`.
+
+**Root cause, and it predates this port.** `eph_08` and (by inheritance) `eph_09` were the
+only two notebooks that *read* `all_counts_df.parquet` from a path; `eph_01`–`eph_06` all
+**build** it via `ephys_utils.build_all_counts_df`. The read came from source notebook
+`spatial_axis_..._update`, where that very line is **commented out** (cell 7) next to a NOTE
+saying the pipeline functions had to be pasted in — i.e. it was a placeholder that was
+probably never executed as written. `/root/capsule/scratch` is also not persistent on Code
+Ocean, so even a file that once existed there is gone.
+
+**Fix:** both notebooks now follow the `eph_02` pattern —
+`load_units_with_spike_times` → `build_all_counts_df(units_with_spikes, cfg, base_dirs)`.
+
+> **Superseded 2026-09-16 on the window values only.** That fix used the project-wide
+> `count_window_s=(0.0, 0.2)`, `baseline_window_s=(-1.0, 0.0)`. Those are `eph_01`–`eph_06`'s
+> windows but **not** the reference figure's, and they are why the first Code Ocean run gave
+> r=0.013 instead of 0.184. Both notebooks now use `(0.0, 0.5)` / `(-2.0, 0.0)`. Building
+> `all_counts_df` in-notebook (rather than reading a path) was and remains correct.
+
+### Replication of the reference figure (resolved 2026-09-16)
+
+**Target.** `rt_response_projection_abs.svg` — three panels, `|T_rt|` (response, abs)
+projected onto the waveform / MERFISH / retrograde axes; wf panel r=0.184, p=0.0681, n=99.
+
+**Where it came from.** `code/archive/spatial_axis_comparison_rt_encoding.ipynb` cell 42
+(`execution_count` 37), saved to `/root/capsule/scratch/figures/poster/`, SVG timestamp
+2026-05-04 00:34:41, committed 16 minutes later in `2f20188`. **Not** `_update` — that file
+was *created* in the same commit, after the figure existed. Confirmed independently: the
+SVG's per-panel x-tick colours are that notebook's `COLORS` entries for the three axes, and
+cell 42's stored output carries the figure's r/p/n verbatim.
+
+**Two root causes, both now fixed:**
+
+1. **Spike-count windows.** Cell 9 of that run (`execution_count` 7) builds `all_counts_df`
+   with `count_window_s=(0.0, 0.5)`, `baseline_window_s=(-2, 0.0)` — also the published
+   analysis's windows (500 ms post-cue, 2 s pre-cue baseline). `eph_08`/`eph_09` had
+   `(0.0, 0.2)` / `(-1.0, 0.0)`, inherited from a **commented-out** cfg in `_update` whose
+   values had already been changed. Fixing this moved r from 0.013 to 0.19.
+2. **ML fold sign.** The reference folds unit coordinates to `+ML`
+   (`ccfs[:, ml] = np.abs(...)`, commented "POSITIVE, matching upstream"); `eph_08`/`eph_09`
+   folded to `-ML` while the structural axes are *fitted* in `+ML` space
+   (`ccf_wf[:, ml] = np.abs(...)`), flipping the ML component of every projection relative to
+   the axis it is projected onto. Fixing this moved r from 0.19 to 0.184.
+
+Also added: the reference's `z_ccf` ∈ [-5.2, -3.5] anatomical filter, which drops exactly one
+mislocalised unit (`behavior_758017_2025-02-06_11-26-14` unit 85, `z_ccf = -2.174`, 2.25 mm
+from the mesh centroid vs 0.79 mm for every other unit), taking n from 100 to 99. In `eph_09`
+it sits **after** the axis fits and **before** §8, matching the reference's ordering (axis fit
+n=100, projections n=99).
+
+**Deliberately not matched: the mesh.** The reference uses `new_core_mesh.obj` with a bespoke
+transform; both notebooks keep `20250418_transformed_remesh_10_ccf25.obj` + `pir_to_lps`.
+Centering is a pure translation along the projection axis, so r, p and n are unaffected and
+only the plotted x-axis shifts (~0.19 mm; ours spans ≈ -0.65…+0.58, the reference
+-0.78…+0.44). Verified locally: with the `+ML` fold, both meshes give identical r.
+
+**Method note worth keeping.** The whole case rested on the archived notebook's **stored
+outputs and `execution_count` values** — they pinned the windows, the axis, the unit counts
+and the run ordering. `_update` had its outputs cleared and could prove none of it. Clearing
+notebook outputs is lossy for provenance.
+
+**Assumption to check on the next run:** that this cfg matches whatever produced the
+now-missing cached parquet. If `eph_08`'s poster figure comes out numerically different from
+the published version, **the count/baseline windows are the first thing to suspect** — not the
+`spatial_axes.py` refactor, which is separately verified bit-identical.
+
+Build cost: `build_all_counts_df` loops every session × unit, so `eph_08` and `eph_09` each
+pay it. If that becomes annoying, cache it once to `SCRATCH` and read-if-present — but do it
+in `ephys_utils`, for all the `eph_*` notebooks at once, not ad hoc in these two.
+
+### Fixed 2026-09-15 (third pass): waveform CSV path pointed at the upstream layout, not this capsule
+
+Second Code Ocean failure, in the waveform block:
+`FileNotFoundError: /root/capsule/data/LC-NE_scratch_data_1/combined/waveforms_np/combined_features.csv`
+
+**Root cause.** The CSV is a **separately attached Code Ocean data asset**, not part of
+`LC-NE_scratch_data_1`. The archived predecessor
+(`code/archive/spatial_axis_comparison_rt_encoding.ipynb` cell 23) hardcodes the real path:
+`/root/capsule/data/results-59472bbb-4c3a-40f9-a1f5-b0c5113e4ab9-waveforms_np/combined_features.csv`.
+The `_update` source rewrote it to `FIG_PREP_DIR/waveforms_np/` — the upstream capsule's own layout —
+and `eph_08` / `eph_09` inherited that. `combined_unit_tbl.pkl` is unaffected; it really does
+live under `FIG_PREP_DIR/combine_unit_tbl/`.
+
+**Fix:** both notebooks now call a `find_wf_features_csv(DATA)` resolver — tries the upstream layout,
+then the known asset id, then `*waveforms_np*/combined_features.csv`, then any
+`**/combined_features.csv`, and raises listing everything it tried. Globbing means a
+re-attached asset with a new id still resolves. Tested locally against five synthetic layouts.
+
+**Note this was masked in `_update` and would have been masked in `eph_09`.** The source's
+waveform block is wrapped in `try/except`, so it printed "Could not load waveform data" and set
+`HAS_WAVEFORM = False` — meaning **the `_update` notebook very likely never fitted the waveform
+axis either**, and its comparison table would have silently omitted it. `eph_09` has the same
+guard by design, so watch the `HAS_*` flags and the "OMITTED (asset unavailable)" line in §6
+rather than assuming all five axes are present. `eph_08` has no such guard, which is why it
+raised and surfaced the problem at all.
+
+**Still unconfirmed:** whether the asset id above is current in this capsule. A diagnostic that
+lists the data mounts, globs for the CSV, and checks whether `combined_unit_tbl.pkl` already
+carries the seven `wf_feature_cols` (in which case the CSV is unnecessary) was handed to the
+user; the answer has not come back yet.
+
+### Follow-ups this port surfaced (not blocking)
+
+- **`eph_08` still duplicates two things it need not.** Its §2 reimplements the session-QC
+  and unit-QC filter inline although `data_loading.load_session_quality_filter` /
+  `filter_ephys_units` already do exactly that, and it carries its own
+  `build_rt_encoding_stats` and `get_regression_CI`. Left alone deliberately this session —
+  `eph_08` is a poster-figure path and the brief was a pure move. Fold it in once `eph_08`
+  has been re-run and confirmed unchanged.
+- **`build_rt_encoding_stats` is orphan code** in the same sense as `annotate_movement_bouts`
+  was: defined only in `eph_08` §2 and source cell 8. `eph_09` avoids adding a third copy by
+  using `fit_encoding`; `eph_08`'s copy should follow once it is safe to touch.
+- **`get_regression_CI` now exists twice** — in `spatial_axes.py` and inline in `eph_08` §5.
+  Same fix, same gating.
+- The source's `get_regression_CI` computed `se` twice, the first immediately overwritten by
+  the second. The dead line is dropped in the module (`eph_08`'s copy had already dropped
+  it); no numerical change.
+- **`compare_bootstrap_directions` no longer mutates its inputs.** The source did
+  `np.asarray(b_x_boot, float)` and then flipped signs in place, so passing a float64 array
+  (or a *slice* of one, as source cell 24 does) rewrote the caller's bootstrap cloud. In
+  this pipeline the flip mask is always empty — the clouds arrive already hemisphere-aligned
+  — so this changes no result, but the module copies defensively now.
+
+
+### Why
+
+`spatial_axis_comparison_rt_encoding_update.ipynb` (41 cells) compares the RT-encoding spatial
+axis against **four** structural axes — waveform (CCA), MERFISH transcriptomics (CCA), and
+retrograde tracing (LDA) — with bootstrap direction comparison, 95% confidence cones in
+azimuth-elevation, and projection scatters.
+
+`eph_08_waveform_axis.ipynb` is thinner than previously recorded. It ports the waveform CCA axis
+and the `|T_rt|` projection scatter, and **it never fits the RT-encoding spatial axis itself**
+(§6 of the source). So MERFISH, retrograde/LDA, `compare_bootstrap_directions`,
+`cone_half_angle`, and the multi-axis cone visualization have no home anywhere in `eph_*`.
+
+`spatial_encoding.py` is not that home either: it provides `SpatialEncoder` (CCF maps, subgroup
+maps, permutation tests) and contains **no axis-fitting machinery at all**. `eph_08` currently
+carries private inline copies of `fit_spatial_axis_cca` and `bootstrap_spatial_axis_cca`.
+
+(`spatial_axis_comparison_rt_encoding.ipynb` without `_update` was the older duplicate and is
+already archived. `_update` is the source for this port.)
+
+### What to do
+
+- **`spatial_axes.py`** (new flat module), from `spatial_axis_..._update` cells 14 and 15:
+  `fit_spatial_axis_linear` / `_cca` / `_LDA` and their bootstrap wrappers, `cone_half_angle`,
+  `compare_bootstrap_directions`, `vectors_to_az_el`, `plot_projected_arrow_with_cone`, and
+  `plot_projection_scatter` (cell 31). Keep it separate from `spatial_encoding.py` — different
+  question (direction of a gradient vs clustering in space), different inputs.
+- **Refactor `eph_08`** to import from `spatial_axes.py`, deleting its two inline copies.
+  Behavior must not change; the projection figure is a poster figure.
+- **`eph_09_structural_axes.ipynb`**:
+  - Fit the RT-encoding spatial axis (linear, scalar `T_rt` → OLS) and the baseline `T_rt_bl`
+    axis, with 2000-resample bootstrap and cone half-angles (cells 17, 18). *This is the piece
+    `eph_08` skipped.*
+  - Load and fit the three structural axes (cells 20, 21, 22), each in its own guarded block —
+    the source already uses `HAS_WAVEFORM` / `HAS_MERFISH` / `HAS_RETRO` flags so a missing
+    asset degrades instead of failing. Keep that pattern.
+  - Pairwise `compare_bootstrap_directions` over all axes, with angle, Wald W, χ² p and
+    bootstrap p (cell 24), and the summary table (cell 29).
+  - The three-plane projected-arrow figure with 95% confidence cones (cell 26) and the
+    azimuth-elevation bootstrap scatter (cell 27).
+  - Projection scatters of `T_rt` and `T_rt_bl` onto each structural axis, plus the combined
+    table (cells 34, 36, 38).
+  - Carry over the interpretation guide (cell 28 markdown) — it states how to read
+    angle × p-value, and without it the summary table is hard to act on.
+- Drop cell 40 (a commented-out registry sketch); register through `per_unit_stats_registry`
+  properly or not at all.
+
+### Notes
+
+- ~~Confirm the external assets are reachable on Code Ocean before starting this item~~ —
+  **done 2026-09-15: the user confirmed both are still mounted**
+  (`merfish_data/adata/adata_mer_subset_2_2k.h5ad` and
+  `LC_retro/manual_proofread_ccf_18brains.csv`, under `/root/capsule/data`, from the upstream
+  capsule), so the degraded fallback was not needed and all three structural axes are
+  written. `scanpy` was indeed absent from the pip block, was added, and the rebuilt image
+  ran the MERFISH axis on 2026-09-16 — see the status section above.
+- Retrograde LDA sign is arbitrary; the source aligns it to the waveform axis (cell 22). Keep
+  that convention or the cone figure flips between runs.
+- Code Ocean only, like `eph_08`. Use the same `IS_CO` skip-guard structure so it runs clean
+  locally.
+
+---
+
+## Recharacterize lickometer validation from the ground up
+
+_Logged 2026-09-17. Replaces the "Repair and refocus `tongue_lickometer.ipynb`" item, which is
+done: `val_02_lickometer` was repaired, given Implementation B, and run on Code Ocean, and
+`val_04`/`val_05` ran there the same week. The full text of that item, including the six-function
+library diff and the A-vs-B comparison plan, is in git history (`git show fb794c3:TODO.md`)._
+
+### Why
+
+Three notebooks now ask overlapping versions of "does pose tracking agree with the lickometer",
+with three detectors, three matching rules and three sets of numbers that do not reconcile:
+
+| Notebook | Detector | Reference | State |
+|---|---|---|---|
+| `val_02_lickometer` | fixed pixel threshold + refractory filter (A), hysteretic closest-approach (B) | lickometer, one session | **old implementation** — predates the per-session calibration; kept as the only precision measure |
+| `val_03_missed_licks` | 10 px excursions, one-to-one greedy pairing | lickometer, 53 sessions | **not good** — its miss rate was pose noise (see `CHANGELOG.md` 2026-09-17); kept only for the threshold sweep, trajectory panels and clip extraction |
+| `val_04_lickometer_qc` + `val_05` + `lickometer_qc.py` | per-session calibrated contact-like excursions, any-event-in-window | lickometer, 53 sessions | **best current version** |
+
+Nothing is wrong with any single number in `val_04`. The problem is that a reader cannot tell
+which of the three definitions of "lick", "match" and "miss" is the one the project stands
+behind, and the three notebooks share no code.
+
+### What to do
+
+Start from a clean definition, not from any of the three notebooks.
+
+- **Decide the definitions first, in prose, before code:** what a lick is (spout contact vs
+  any excursion), what the reference is (the lickometer, or a by-eye scored candidate set —
+  no candidate has been scored by eye yet), what a match is (window, one-to-one vs any-in-window,
+  onset vs closest approach), and how per-session scale is handled (pixels do not transfer;
+  the jaw→spout distance from `kin_06` §3 is the candidate unit).
+- **One result notebook and one methods notebook** (`val_` pair), on **one module**. Reuse from
+  `lickometer_qc.py` and `val_04` what survives the definitions; take the threshold sweep,
+  trajectory panels and clip machinery from `val_03`; take the precision direction and the
+  hysteretic detector from `val_02` if the contact definition wins.
+- **Archive the rest** with a note in `code/archive/README.md` saying which section of the new
+  pair replaced each.
+- **Carry forward the promises the old item never delivered:** multi-session with a normalised
+  threshold; the multi-keypoint contact detector (`detect_licks_multiple`, called by the archived
+  `tongue_kinematics.ipynb` cells 103–105 and defined nowhere — re-derive or drop explicitly);
+  promoting whichever detector wins into the library alongside `detect_licks`.
+
+### Notes
+
+- Not urgent. `val_04` answers dynamic-foraging-processing#96 as it stands.
+- Do the library-boundary item below first: which detector lives where is exactly the kind of
+  decision that item is meant to settle.
+
+---
+
+## Define the boundary between the library and this repo's `code/` modules
+
+_Logged 2026-09-15. **Decided and implemented 2026-09-17** on the library branch
+`library-boundary-outbound` (local clone) and on `wild` here. **Merged as PR #4 and confirmed
+on the rebuilt capsule 2026-09-22.** What remains is the fuller pipeline re-run under the
+outbound-metrics item below, not this item._
+
+> **Status 2026-09-17.** The criteria below (one test: would another AIND project doing tongue
+> kinematics want this, unchanged?) are now written into `CLAUDE.md` ("Library vs repo
+> boundary") and the library `README.md` ("Scope"). Done on the library branch: the six
+> duplicated functions reduced to one copy each (`tongue_lickometer_utils` keeps
+> `detect_licks` / `calculate_metrics` / `calculate_metrics_witheventkeys`;
+> `tongue_kinematics_utils` keeps `load_keypoints_from_csv` / `mask_keypoint_data` /
+> `filter_timestamps_refractory`); `extract_clips_ffmpeg_encode` moved to `video_clip_utils`;
+> layering docstrings on `tongue_kinematics_utils`, `tongue_lickometer_utils`, `tongue_ephys`
+> (and `ephys_utils.py` here); the `tongue_quality_stats.json` contract declared next to the
+> writer (`TONGUE_QUALITY_STATS_FILENAME`, `load_tongue_quality_stats`, `get_quality_summary`)
+> and consumed through it by `data_loading.py` and `build_all_tongue_movements.py`; first real
+> unit tests in the library (`tests/test_tongue_kinematics_utils.py`,
+> `tests/test_tongue_analysis.py`, 10 passing). Plotting rule chosen: the library's plotters
+> are QC artefacts with no styling contract, presentation plotting stays here; nothing was
+> restyled. `annotate_movement_bouts` stays in `ephys_utils.py` until it has a second consumer.
+>
+> **PR #4 merged 2026-09-22, image rebuilt, verified with `code/verify_library_migration.ipynb`
+> on Code Ocean the same day.** §2 (imports resolve on the real capsule): passed, after fixing
+> one bug the check itself surfaced — `build_all_tongue_movements.py` had no
+> `if __name__ == "__main__":` guard, so the plain `import` in §2 ran its whole batch job as a
+> side effect (harmless: it wrote to a scratch temp path, nothing canonical) before the guard
+> was added. §4 (`aggregate_tongue_movements` re-run on one real session matches its existing
+> `tongue_movs.parquet`): passed on `behavior_782394_2025-04-23_10-51-14`, all 3,761 movements,
+> 50 via the documented convention difference, 0 unexplained — see the outbound-metrics item
+> below for detail. §3 (session-filter parity): passed — `load_session_quality_filter` and a
+> hand-parsed re-derivation agree on the same 44 sessions. **All three sections green; this
+> item's acceptance checklist is complete.**
+>
+> **Consumers updated here** (`val_02`, `val_03`, `val_04` import cells, `data_loading.py`,
+> `build_all_tongue_movements.py`) now resolve on both the local venv (editable install
+> repointed at the clone) and the rebuilt capsule.
+
+### Why
+
+Both `aind-dynamic-foraging-behavior-video-analysis` and this repo's `code/` carry "kinematics
+utils" and "ephys utils", with no stated rule for what belongs where. The result is duplication,
+inconsistent figure styling, and a recurring per-function argument.
+
+Current state, for reference:
+
+**Library** (`aind_dynamic_foraging_behavior_video_analysis`)
+- `kinematics/tongue_kinematics_utils.py` (1437 lines) — segmentation, aggregation, annotation,
+  lick detection, keypoint masking/filtering, video/CSV discovery, **and 5 plot functions**
+- `kinematics/tongue_analysis.py` (563) — batch runner, QC stats, intermediate generation
+- `kinematics/tongue_lickometer_utils.py` (275), `video_clip_utils.py` (218),
+  `kinematics_nwb_utils.py` (88)
+- `ephys/tongue_ephys.py` (516) — session dir/intermediate loading, event construction,
+  raster/PSTH primitives, `RasterPlotter`, **and 5 plot functions**
+
+**This repo** (`code/`, flat — notebooks import by bare name)
+- `data_loading.py` (187), `ephys_utils.py` (323), `encoding_methods.py` (558),
+  `encoding_plots.py` (895), `per_unit_stats_registry.py` (442), `spatial_encoding.py` (629),
+  `plotstyle.py` (190), `ccf_utils.py` (58), + planned `spatial_axes.py`
+
+### Concrete problems this causes
+
+1. **Duplication inside the library.** `tongue_lickometer_utils.py` and
+   `tongue_kinematics_utils.py` define the same six functions by the same names:
+   `filter_timestamps_refractory`, `calculate_metrics`, `calculate_metrics_witheventkeys`,
+   `detect_licks`, `mask_keypoint_data`, `load_keypoints_from_csv`. Which one a notebook gets
+   depends on which module it imported.
+2. **Plotting has no home rule.** The library owns ~10 plot functions (movement tiles, processing
+   steps, keypoint confidence, raster/PSTH, unit panels); this repo owns `plotstyle.py` +
+   `encoding_plots.py`. The library's plotters predate and ignore `plotstyle.py`, which is why
+   every port has to restyle figures by hand.
+3. **"Ephys utils" in both.** `tongue_ephys.py` (primitives) vs `ephys_utils.py` (analysis config,
+   spike counting, session bundles, `all_counts_df`). The layering is actually reasonable —
+   repo-on-top-of-library — but nothing states it, so new code lands in whichever was opened last.
+4. **Silent cross-boundary coupling.** `data_loading.load_session_quality_filter` reads
+   `tongue_quality_stats.json`, which the library's `analyze_tongue_movement_quality` writes.
+   Neither side declares the contract; a library-side field rename breaks this repo quietly.
+
+### Proposed criteria (starting point — decide, then write it into CLAUDE.md)
+
+One test: **would another AIND project doing tongue kinematics want this?**
+
+- **Library** — produces or annotates the per-session intermediates; runs in the batch pipeline;
+  generic to tongue-kinematics work; must stay stable because other capsules depend on it.
+  *Segmentation, aggregation, annotation, QC stats, lick detection, video/NWB I/O.*
+- **This repo** — analysis built *on top of* those intermediates, specific to the LC-NE RT-encoding
+  question; fast-moving; free to churn. *Encoding models, per-unit registries, spatial topography
+  and axes, manuscript figure style.*
+
+Sorting the open cases under that test: `compute_outbound_metrics` → library (already the plan);
+`annotate_movement_bouts` → library, once settled; `encoding_methods`, `per_unit_stats_registry`,
+`spatial_encoding`, `spatial_axes`, `encoding_plots`, `plotstyle` → repo.
+`ephys_utils.build_trial_features` is the genuinely ambiguous one — it derives generic per-trial
+kinematic features, but its column set (`kcols`) is chosen for this project's encoding models.
+
+### What to do
+
+- Agree the criteria, then record them in `CLAUDE.md` so the rule is enforced at the point new
+  code gets written, not rediscovered per function.
+- Resolve the library-internal duplication in (1) — one definition, one import path.
+
+  > **Resolved by inspection 2026-09-16** (detail in the retired `tongue_lickometer` item, `git show fb794c3:TODO.md`). Keep
+  > `tongue_lickometer_utils`'s `detect_licks` (vectorized; 225× faster than
+  > `tongue_kinematics_utils`'s row-loop copy, and the only signature its call sites use),
+  > `calculate_metrics` and `calculate_metrics_witheventkeys` (the `tku` copies add a `tn`
+  > that subtracts counts from a timestamp — delete, do not merge). Keep
+  > `tongue_kinematics_utils`'s `load_keypoints_from_csv` (coerces to numeric; `tlu`'s does
+  > not) and its `mask_keypoint_data` / `filter_timestamps_refractory` (byte-identical — keep
+  > one copy). Net: `tongue_lickometer_utils` owns **contact detection and event scoring**,
+  > `tongue_kinematics_utils` owns **keypoint I/O, filtering and movement segmentation**; the
+  > two implement different lick definitions and both are load-bearing, so this is a
+  > de-duplication, not a consolidation. Also move `extract_clips_ffmpeg_encode` from
+  > `tongue_lickometer_utils` to `video_clip_utils` (its `libx264` re-encode is the correct
+  > precise-seek variant; do **not** replace it with `extract_clips_ffmpeg_after_reencode`,
+  > which is `-c copy` and keyframe-snapped). Only two consumers exist ecosystem-wide —
+  > `val_02_lickometer.ipynb` and `tongue_kinematics.ipynb` (HOLD) — so this is a low-risk
+  > deletion, and the lickometer notebook can ship against `tongue_lickometer_utils` before
+  > the library PR lands. A validated Implementation B would land here too, **alongside**
+  > `detect_licks` rather than replacing it.
+- Decide the plotting rule in (2): either the library's plotters adopt `plotstyle.py`, or the
+  library stops shipping plot functions and this repo owns presentation entirely.
+- State the layering in (3) explicitly in both modules' docstrings.
+- Give (4) a declared contract — a documented schema for `tongue_quality_stats.json`, or a
+  library-side accessor this repo calls instead of reading the JSON directly.
+
+### Notes
+
+- Library changes need their own branch/PR + a pin bump here, so batch them: do this alongside
+  the outbound-metrics consolidation below rather than as a separate round trip.
+- Blocks nothing immediately, but every deferred "promote to the library?" note in this file
+  (`compute_outbound_metrics`, `annotate_movement_bouts`, the `kin_06` landmark helper) resolves
+  faster once the criteria exist.
+
+---
+
+## Fold outbound metrics into the library's movement aggregation step
+
+_Logged 2026-09-11. **Library side done and confirmed on real data 2026-09-22**
+(`library-boundary-outbound` merged as PR #4). Remaining: re-run the per-session pipeline so
+intermediates carry `out_*` from segmentation (today they still come from the
+`add_outbound.ipynb` backfill or an equivalent prior run), then the full-parquet parity check,
+then archive `add_outbound.ipynb`._
+
+> **Status 2026-09-17.** `compute_outbound_metrics` now lives in
+> `tongue_kinematics_utils` and `aggregate_tongue_movements` calls it, so `tongue_movs.parquet`
+> carries `out_*` natively. Both notebook copies were replaced by the library import
+> (`add_outbound.ipynb` keeps its backfill for intermediates written before the change;
+> `tongue_movements_all.ipynb` cell 30 is now just the import).
+>
+> **Which copy was canonical mattered.** The two notebook copies differed in one case: when
+> the endpoint is the movement's first frame, `add_outbound` wrote `out_duration = NaN` and
+> `tongue_movements_all` wrote `0.0`. The pooled parquet has 0 NaN and 18,515 zeros in
+> `out_duration` (with `out_total_distance` NaN on exactly those rows), so the data carry the
+> `tongue_movements_all` convention and the library reproduces it. Checked bit-for-bit against
+> that copy on 400 random movements with NaN frames; the only difference from the
+> `add_outbound` copy is those zero-length rows. The parity check after the pipeline re-run
+> should therefore be exact, not approximate.
+>
+> **Confirmed on real data 2026-09-22**, via `code/verify_library_migration.ipynb` §4, on
+> `behavior_782394_2025-04-23_10-51-14`: `aggregate_tongue_movements` re-run from that
+> session's frame-level `tongue_kins.parquet` reproduces the `out_*` columns already in its
+> `tongue_movs.parquet` on all 3,761 movements — 3,711 exactly, 50 via the documented
+> zero-length-outbound convention above, 0 unexplained. This is the strongest confirmation so
+> far that the migrated code is correct, but it is still one session out of 44; the remaining
+> risk is session-to-session variation (e.g. a session with an all-NaN movement, which the
+> synthetic tests cover but this real-data check hasn't hit yet), not the convention itself.
+>
+> **Full pipeline re-run staged 2026-09-22, not yet executed.** `run_batch_analysis.py` (also
+> the capsule's Reproducible Run entrypoint — see `code/run`) points `save_root` at a fresh
+> `session_analysis_fall2026` (unchanged: reads `pred_csv_list` from the existing
+> `pred_csv_list_20250113.json`) and, after the batch, pools the result into a freshly dated
+> `all_tongue_movements_MMDDYYYY.parquet` via the now-parametrized
+> `build_all_tongue_movements(base=, out=)`. `session_analysis_mlk` is untouched. Needs to
+> actually run on Code Ocean; the full-parquet parity check against
+> `all_tongue_movements_04022026.parquet` (session/movement_id join, same convention-aware
+> comparison as `verify_library_migration.ipynb` §4) still needs to be written once that run
+> completes.
+
+### Why
+
+The outbound-phase metrics (`out_duration`, `out_peak_velocity`, `out_mean_velocity`,
+`out_total_distance` — computed over the outbound segment only, start → max-jaw-excursion frame)
+are **not** part of the standard segmentation/aggregation in
+`aind-dynamic-foraging-behavior-video-analysis`. The library's
+`kinematics/tongue_kinematics_utils.py::aggregate_tongue_movements()` only emits *whole-movement*
+metrics (`peak_velocity`, `duration`, `total_distance`, excursion endpoints). No branch
+(`main`, `LC_manuscript`, `video_alignment`) computes an outbound split.
+
+As a result the logic lives as orphan code in this repo, duplicated in two places:
+- `code/add_outbound.ipynb` — the canonical generator (`compute_outbound_metrics` +
+  `augment_movs_with_outbound_in_place`), which backfills `out_*` into each per-session
+  `tongue_movs.parquet` after the fact.
+- `code/tongue_movements_all.ipynb` cell 30 — a duplicate copy of `compute_outbound_metrics`.
+
+Every downstream consumer already depends on these columns: `ephys_utils.py` (`kcols` →
+`first_move_out_*` / `cue_response_out_*` in `all_counts_df`), `eph_02/03/04`, and `kin_00/01/03/04`.
+
+### What to do
+
+- Move `compute_outbound_metrics()` into the library, computing `out_*` **inside**
+  `aggregate_tongue_movements()` (it already has `movement_id`, `x`, `y`, `v`, `time_in_session`
+  and the jaw keypoint it needs) so every session's movement table carries `out_*` by default —
+  no separate augmentation pass.
+- Once the library emits `out_*` natively: delete the two duplicate defs
+  (`add_outbound.ipynb`, `tongue_movements_all.ipynb` cell 30), retire the
+  `augment_movs_with_outbound_in_place` backfill, and re-run the per-session pipeline so the
+  intermediates are regenerated with `out_*` baked in from segmentation.
+- Verify column parity against the current `all_tongue_movements_04022026.parquet` before/after
+  (same values, same dtypes) so `ephys_utils.py` and the `kin_*`/`eph_*` notebooks are unaffected.
+
+### Notes
+
+- Do this in the library repo (its own branch/PR), then bump the pin here. Batch it with the
+  library-vs-repo module-boundary item above — both touch the library and both need a pin bump,
+  so one round trip is cheaper than two.
+- Unblocks archiving `add_outbound.ipynb` and simplifies `tongue_movements_all.ipynb`.
+
+---
+
+## Upgrade the Code Ocean environment off Python 3.9
+
+_Logged 2026-09-07. Not scheduled — do this deliberately, on a branch, not mid-analysis._
+
+### Why
+
+`environment/Dockerfile` builds from
+`codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04`. Python 3.9 reached
+end-of-life in October 2025. That single pin is the root cause of several unrelated-looking
+workarounds scattered through this repo:
+
+1. **`rachel-analysis-utils` needs `--ignore-requires-python`.** The package declares
+   `requires-python>=3.10`. The Dockerfile installs it in an isolated `RUN` layer with
+   `--ignore-requires-python` specifically so that flag does not leak into the main pip block
+   (where it would let pip resolve a too-new numpy and break the build). See the comment above
+   that layer.
+2. **`rachel_analysis_utils.analysis_utils` cannot be imported at all** on 3.9 — it has a
+   nested-quote f-string at `analysis_utils.py:294` (`f'{x.split('_dff')...}'`), which is 3.12+
+   syntax. Because of this, `fip_00_explore.ipynb` reimplements `enrich_df_trials`'s
+   `num_reward_past` locally as `enrich_streaks` (unit-tested to match the package). That
+   reimplementation exists *only* to dodge the import and can be deleted after the upgrade.
+3. **The repo-wide "Python 3.9 compatible syntax only" rule** in `CLAUDE.md` — no `|` type
+   unions, no structural pattern matching, no walrus in complex contexts — exists solely to
+   match this image.
+
+Upgrading the base image removes all three.
+
+### Risk (why this is not a quick change)
+
+The main pip block pins a mutually-consistent stack that was resolved against 3.9:
+
+```
+spikeinterface[full]==0.100.0   scipy==1.13.0        pynwb==3.0.0
+hdmf-zarr==0.11.0               zarr==2.18.2         statsmodels==0.14.2
+pyarrow==21.0.0                 seaborn==0.13.2      opencv_python==4.11.0.86
+moviepy==1.0.3                  scikit-image==0.24.0 aind-ephys-utils==0.0.15
+```
+
+Several of these will need version bumps on a newer interpreter, and `spikeinterface[full]`
+in particular pulls a large transitive tree. ~41 notebooks depend on this environment, with
+the `eph_*` and `kin_*` families being the most exposed (they use spikeinterface, pynwb and
+the ephys stack directly). A bad upgrade silently breaks working analyses.
+
+### Suggested approach
+
+- Do it on a dedicated branch, and use Code Ocean's environment versioning so the current
+  working environment stays recoverable.
+- Bump the base image to the Code Ocean `python3.11` JupyterLab image (matches
+  `aind-motion-energy`, which already targets 3.11).
+- Relax the pins in the main block to `>=` where possible, rebuild, then re-pin to whatever
+  actually resolves — do not hand-guess versions.
+- Drop `--ignore-requires-python` from the `rachel-analysis-utils` layer and fold it back
+  into the main pip block.
+- Verification pass, in rough order of blast radius: `eph_00`, `kin_00`, then `fip_00`.
+  Confirm `import rachel_analysis_utils.analysis_utils` succeeds, then delete the local
+  `enrich_streaks` reimplementation in `fip_00_explore.ipynb` and switch back to
+  `enrich_df_trials`.
+- Remove the Python 3.9 syntax rule from `CLAUDE.md` once the image is live.
+
+### Related cleanups unblocked by this
+
+- `fip_00_explore.ipynb` cell 3 pip-installs `fastparquet` at runtime because the image does
+  not ship it (`rachel_analysis_utils.load_nwb_list` hardcodes `engine="fastparquet"`).
+  That belongs in the Dockerfile pip block regardless of the Python version — it does not
+  need to wait for this upgrade.

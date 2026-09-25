@@ -148,3 +148,7 @@ dmypy.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 .vscode
+
+# Local VS Code multi-root workspaces — these point at machine-specific paths
+# (e.g. ../.venv/src/...) and are not portable to other machines or Code Ocean.
+*.code-workspace
