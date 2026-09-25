@@ -29,6 +29,14 @@ optional. The three AIND libraries are now pinned to their baseline commits inst
 and `aind-dynamic-foraging-models` to 0.16.0, so the comparison isn't affected by upstream
 changes made since the baseline. Set them back to `@main` when adopting.
 
+**2026-09-25, notebook kernels hanging at startup in VS Code** (eph_01, kin_07; imports worked
+in a terminal): `debugpy` was still 1.6.6 from the baseline, which predates Python 3.12 support.
+It had installed only because it ships a generic pure-Python wheel, and ipykernel loads it at
+every kernel start. It's now 1.8.20. `ipykernel` is held at 6.29.5 (last 6.x) instead of
+floating to 7.1. Both are notebook tooling. A scan for other packages with compiled wheels only
+for Python <= 3.11 found pymongo (compiled from source, C extensions confirmed working) and
+pyrsistent (pure-Python fallback, Jupyter-only).
+
 ### `env_00_reference_sessions`: baseline for the Python 3.12 environment migration
 
 New notebook for Stage 2 of the library's `PYTHON_311_UPGRADE_PLAN.md`. It runs
