@@ -17,21 +17,26 @@ and code editing. Data lives on Code Ocean — do not expect data files to be pr
 
 ## Rules
 
-- **Python 3.9 compatible syntax, for now.** No `|` for type unions, no structural pattern
-  matching, no walrus operator in complex contexts. The Code Ocean environment is Python 3.12
-  from 2026-09 (`environment/Dockerfile`), but `main`, `kinematics-manuscript` and `local-dev`
-  stay on the 3.9 image until they take the same Dockerfile change, and code moves between
-  branches. Relax this to 3.12 once every active branch has migrated (library
-  `PYTHON_311_UPGRADE_PLAN.md`, Stage 2c).
+- **Python 3.12.** Every active branch (`wild`, `main`, `kinematics-manuscript`) runs the
+  Python 3.12 Code Ocean image as of 2026-09-25, so 3.10+ syntax (`X | None`, `match`) is fine
+  in this repo's own code. Package versions are held at the 3.9-era baseline by
+  `environment/py39-constraints.txt`. Change a version there, deliberately, to upgrade it.
+  Code headed for the library (`aind-dynamic-foraging-behavior-video-analysis`) must still
+  run on Python 3.11.
 - **Do not modify anything in `/environment`.** That folder controls the Code Ocean
   Docker build and should only be changed intentionally.
 - **Do not modify `.codeocean/` config files.**
 - **Branch behavior depends on which branch is active:**
-  - `local-dev` — careful development with user oversight. Make targeted, minimal edits.
-    Always show diffs and wait for approval before applying broad changes.
-  - `wild` — agentic refactoring with more latitude. Larger changes are acceptable,
-    but still commit frequently and summarize what changed.
-  - `main` — do not modify or push to main under any circumstances.
+  - `wild` — **development with Claude.** Agentic work with latitude: larger changes are
+    acceptable, but commit frequently and summarize what changed.
+  - `main` — **verified, working code only.** It gets there by merging `wild` into `main`
+    once the changes have been run and checked. Do not commit to or push `main` unless the
+    user explicitly asks for that promotion.
+  - `kinematics-manuscript` — forward-looking manuscript work; periodically takes `wild`.
+  - Retired, kept as tags (not branches): `archive/local-dev` (old careful-dev branch) and
+    `archive/main-py39` (main before its 2026-09-25 promotion to `wild`; Python 3.9 image,
+    with AIND libraries pinned so it still builds). Restore one with
+    `git switch -c <name> archive/<tag>`.
 - **Preserve existing function signatures** unless explicitly told to change them.
   Other notebooks may depend on them.
 - **Do not delete or overwrite data loading cells** in notebooks — data paths are
