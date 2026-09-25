@@ -1,0 +1,222 @@
+# Package versions held at the Python 3.9 baseline (environment/py39-freeze.txt, wild @ 7daae78).
+#
+# Used as a pip constraints file (-c) in the Dockerfile: it doesn't add packages, it only fixes
+# the version of any package that gets installed. This keeps the Python 3.12 image identical
+# to the 3.9 one apart from Python, the OS and the Jupyter tooling, so env_00_reference_sessions
+# compares like with like.
+#
+# Generated from py39-freeze.txt, keeping only `name==version` lines and leaving out:
+#   - the Jupyter stack (jupyterlab 3.6 doesn't fit the new base image; it moves to 4.x)
+#   - packages installed from git, which the Dockerfile pins to their baseline commits instead
+# Every version here resolved for Linux + Python 3.12 on 2026-09-24.
+#
+# To upgrade a package deliberately, change or delete its line here.
+#
+# Bumped from the baseline because the 3.9 version has no Linux wheel for Python 3.12 and its
+# C extension fails to compile there (2026-09-25; found when PyYAML 6.0 broke the first build).
+# Each is the smallest bump that has a wheel, and none is used in numerical code:
+#   PyYAML 6.0 -> 6.0.1, pyzmq 25.0.0 -> 25.1.1, MarkupSafe 2.1.2 -> 2.1.3
+# Still built from source on 3.12:
+#   - pure Python, build fine: asciitree, moviepy, open-ephys-python-tools, zmq
+#   - pymongo 4.3.3: can't be bumped, because aind-data-access-api[docdb] (latest, 1.10.0) pins it
+#     exactly. Its C extensions are optional; if they fail to compile, pymongo installs pure
+#     Python and works (just slower).
+#   - wavpack-numcodecs 0.1.5: C code, compiles against build-essential as it already does on 3.9.
+#
+# Notebook-kernel fix (2026-09-25). Kernels hung at startup when a notebook was first run from
+# VS Code (eph_01, kin_07). Two tooling changes, neither used in analysis code:
+#   - debugpy 1.6.6 -> 1.8.20: 1.6.6 predates Python 3.12 support (added in 1.8.x); it only
+#     installed because it ships a generic py2.py3 wheel. ipykernel loads it at kernel start.
+#   - ipykernel held at 6.29.5 (last 6.x; the 3.9 image had 6.21.3) instead of floating to 7.x,
+#     which changed kernel start/interrupt/restart handling.
+aind-analysis-arch-result-access==1.2.0
+aind-data-access-api==1.10.0
+aind-ephys-utils==0.0.15
+aind_hierarchical_bootstrap==0.0.8
+aiobotocore==2.26.0
+aiofiles==22.1.0
+aiohappyeyeballs==2.6.1
+aiohttp==3.13.5
+aioitertools==0.13.0
+aiosignal==1.4.0
+aiosqlite==0.18.0
+anndata==0.10.9
+annotated-types==0.7.0
+anyio==3.6.2
+argon2-cffi==21.3.0
+argon2-cffi-bindings==21.2.0
+array_api_compat==1.11.2
+arrow==1.2.3
+asciitree==0.3.3
+asttokens==2.2.1
+async-timeout==5.0.1
+attrs==22.2.0
+Babel==2.12.1
+backcall==0.2.0
+backports.strenum==1.3.1
+bcrypt==5.0.0
+beautifulsoup4==4.11.2
+bleach==6.0.0
+boto3==1.41.5
+botocore==1.41.5
+brotlipy==0.7.0
+certifi==2021.10.8
+cffi==2.0.0
+codeocean==0.17.0
+comm==0.1.2
+conda==4.12.0
+contourpy==1.3.0
+cramjam==2.11.0
+cuda-bindings==13.0.3
+cuda-pathfinder==1.3.2
+cuda-python==13.0.3
+cycler==0.12.1
+dataclasses-json==0.6.7
+debugpy==1.8.20
+decorator==4.4.2
+defusedxml==0.7.1
+distinctipy==1.3.4
+dnspython==2.7.0
+exceptiongroup==1.3.1
+executing==1.2.0
+fasteners==0.20
+fastjsonschema==2.16.3
+fastparquet==2024.11.0
+fonttools==4.60.2
+fqdn==1.5.1
+frozenlist==1.8.0
+fsspec==2025.10.0
+get-annotations==0.1.2
+h5py==3.14.0
+hdmf==4.3.1
+hdmf_zarr==0.11.0
+ImageIO==2.37.2
+imageio-ffmpeg==0.6.0
+importlib-metadata==6.0.0
+importlib_resources==6.5.2
+invoke==3.0.3
+isoduration==20.11.0
+jedi==0.18.2
+Jinja2==3.1.2
+jmespath==1.1.0
+joblib==1.5.3
+json5==0.9.11
+jsonpointer==2.3
+jsonschema==4.17.3
+kiwisolver==1.4.7
+lazy-loader==0.6
+legacy-api-wrap==1.5
+llvmlite==0.43.0
+MarkupSafe==2.1.3
+marshmallow==3.26.2
+matplotlib==3.9.4
+matplotlib-inline==0.1.6
+mistune==2.0.5
+moviepy==1.0.3
+multidict==6.7.1
+mypy_extensions==1.1.0
+narwhals==2.21.0
+natsort==8.4.0
+nbclient==0.7.2
+neo==0.14.3
+nest-asyncio==1.5.6
+networkx==3.2.1
+numba==0.60.0
+numcodecs==0.12.1
+numpy==2.0.2
+open-ephys-python-tools==0.1.7
+opencv-python==4.11.0.86
+packaging==26.3
+pandas==2.3.3
+pandocfilters==1.5.0
+paramiko==5.0.0
+parso==0.8.3
+pathlib==1.0.1
+patsy==1.0.3
+pexpect==4.8.0
+pickleshare==0.7.5
+pillow==10.3.0
+platformdirs==3.1.0
+plotly==7.1.0
+probeinterface==0.3.1
+proglog==0.1.12
+prometheus-client==0.16.0
+prompt-toolkit==3.0.38
+propcache==0.4.1
+psutil==5.9.4
+ptyprocess==0.7.0
+pure-eval==0.2.2
+pyarrow==21.0.0
+pycosat==0.6.3
+pydantic==2.11.10
+pydantic-settings==2.11.0
+pydantic_core==2.33.2
+Pygments==2.14.0
+pymongo==4.3.3
+PyMuPDF==1.24.2
+PyMuPDFb==1.24.1
+PyNaCl==1.6.2
+pynndescent==0.6.0
+pynwb==3.0.0
+pyparsing==3.3.3
+PyPDF2==3.0.1
+pyrsistent==0.19.3
+python-dateutil==2.8.2
+python-dotenv==1.2.1
+python-json-logger==2.0.7
+pytz==2026.3.post1
+PyYAML==6.0.1
+pyzmq==25.1.1
+quantities==0.16.2
+requests==2.28.2
+requests-toolbelt==1.0.0
+rfc3339-validator==0.1.4
+rfc3986-validator==0.1.1
+ruamel.yaml==0.19.1
+s3fs==2025.10.0
+s3transfer==0.15.0
+scanpy==1.10.3
+scikit-image==0.24.0
+scikit-learn==1.6.1
+scipy==1.13.0
+seaborn==0.13.2
+Send2Trash==1.8.0
+session_info==1.0.1
+sniffio==1.3.0
+soupsieve==2.4
+spikeinterface==0.100.0
+sshtunnel==0.4.0
+stack-data==0.6.2
+statsmodels==0.14.2
+stdlib-list==0.12.0
+terminado==0.17.1
+threadpoolctl==3.7.0
+tifffile==2024.8.30
+tinycss2==1.2.1
+tomli==2.0.1
+tornado==6.2
+traitlets==5.9.0
+trimesh==4.11.0
+typing-inspect==0.9.0
+typing-inspection==0.4.2
+typing_extensions==4.16.0
+tzdata==2026.4
+umap-learn==0.5.12
+uri-template==1.2.0
+wavpack_numcodecs==0.1.5
+wcwidth==0.2.6
+webcolors==1.12
+webencodings==0.5.1
+websocket-client==1.5.1
+wrapt==1.17.3
+xarray==2024.7.0
+y-py==0.5.9
+yarl==1.22.0
+ypy-websocket==0.8.2
+zarr==2.18.2
+zipp==3.15.0
+zmq==0.0.0
+# Added by hand (2026-09-25): a dependency of basic-analysis, held at the baseline version so it
+# doesn't move whenever basic-analysis @main does. Bump deliberately.
+aind-dynamic-foraging-models==0.16.0
+ipykernel==6.29.5

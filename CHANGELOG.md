@@ -2,7 +2,57 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-25
+
+### Environment: Python 3.12 adopted (`env/py312` -> `wild`)
+
+Validation in a duplicate capsule, on `env/py312`:
+- `env_00_reference_sessions` outputs were bit-for-bit identical to the 3.9 baseline (2 sessions,
+  17 parquet files each, plus quality stats).
+- Every module in `code/` imports.
+- `eph_01`, `eph_09`, `kin_02`, `kin_03`, `kin_07` and `fip_01` run end to end, and `kin_07`'s
+  live docDB query works.
+
+For adoption, the three AIND libraries go back from their baseline SHAs to `@main`, as before
+the migration. Since the baseline, upstream changed only `compute_side_bias` in basic-analysis
+(a failed logistic fit now gives NaN instead of raising) and a `hdmf_zarr<0.14` cap in
+data-utils. `aind-dynamic-foraging-models` stays at 0.16.0 in `py39-constraints.txt`.
+`CLAUDE.md` keeps the 3.9-syntax rule until every active branch has migrated.
+
 ## 2026-09-24
+
+### Environment: Python 3.12 on the AIND capsule template (`env/py312` only)
+
+`environment/Dockerfile` moves from `jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04` to
+AIND's template base, `mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04`. The new
+`environment/py39-constraints.txt`, generated from `py39-freeze.txt`, holds every package at
+its 3.9-baseline version through `pip install -c`. Only Python, the OS and the Jupyter tooling
+change (JupyterLab 3.6 -> 4.1, ipywidgets 7 -> 8). All 187 constrained versions resolved for
+Linux + Python 3.12 before this commit.
+
+Other changes: apt packages are no longer pinned to Ubuntu 20.04 builds; `python3-tk` is dropped
+(conda-forge Python ships its own Tk); `git`, `curl` and `ca-certificates` are added, since the
+minimal base doesn't have them; and the `--ignore-requires-python` workaround for
+`rachel-analysis-utils` is removed. Not yet built on Code Ocean. `wavpack-numcodecs` compiles
+from source (as it already did on 3.9) and is the step most likely to fail. Validate with
+`env_00_reference_sessions.ipynb` against the `env_reference_py39` data asset before merging into
+`wild`.
+
+**2026-09-25, after the first build failed on PyYAML 6.0**, which has no 3.12 wheel and whose
+source build breaks under Cython 3: every resolved package was checked for a Linux 3.12 wheel.
+PyYAML (6.0.1), pyzmq (25.1.1) and MarkupSafe (2.1.3) got the smallest bump that has one.
+pymongo stays at 4.3.3 because `aind-data-access-api` pins it exactly; its C extensions are
+optional. The three AIND libraries are now pinned to their baseline commits instead of `@main`,
+and `aind-dynamic-foraging-models` to 0.16.0, so the comparison isn't affected by upstream
+changes made since the baseline. Set them back to `@main` when adopting.
+
+**2026-09-25, notebook kernels hanging at startup in VS Code** (eph_01, kin_07; imports worked
+in a terminal): `debugpy` was still 1.6.6 from the baseline, which predates Python 3.12 support.
+It had installed only because it ships a generic pure-Python wheel, and ipykernel loads it at
+every kernel start. It's now 1.8.20. `ipykernel` is held at 6.29.5 (last 6.x) instead of
+floating to 7.1. Both are notebook tooling. A scan for other packages with compiled wheels only
+for Python <= 3.11 found pymongo (compiled from source, C extensions confirmed working) and
+pyrsistent (pure-Python fallback, Jupyter-only).
 
 ### `env_00_reference_sessions`: baseline for the Python 3.12 environment migration
 
