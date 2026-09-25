@@ -168,6 +168,7 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 | `fip_01_movement_value_coding` | Motion energy × RPE / value coding (tonic value, phasic RPE) |
 | `fip_02_ne_only_events` | Do NE and DA transients dissociate around movement onsets? |
 | `fip_03_da_ne_commonality` | How much of the motion-energy variance DA and NE explain is unique to each and how much is shared? |
+| `fip_04_da_ne_xcorr` | Do DA and NE co-vary across animals? Same-hemisphere DA × NE cross-correlation and coherence over every curated session, with animal as the unit |
 
 ### `val_*` — detection validation
 

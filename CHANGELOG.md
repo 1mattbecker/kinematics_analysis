@@ -4,6 +4,38 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-25
 
+### `fip_04_da_ne_xcorr.ipynb` — DA × NE cross-correlation and coherence across animals
+
+New notebook. Extends `fip_03` §3–§3b, which covered only the 10 sessions with motion energy (one
+animal), to every curated session with a same-side DA/NE pair, and makes animal the unit.
+Produces one main figure (example traces + zoom, single-session xcorr and coherence, grand-mean
+xcorr and coherence over animals, peak lag × peak r scatter, per-animal peak r against the null) and
+a supplementary one (band coherence per animal, peak r across days, windowed zero-lag r within the
+session).
+
+Decisions worth recording:
+
+- **Same-hemisphere pairs.** `PL(X)-Gcamp` is paired with `NAc(X)-dLight` by the side in the curated
+  region label. Curation drops each animal's noisy PL fiber, so most animals have one usable side;
+  an animal with both is held to the side with more sessions (`HEMI_BY_SUBJECT` overrides). Side
+  therefore varies between animals and is confounded with animal.
+- **Grand means are means of per-animal means**, SEM over animals; tests are Wilcoxon on animal
+  means; CIs are a hierarchical bootstrap (animals, then sessions).
+- **Circular-shift null via one FFT per session**: a shift of k samples at lag L equals the circular
+  cross-correlation at k + L. The minimum shift is 60 s (`fip_03` used 1 s), well past the
+  2–8 s shared timescale.
+- **Task period only**: first go cue to last go cue + 10 s.
+- **`BAND_HZ = (0.12, 0.45)`** is `fip_03`'s cluster, fixed in advance. 808054 is in both datasets,
+  so for that animal the band is not an independent choice.
+- No `fip_utils` change; the pairing and summary helpers are notebook-local.
+
+Validated statically (py3.9 parse, pyflakes) and by exec'ing the notebook's own cells against
+synthetic sessions with known structure. A +0.5 s NE lead planted in one animal is recovered at
++0.50 s. An uncoupled animal scores peak r 0.06 against a null of 0.05. The planted
+0.12–0.45 Hz band is recovered as the grand-mean cluster (0.117–0.488 Hz). The both-sides,
+misconnect, too-short, NaN-heavy and too-few-sessions cases route correctly. The circular null
+matches `fu.norm_xcorr` on shifted data to 1.4e-3. Not yet run on Code Ocean.
+
 ### Environment: Python 3.12 adopted (`env/py312` -> `wild`)
 
 Validation in a duplicate capsule, on `env/py312`:

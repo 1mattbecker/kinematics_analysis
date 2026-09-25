@@ -2,8 +2,27 @@
 
 Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
 `fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`,
-`fip_03_da_ne_commonality.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
+`fip_03_da_ne_commonality.ipynb`, `fip_04_da_ne_xcorr.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
 `kin_*`/`eph_*` port plan. Newest first, dated `YYYY-MM-DD`.
+
+---
+
+## 2026-09-25
+
+**`fip_04_da_ne_xcorr.ipynb` added** (see `CHANGELOG.md` 2026-09-25). Synthetic-validated only.
+
+- **Run it on Code Ocean** and check the side table in §2: expect roughly 7 animals (813929 has
+  both PL fibers dropped, 809488 is `drop_all`). Confirm which side each animal lands on matches
+  the curation notes; `HEMI_BY_SUBJECT` overrides.
+- **Check the curation drop semantics.** `drop_channels` lists physical channels (`G_0`, `G_1`),
+  and for 808054/808056 most sessions carry `misconnect_fixes` that move PL to a different
+  physical channel. If a drop is applied before the remap, the surviving PL fiber in those
+  sessions may be the noisy one. §2's side table shows what survived; compare with the notes.
+- **Contralateral control.** Every animal also has the opposite-side NAc dLight. DA(contra) × NE
+  would show whether the coupling is lateralized. Bilateral dLight is r ≈ 0.98 in 808054, so a
+  near-identical result is the expected outcome.
+- The Wilcoxon on peak lag has many exact-zero ties, so scipy falls back to the normal
+  approximation and warns. Report the lag with the bootstrap CI if the test is unstable.
 
 ---
 
