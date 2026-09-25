@@ -1,35 +1,52 @@
 # hash:sha256:2e986011032f62d32c9f0c8a6bdec40fd30fdc1642dfd1e39cfe52a608f98f19
 ARG REGISTRY_HOST
-FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
- 
+# AIND capsule template base: Python 3.12.4 (mamba/conda-forge), Ubuntu 22.04.
+# Replaces jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04. See
+# PYTHON_311_UPGRADE_PLAN.md in aind-dynamic-foraging-behavior-video-analysis, Stage 2.
+FROM $REGISTRY_HOST/codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04
+
 ARG DEBIAN_FRONTEND=noninteractive
 ARG AWS_ACCESS_KEY_ID
 ARG AWS_DEFAULT_REGION
 ARG AWS_SECRET_ACCESS_KEY
- 
+
 ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
 COPY git-ask-pass /
- 
+
 RUN python -m pip install --upgrade pip
 
+# Versions are no longer pinned to Ubuntu 20.04 builds. python3-tk is gone: it was the
+# system Python's Tk, and conda-forge's Python ships its own. git and curl are listed
+# explicitly because this base image is minimal: git for the pip installs from GitHub,
+# curl for postInstall's code-server download.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential=12.8ubuntu1.1 \
-        libgit2-dev=0.28.4+dfsg.1-2ubuntu0.1 \
-#        libssl-dev=1.1.1f-1ubuntu2.22 \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        libgit2-dev \
         libgl1-mesa-glx \
-        pandoc=2.5-3build2 \
-        pkg-config=0.29.1-0ubuntu4 \
-        python3-tk=3.8.10-0ubuntu1~20.04 \
+        pandoc \
+        pkg-config \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install -U --no-cache-dir \
+# Every pip install below uses -c /py39-constraints.txt, which holds each package at its
+# version from the Python 3.9 baseline (environment/py39-freeze.txt). Change a version there,
+# not here, to upgrade it deliberately.
+COPY py39-constraints.txt /
+
+# jupyterlab and ipywidgets: this base image has no IDE, and a hand-edited Dockerfile blocks
+# Code Ocean's automatic IDE install. They move from 3.6 / 7.7 to current versions (JupyterLab
+# 3.6 doesn't fit this base). No code in this repo uses ipywidgets directly.
+RUN pip install -U --no-cache-dir -c /py39-constraints.txt \
+    jupyterlab \
+    ipywidgets \
     aind-ephys-utils==0.0.15 \
     hdmf-zarr==0.11.0 \
     fastparquet==2024.11.0 \
-    ipywidgets==7.7.2 \
     open-ephys-python-tools==0.1.7 \
     pillow==10.3.0 \
     pyarrow==21.0.0 \
@@ -53,22 +70,19 @@ RUN pip install -U --no-cache-dir \
     # hdmf==3.12.2 \
     # aind_dynamic_foraging_data_utils==0.1.5
 
-# rachel-analysis-utils declares requires-python>=3.10 but its code is 3.9-safe and has
-# no deps. Install it in isolation with --ignore-requires-python so the flag does NOT leak
-# into the block above (which would let pip pull a too-new numpy and break the build).
-RUN pip install --no-cache-dir --ignore-requires-python \
+# rachel-analysis-utils requires Python >=3.10, which this image meets, so the
+# --ignore-requires-python workaround needed on 3.9 is gone.
+RUN pip install --no-cache-dir -c /py39-constraints.txt \
     -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@864550d55356ecb4906d05801cdae694bd000fde#egg=rachel-analysis-utils
 
 # scanpy, for eph_09_structural_axes' MERFISH axis (reads adata_mer_subset_2_2k.h5ad).
-# 1.10.3 is the LAST scanpy supporting python 3.9 (1.10.4+ require >=3.10) — do not bump
-# without moving the base image first. Its own layer, like rachel-analysis-utils above,
-# so its resolution is separate from the pinned block; scipy is re-asserted here as a
-# tripwire, so if scanpy ever wants to move it the build fails loudly instead of
-# silently upgrading numpy/scipy underneath the rest of the pins.
-RUN pip install --no-cache-dir \
-    scanpy==1.10.3 \
+# Held at 1.10.3 (the 3.9 baseline) by the constraints file, so the migration changes as little
+# as possible. It was pinned there only because 1.10.4+ need Python >=3.10, so it can be
+# bumped now. scipy is re-asserted as a tripwire: if scanpy ever wants to move it, the build
+# fails loudly instead of silently changing numpy/scipy under the rest of the pins.
+RUN pip install --no-cache-dir -c /py39-constraints.txt \
+    scanpy \
     scipy==1.13.0
 
 COPY postInstall /
 RUN /postInstall
-# v1

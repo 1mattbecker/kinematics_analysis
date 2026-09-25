@@ -17,8 +17,12 @@ and code editing. Data lives on Code Ocean — do not expect data files to be pr
 
 ## Rules
 
-- **Python 3.9 compatible syntax only.** No `|` for type unions, no structural pattern
-  matching, no walrus operator in complex contexts. This matches the Code Ocean environment.
+- **Python 3.9 compatible syntax, for now.** No `|` for type unions, no structural pattern
+  matching, no walrus operator in complex contexts. The Code Ocean environment is Python 3.12
+  from 2026-09 (`environment/Dockerfile`), but `main`, `kinematics-manuscript` and `local-dev`
+  stay on the 3.9 image until they take the same Dockerfile change, and code moves between
+  branches. Relax this to 3.12 once every active branch has migrated (library
+  `PYTHON_311_UPGRADE_PLAN.md`, Stage 2c).
 - **Do not modify anything in `/environment`.** That folder controls the Code Ocean
   Docker build and should only be changed intentionally.
 - **Do not modify `.codeocean/` config files.**
@@ -67,8 +71,9 @@ says "the library", it means this one.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
   to `@main` — so anything merged to `main` reaches the capsule on its next image build.
   There is no version pin to shield against upstream changes.
-- **Import path:** `aind_dynamic_foraging_behavior_video_analysis`. `requires-python = ">=3.9"`,
-  which is what keeps it compatible with this capsule.
+- **Import path:** `aind_dynamic_foraging_behavior_video_analysis`. `requires-python = ">=3.9"`
+  today; it will move to `">=3.11"` once every consumer capsule and branch is on 3.11+ (the
+  library's `PYTHON_311_UPGRADE_PLAN.md`, Stage 3). This capsule's `wild` branch runs 3.12.
 - Its `README.md` is the AIND template plus a "Scope" section stating what belongs in the
   library — read that section, then the module source.
 

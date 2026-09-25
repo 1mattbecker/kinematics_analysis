@@ -514,6 +514,10 @@
 			"mount": "behavior_752014_2025-03-25_12-09-16"
 		},
 		{
+			"id": "a552a5f4-eff0-40bf-ac56-b2ef2579d167",
+			"mount": "kinematics_analysis_scratch_20260924"
+		},
+		{
 			"id": "a60b6930-197d-4120-a7c8-2c41fa07081f",
 			"mount": "behavior_754897_2025-03-12_12-23-09_videoprocessed_2025-10-29_21-59-06"
 		},
@@ -714,6 +718,10 @@
 			"mount": "behavior_751769_2025-01-16_11-31-52"
 		},
 		{
+			"id": "e161c24a-a20f-4a5b-b065-c8dff2f7f490",
+			"mount": "LCrecordings_combined_units"
+		},
+		{
 			"id": "e22860ce-0424-4a37-ba30-f121e4b9baf6",
 			"mount": "behavior_791691_2025-06-27_13-54-27_videoprocessed_2025-11-07_21-12-28"
 		},
@@ -788,6 +796,10 @@
 		{
 			"id": "f433e3f4-9cbe-4884-a23d-bf45a768b86c",
 			"mount": "behavior_754897_2025-03-12_12-23-09_videoprocessed_2025-09-09_18-59-42"
+		},
+		{
+			"id": "f52ccb2d-4d45-43d6-9c34-e384623e93d8",
+			"mount": "env_reference"
 		},
 		{
 			"id": "f6ee028f-0bfe-46a1-9bd8-16749e9b2e33",

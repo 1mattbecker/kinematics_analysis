@@ -4,6 +4,56 @@ Deferred work items. Newest first. Dates are YYYY-MM-DD.
 
 ---
 
+## Move analysis inputs out of `/root/capsule/scratch` into data assets
+
+_Logged 2026-09-25, during the Python 3.12 migration (library `PYTHON_311_UPGRADE_PLAN.md`,
+Stage 2)._
+
+**Why.** Scratch belongs to a single capsule. It isn't in git, isn't copied when a capsule is
+duplicated, and records nothing about where its files came from. The 3.12 duplicate capsule
+started with an empty scratch, so `eph_09` failed on `SCRATCH / "combined_unit_tbl.pkl"`.
+Nothing in this repo writes that file, so its origin is unrecorded. It has been the main unit
+table for every eph notebook since 2026-01-13 (`3dda68b`).
+
+**Stopgap, 2026-09-25.** The old capsule's scratch was saved as a data asset. For the 3.12
+spot-checks, its files are symlinked or copied into the duplicate's `/root/capsule/scratch/`, so
+the notebooks run unchanged on byte-identical inputs. No notebook paths were changed as part of
+the migration.
+
+**Do after the 3.12 migration is adopted (not during it),** one input at a time, each as its own
+commit with a CHANGELOG entry:
+
+- [ ] **Unit table: switch to the official
+      `/root/capsule/data/LCrecordings_combined_units/combined_unit_tbl.pkl`.**
+  1. Attach the `LCrecordings_combined_units` asset; it isn't in `.codeocean/datasets.json`
+     today.
+  2. `md5sum` it against the current `scratch/combined_unit_tbl.pkl` (from the saved scratch
+     asset). **Identical:** only the path changes, with no provenance or results impact.
+     **Different:** rerun `eph_01`–`eph_09` on both, record which results move, and note the
+     switch in the CHANGELOG as a data change.
+  3. Point the 10 notebooks that read `SCRATCH / "combined_unit_tbl.pkl"` at the asset
+     (`eph_00`–`eph_09`; `eph_08`/`eph_09` also read the separate upstream table under
+     `LC-NE_scratch_data_1/combined/combine_unit_tbl/` for waveform CCF coordinates. That one
+     is correct and stays).
+  4. Fix `CLAUDE.md` "Code Ocean data": it names this file as the primary reference, but the
+     code doesn't read it.
+- [ ] **`session_analysis_mlk/`** (22 notebooks: tongue-QC session outputs, read through
+      `load_session_quality_filter`). Save it as a data asset, or regenerate it into one with
+      `run_batch_analysis`, and repoint.
+- [ ] **`all_tongue_movements_04022026`** (8 `kin_` notebooks). A data asset with this name is
+      already attached; check it's the same file and repoint.
+- [ ] **`pred_csv_list_20250113.json`** (`run_batch_analysis.py`, `kin_00`, `attach_data`,
+      `env_00_reference_sessions`). Small, so commit it to the repo (e.g. `metadata/`) or add it
+      to an asset.
+- [ ] Lower-traffic inputs, handle as each notebook is next touched:
+      `features_combined_beh_all.pkl` (`eph_06`), `labeled_clips/` (`val_02`, `val_03`),
+      `predictions_pixel_error.csv` (`pixel_error`), and the `session_analysis_*` variants in
+      `test_session_*` notebooks.
+- [ ] Outputs written to scratch (figures, `temp/`, caches, `env_reference/`) can stay there. Only
+      *inputs* need to move.
+
+---
+
 ## Port plan for the five HOLD notebooks (overview)
 
 _Logged 2026-09-11. Revised 2026-09-11 after a full cell-by-cell audit of all five HOLD
