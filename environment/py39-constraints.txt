@@ -216,6 +216,7 @@ ypy-websocket==0.8.2
 zarr==2.18.2
 zipp==3.15.0
 zmq==0.0.0
-# Added by hand (2026-09-25): a dependency of basic-analysis, pinned so it doesn't move with it.
+# Added by hand (2026-09-25): a dependency of basic-analysis, held at the baseline version so it
+# doesn't move whenever basic-analysis @main does. Bump deliberately.
 aind-dynamic-foraging-models==0.16.0
 ipykernel==6.29.5

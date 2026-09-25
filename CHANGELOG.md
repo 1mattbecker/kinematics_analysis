@@ -2,6 +2,23 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-25
+
+### Environment: Python 3.12 adopted (`env/py312` -> `wild`)
+
+Validation in a duplicate capsule, on `env/py312`:
+- `env_00_reference_sessions` outputs were bit-for-bit identical to the 3.9 baseline (2 sessions,
+  17 parquet files each, plus quality stats).
+- Every module in `code/` imports.
+- `eph_01`, `eph_09`, `kin_02`, `kin_03`, `kin_07` and `fip_01` run end to end, and `kin_07`'s
+  live docDB query works.
+
+For adoption, the three AIND libraries go back from their baseline SHAs to `@main`, as before
+the migration. Since the baseline, upstream changed only `compute_side_bias` in basic-analysis
+(a failed logistic fit now gives NaN instead of raising) and a `hdmf_zarr<0.14` cap in
+data-utils. `aind-dynamic-foraging-models` stays at 0.16.0 in `py39-constraints.txt`.
+`CLAUDE.md` keeps the 3.9-syntax rule until every active branch has migrated.
+
 ## 2026-09-24
 
 ### Environment: Python 3.12 on the AIND capsule template (`env/py312` only)
