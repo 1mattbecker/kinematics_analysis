@@ -4,6 +4,28 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-25
 
+### `fip_04` reads a second, pre-curated asset; `fu.build_meta` reads build-time curation
+
+`DANE_3channels_curated` (Rachel, 8 animals, none shared with `DA_NE_4channels`) was built with
+rachel-analysis-utils' CSV curation (`b7b7487` onward): each event is already renamed to its
+target (`latNAcc(L)-DA`, `PL(L)-LCAxonCa`), failed fibers are gone, the patch cord is in
+`patch_cord`, the variant is in `preprocessing`, and there is no `intended_measurement`.
+
+- **`fu.build_meta`** gains a branch for that format: when `intended_measurement` is absent and
+  `patch_cord` is present, the region is the event name. Assets with `intended_measurement`
+  (every existing `fip_*` notebook) take the unchanged path.
+- **`fip_04`** loads each asset in `USE_ASSETS` with its own `use_curation` setting, caches each
+  one separately (`fip_04_pairs_<asset>.pkl`, which replaces `fip_04_pairs.pkl`), and releases each
+  NWB list before loading the next. DA/NE labels are matched by `DA_REGION_RE` / `NE_REGION_RE`,
+  which accept both namings. Every animal carries its asset as `cohort`, and panels h/i label it.
+  The strip-plot labels are now single-line and angled, to fit 10+ animals.
+- **The environment pin stays at `864550d`.** `load_nwb_list` is unchanged upstream, so the pinned
+  version reads the new asset; only the curation step moved.
+
+The synthetic harness now also builds sessions in the new format. The new asset loads with
+`use_curation=False`, pairs come out as `PL(L)-LCAxonCa` × `latNAcc(L)-DA`, and medial-site and
+NE-less sessions are excluded. All earlier ground-truth checks still pass.
+
 ### `fip_04_da_ne_xcorr.ipynb` — DA × NE cross-correlation and coherence across animals
 
 New notebook. Extends `fip_03` §3–§3b, which covered only the 10 sessions with motion energy (one

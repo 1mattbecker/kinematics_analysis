@@ -173,7 +173,7 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 | `fip_01_movement_value_coding` | Motion energy × RPE / value coding (tonic value, phasic RPE) |
 | `fip_02_ne_only_events` | Do NE and DA transients dissociate around movement onsets? |
 | `fip_03_da_ne_commonality` | How much of the motion-energy variance DA and NE explain is unique to each and how much is shared? |
-| `fip_04_da_ne_xcorr` | Do DA and NE co-vary across animals? Same-hemisphere DA × NE cross-correlation and coherence over every curated session, with animal as the unit |
+| `fip_04_da_ne_xcorr` | Do DA and NE co-vary across animals? Same-hemisphere DA × NE cross-correlation and coherence over every curated session of both FIP assets (`DA_NE_4channels`, `DANE_3channels_curated`), with animal as the unit |
 
 ### `val_*` — detection validation
 
@@ -216,7 +216,7 @@ out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py
 | `ccf_utils.py` | CCF conversions — `pir_to_lps`, `ccf_pts_convert_to_mm`, `project_to_plane` |
 | `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
 | `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
-| `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock, signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
+| `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`; `use_curation=False` for assets curated at build time, e.g. `DANE_3channels_curated`, which `build_meta` reads from the event names), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock, signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
 
 `spatial_encoding.py` and `spatial_axes.py` are deliberately separate: *where* a statistic is
 large and *in which direction* it changes are different questions with different inputs.

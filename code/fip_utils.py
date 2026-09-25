@@ -341,8 +341,17 @@ def get_trace(
 def build_meta(df_fip: pd.DataFrame) -> pd.DataFrame:
     """Signal inventory for one session's df_fip.
 
-    Drops ``pearsonR`` series (signal-signal correlations, not photometry) and, when
-    curation has run, maps each event to its ``intended_measurement`` region label.
+    Drops ``pearsonR`` series (signal-signal correlations, not photometry) and reads each
+    event's region label from whichever curation format the asset carries:
+
+    * JSON curation applied at load time (:func:`load_curated_sessions`, ``DA_NE_4channels``):
+      events keep their patch-cord names (``G_1_dff-...``) and the region is in
+      ``intended_measurement``.
+    * CSV curation applied when the asset was built (rachel-analysis-utils ``b7b7487`` onward,
+      e.g. ``DANE_3channels_curated``): ``apply_curation_df_fip`` has already replaced each
+      event with its target (``latNAcc(L)-DA``), moved the patch cord to ``patch_cord`` and the
+      variant to ``preprocessing``, and there is no ``intended_measurement``. Load these with
+      ``use_curation=False``.
 
     Returns
     -------
@@ -350,6 +359,15 @@ def build_meta(df_fip: pd.DataFrame) -> pd.DataFrame:
         Columns ``event, channel, fiber, variant`` and, if available, ``region``.
     """
     events = [e for e in sorted(df_fip["event"].unique()) if "pearson" not in e.lower()]
+    if "intended_measurement" not in df_fip.columns and "patch_cord" in df_fip.columns:
+        # Curated at build time: the event name is the region label.
+        first = df_fip.groupby("event")[["patch_cord", "preprocessing"]].first()
+        rows = []
+        for e in events:
+            channel, fiber, _ = parse_event(str(first.loc[e, "patch_cord"]))
+            rows.append((e, channel, fiber, str(first.loc[e, "preprocessing"]), e))
+        return pd.DataFrame(rows, columns=["event", "channel", "fiber", "variant", "region"])
+
     meta = pd.DataFrame(
         [(e,) + parse_event(e) for e in events],
         columns=["event", "channel", "fiber", "variant"],

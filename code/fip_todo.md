@@ -11,13 +11,23 @@ Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
 
 **`fip_04_da_ne_xcorr.ipynb` added** (see `CHANGELOG.md` 2026-09-25). Synthetic-validated only.
 
-- **Run it on Code Ocean** and check the side table in §2: expect roughly 7 animals (813929 has
-  both PL fibers dropped, 809488 is `drop_all`). Confirm which side each animal lands on matches
-  the curation notes; `HEMI_BY_SUBJECT` overrides.
-- **Check the curation drop semantics.** `drop_channels` lists physical channels (`G_0`, `G_1`),
-  and for 808054/808056 most sessions carry `misconnect_fixes` that move PL to a different
-  physical channel. If a drop is applied before the remap, the surviving PL fiber in those
-  sessions may be the noisy one. §2's side table shows what survived; compare with the notes.
+- **First CO run (`DA_NE_4channels` only): 144 sessions, 5 animals.** The asset holds 7 animals
+  (808054, 808056, 809488, 809491, 813929, 816212, 816214); 809488 is `drop_all` and 813929 loses
+  both PL fibers, so its 28 sessions have no pair. 809487 and 815334 are in the curation JSON
+  but not in the asset. Curation drops are applied by region label after the misconnect remap
+  (`_apply_channel_drops_to_nwb` maps `G_x` through `correct_mapping`), so no good fiber is lost.
+- **Grand-mean coherence was significant over 0–4.5 Hz and 6.5–10 Hz** (peak 0.57 at 8.8 Hz) in
+  that run, not only fip_03's 0.12–0.45 Hz band. Broad high-frequency coherence between two green
+  channels looks like shared artifact or crosstalk; check per animal before reading f/g. 816212
+  has peak r ≈ 0.00 while 808056 has 0.62.
+- **`DANE_3channels_curated` added as a second asset** (8 different animals, curated at build time
+  with the CSV curation, so loaded with `use_curation=False`). Only `PL(L)-LCAxonCa` survives
+  curation (39 sessions), so its pairs are all left-side `latNAcc(L)-DA`. Ask Rachel whether
+  `latNAcc` is the same placement as the older asset's `NAc`; if not, report the cohorts
+  separately. `medNAcc(R)-DA` is not paired (no right-side NE).
+- **Environment pin stays at `864550d`.** Upstream `main` replaced the JSON curation with CSVs in
+  `aind_bwnm_fiber_data_curation_utils` (not installed) and removed `apply_curation_nwb_list`;
+  `load_nwb_list` is unchanged, so pre-curated assets load fine on the pin.
 - **Contralateral control.** Every animal also has the opposite-side NAc dLight. DA(contra) × NE
   would show whether the coupling is lateralized. Bilateral dLight is r ≈ 0.98 in 808054, so a
   near-identical result is the expected outcome.
