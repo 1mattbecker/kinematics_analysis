@@ -502,6 +502,10 @@
 			"mount": "behavior_763590_2025-05-01_10-59-16_videoprocessed_2025-08-05_20-23-33"
 		},
 		{
+			"id": "a278f830-9bf2-48e8-9928-a2ff78e4818f",
+			"mount": "DANE_3channels_curated"
+		},
+		{
 			"id": "a3cc65f5-5eae-4206-9d09-a45c55206044",
 			"mount": "behavior_808054_2025-09-12_10-24-04_motionenergy_2026-06-29_12-23-25"
 		},
