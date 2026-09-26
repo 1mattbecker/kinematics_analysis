@@ -4,6 +4,13 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-25
 
+### `fip_04`: panel e is now peak lag per animal
+
+The peak-lag × peak-r scatter showed no relationship, and most sessions sit at or near lag 0.
+Panel e is now a per-animal strip of peak lag (Wilcoxon vs 0 in the title), and h stays peak r per
+animal. e, h and i share one animal order (ascending mean peak r). `animal_strip` takes the null
+bar and a reference line as optional arguments.
+
 ### `fip_04` reads a second, pre-curated asset; `fu.build_meta` reads build-time curation
 
 `DANE_3channels_curated` (Rachel, 8 animals, none shared with `DA_NE_4channels`) was built with
