@@ -2,8 +2,33 @@
 
 Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
 `fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`,
-`fip_03_da_ne_commonality.ipynb`, `fip_04_da_ne_xcorr.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
+`fip_03_da_ne_commonality.ipynb`, `fip_04_da_ne_xcorr.ipynb`, `fip_05_da_ne_rpe_coupling.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
 `kin_*`/`eph_*` port plan. Newest first, dated `YYYY-MM-DD`.
+
+---
+
+## 2026-09-27
+
+**`fip_05_da_ne_rpe_coupling.ipynb` added** (see `CHANGELOG.md` 2026-09-27). Run locally only.
+
+- **Attach the 4-channel rebuild on Code Ocean.** Locally it is
+  `results-ddcccb0f-f18f-44a6-a2b1-caba680d28a1` (Rachel's grouped wrapper, 2026-09-22,
+  CSV-curated). It is not in `.codeocean/datasets.json`. The notebook looks for it at
+  `/root/capsule/data/DANE_4channels_curated`, so either attach it under that name or edit
+  `ASSET_CANDIDATES`.
+- **808056 is missing from the rebuild.** It was fip_04's most strongly coupled animal (40
+  sessions, peak r 0.62). Ask Rachel whether it was dropped by curation or left out. 809487 and
+  815334 are new in the rebuild, and 816214's usable side changed from L to R.
+- **Behavior-model dependence.** RPE/value come from the Q-learning fit in `df_trials`. A refit
+  or a different model family would change section 1–2 numbers; the noise correlation is the
+  quantity most sensitive to model misfit.
+- **Engagement model for the slow bands.** The 2–10 min residual correlation is negative
+  (−0.12). It is a partial correlation given event timing. An explicit engagement covariate (lick
+  rate, trial rate, running reward rate) would say whether there is any tonic co-modulation left.
+- **Kinetics.** NE's +0.2 s latency could be GCaMP vs dLight kinetics. Deconvolving with
+  published indicator kernels, or comparing with an nLight/GRAB-NE cohort, would separate them.
+- **Runtime.** About 27 min locally, mostly the parquet inventory and loading. The pair cache
+  skips the load after the first run.
 
 ---
 

@@ -174,6 +174,7 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 | `fip_02_ne_only_events` | Do NE and DA transients dissociate around movement onsets? |
 | `fip_03_da_ne_commonality` | How much of the motion-energy variance DA and NE explain is unique to each and how much is shared? |
 | `fip_04_da_ne_xcorr` | Do DA and NE co-vary across animals? Same-hemisphere DA × NE cross-correlation and coherence over every curated session of both FIP assets (`DA_NE_4channels`, `DANE_3channels_curated`), with animal as the unit |
+| `fip_05_da_ne_rpe_coupling` | How are the DA and NE (LC-axon) RPE signals related? In order: RPE coding in each, trial-by-trial signal vs noise correlation of outcome responses, timing/magnitude of phasic transients, tonic/baseline coupling by timescale (raw vs task-residual), and how often each has a large transient without the other. Reads the CSV-curated parquet assets directly through `fip_coupling.py`, so it also runs locally |
 
 ### `val_*` — detection validation
 
@@ -217,6 +218,7 @@ out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py
 | `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
 | `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
 | `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`; `use_curation=False` for assets curated at build time, e.g. `DANE_3channels_curated`, which `build_meta` reads from the event names), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock, signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
+| `fip_coupling.py` | Machinery for `fip_05` (numpy/pandas/scipy only, no CO libraries): pairs same-side `latNAcc` DA with `PL` LC-axon NE from the CSV-curated parquet assets (`inventory_pairs`, `choose_side`, `load_pairs` with a cache), per-trial baseline/response/latency measures and RPE regressions, an FIR task-event model for task-residual signals, band-limited correlation with circular-shift nulls, transient detection/pairing/context labels |
 
 `spatial_encoding.py` and `spatial_axes.py` are deliberately separate: *where* a statistic is
 large and *in which direction* it changes are different questions with different inputs.

@@ -2,6 +2,30 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-27
+
+### `fip_05_da_ne_rpe_coupling.ipynb` + `fip_coupling.py`: DA × NE RPE, phasic, tonic and dissociation
+
+New notebook on how the DA (lateral NAc dLight) and NE (PL LC-axon GCaMP) signals relate. It asks,
+in order: does each carry an RPE; do outcome responses covary trial by trial (signal vs noise
+correlation); do phasic transients line up in timing and magnitude; do tonic levels covary, and at
+what timescales (raw vs with task-evoked responses removed); how often each has a large transient
+without the other. Animal is the unit throughout (9 animals, 97 sessions, same-side pairs, one side
+per animal).
+
+- Reads the two CSV-curated parquet assets (`DANE_3channels_curated` and the 2026-09-22
+  4-channel rebuild) directly, so it runs locally against the copies in `../data/`. The
+  NWB/curation path in `fip_utils` is not used.
+- `fip_coupling.py` holds the loading, per-trial measures, the FIR event model, band-limited
+  correlation with circular-shift nulls, and transient pairing (numpy/pandas/scipy only).
+- First local run: both signals carry a signed RPE (NE's on top of a large outcome-independent
+  transient). Outcome-response noise correlation is r ≈ 0.15. NE peaks ≈0.2 s after DA. Only DA's
+  baseline tracks value. The continuous correlation (0.26) is almost all shared task drive (0.025
+  in the residual). 17% of large DA transients vs 55% of large NE transients have no partner.
+- Settles `fip_04`'s high-frequency coherence question: the signals are already low-passed, with
+  power 10⁻⁸ above 5 Hz. The 8.8 Hz coherence spike and the 2.4/3.9/6.4 Hz lines are shared
+  narrowband artifact in the noise floor. The correlation above 5 Hz is ≈0.03.
+
 ## 2026-09-25
 
 ### `fip_04`: panel e is now peak lag per animal
