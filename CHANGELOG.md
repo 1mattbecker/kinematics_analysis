@@ -4,6 +4,27 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-28
 
+### `fip_05`: section 2 is total / within-outcome / residual; tuning similarity moves to section 1
+
+- **Signal and noise correlation removed.** "Signal" r correlated the two signals' *predicted*
+  outcome + RPE responses, so it measured how alike their coefficients are (≈0.89, near 1 whenever
+  both are higher after rewards). It said nothing about whether the measured signals co-vary.
+- **Section 2** now correlates measured responses: total, within rewarded / unrewarded, and the
+  residual after outcome + RPE only (r = 0.13, 8/9 animals). The old "noise" model also removed
+  response time, trial position and each signal's own baseline.
+- **Section 2b (Figure 2b)** adds those covariates to the outcome + RPE model one at a time, as
+  separate controls, with both baselines in both models. None moves the residual r by more than
+  0.02.
+- **Figure 1c** compares DA's and NE's outcome/RPE coefficients at the trial level (the old
+  "signal" r), across sessions within animal, and across animals (Spearman).
+- **Two sessions excluded** from `resp` (816212_2025-12-10, 818586_2026-01-05; `MIN_RPE_SD = 0.05`).
+  Their Q-learning fit leaves RPE almost constant within each outcome (SD ≈ 0.01, every other
+  session ≥ 0.06), so their RPE slopes reached ±10–16. They had pulled animal means and made the
+  cross-session coefficient correlation look strongly negative (r ≈ −0.8). Section 1 changes:
+  NE's early (0–0.5 s) reward response now scales with RPE in 9/9 animals under both baseline
+  treatments; DA's early reward response scales with RPE with the baseline subtracted (+0.35, 8/9)
+  and not with it as a covariate. The interpretation text is updated to match.
+
 ### `fip_06_rpe_split.ipynb`: RPE-sign split vs outcome split for RPE slopes
 
 Rachel's `add_AUC_and_rpe_slope` fits RPE_earned ≥ 0 and < 0 separately. That differs from an
