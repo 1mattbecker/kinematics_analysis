@@ -4,6 +4,16 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-28
 
+### `fip_07_da_ne_summary.ipynb`: DA × NE summary figures
+
+New notebook collecting `fip_04` and `fip_05` on the CSV-curated assets (9 animals, 97 sessions):
+Fig 1 cross-correlation and coherence (coherence tested ≤ 2 Hz), Fig 2 large transients with an
+annotated detection schematic, Fig 3 task-aligned responses, RPE-sorted traces within each outcome
+(Rachel's `Qch-binned3`) and trial-by-trial coupling of response size and peak latency. Fig 3 runs
+through Rachel's functions on `data_z_norm`; her window recomputed with
+`get_average_signal_window` matches her stored column on all 43,794 trials. Fig 3 is drawn for
+four windows (Rachel 0.33–1 s, early, late, full).
+
 ### `fip_05` section 3: latency split by outcome; the "NE 0.2 s after DA" lag was the omission dip
 
 - Fig 3a adds unrewarded trials (dashed), each outcome scaled by the animal's rewarded peak.
