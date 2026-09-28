@@ -2,6 +2,27 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-28
+
+### `fip_05`: RPE is `RPE_earned`, extra-water trials excluded, time-resolved RPE regression
+
+- **RPE column.** `RPE_all` → `RPE_earned` (earned reward − Q_chosen, from the per-session
+  `QLearning_L1F1_CK1_softmax` fit, via `enrich_dfs.enrich_df_trials_fm` in Rachel's wrapper).
+  This is the column Rachel's own RPE binning uses. `RPE_all` adds extra (unearned) water; the 393
+  responded trials (0.9%) with extra water are now excluded from the RPE and trial-coupling
+  analyses.
+- **Result change.** Those trials (RPE up to 2, double-water responses) had enough leverage to
+  make DA's reward response look RPE-scaled (+0.44). Without them it is −0.03 (n.s.).
+- **Nuisance terms.** Response time and trial position are in every RPE regression. Low-value
+  choices are slower, which put an RPE-signed coefficient just before the outcome.
+- **Fig 1b (new).** RPE coefficients at every time point, with the pre-cue baseline both
+  subtracted and entered as a covariate. NE's late (0.75–2 s) reward-RPE scaling holds under both
+  (9/9). DA's omission-dip RPE scaling holds only with the baseline subtracted, because DA's
+  baseline tracks value and is nearly collinear with within-outcome RPE.
+- The noise correlation also controls for each signal's own baseline (r = 0.14, 8/9).
+- `fc.fit_rpe_terms` takes `rpe_col` and `covariates`; the pair cache key includes the trial
+  column list.
+
 ## 2026-09-27
 
 ### `fip_05_da_ne_rpe_coupling.ipynb` + `fip_coupling.py`: DA × NE RPE, phasic, tonic and dissociation
@@ -18,8 +39,8 @@ per animal).
   NWB/curation path in `fip_utils` is not used.
 - `fip_coupling.py` holds the loading, per-trial measures, the FIR event model, band-limited
   correlation with circular-shift nulls, and transient pairing (numpy/pandas/scipy only).
-- First local run: both signals carry a signed RPE (NE's on top of a large outcome-independent
-  transient). Outcome-response noise correlation is r ≈ 0.15. NE peaks ≈0.2 s after DA. Only DA's
+- First local run (RPE part superseded 2026-09-28): both signals carry a signed RPE (NE's on top
+  of a large outcome-independent transient). Outcome-response noise correlation is r ≈ 0.15. NE peaks ≈0.2 s after DA. Only DA's
   baseline tracks value. The continuous correlation (0.26) is almost all shared task drive (0.025
   in the residual). 17% of large DA transients vs 55% of large NE transients have no partner.
 - Settles `fip_04`'s high-frequency coherence question: the signals are already low-passed, with

@@ -52,11 +52,15 @@ from scipy.sparse import csr_matrix
 DA_RE = re.compile(r"^latNAcc\((L|R)\)-DA$")
 NE_RE = re.compile(r"^PL\((L|R)\)-LCAxonCa$")
 
-#: Trial columns carried into the cache. ``RPE_all`` / ``Q_*`` come from the behavioral model
-#: fit Rachel's wrapper attaches (``model_name`` column, a Q-learning model with choice kernel).
+#: Trial columns carried into the cache. ``RPE_*`` / ``Q_*`` come from the behavioral model fit
+#: (``QLearning_L1F1_CK1_softmax``, fit per session by the AIND analysis-architecture pipeline) via
+#: ``aind_dynamic_foraging_data_utils.enrich_dfs.enrich_df_trials_fm``:
+#: ``RPE_earned = earned_reward − Q_chosen``; ``RPE_all`` adds ``extra_reward`` (unearned water).
+#: Rachel's analyses (``rachel_analysis_utils.analysis_utils.enrich_df_trials``) use ``RPE_earned``.
 TRIAL_COLS = [
     "trial", "goCue_start_time_in_session", "choice_time_in_session",
-    "reward_outcome_time_in_session", "animal_response", "earned_reward", "RPE_all",
+    "reward_outcome_time_in_session", "animal_response", "earned_reward", "extra_reward",
+    "RPE_earned", "RPE_all",
     "Q_chosen", "Q_unchosen", "Q_sum", "num_reward_past", "response_time",
 ]
 
@@ -189,7 +193,7 @@ def load_pairs(kept: pd.DataFrame, fs: float = 20.0, pre_s: float = 5.0, post_s:
         ``da`` / ``ne`` are dF/F (``data`` column, ``dff-bright_mc-iso-IRLS`` preprocessing),
         not z-scored.
     """
-    key = tuple(kept["path"])
+    key = (tuple(kept["path"]), tuple(TRIAL_COLS))  # a changed column list also reloads
     if cache_path and os.path.exists(cache_path):
         with open(cache_path, "rb") as fh:
             cached = pickle.load(fh)
@@ -304,7 +308,8 @@ def trial_measures(pair: dict, windows: Dict[str, Tuple[float, float]],
     return tr
 
 
-def fit_rpe_terms(df: pd.DataFrame, y: str) -> pd.Series:
+def fit_rpe_terms(df: pd.DataFrame, y: str, rpe_col: str = "RPE_earned",
+                  covariates: Sequence[str] = ()) -> pd.Series:
     """OLS of a response on reward and on RPE separately within each outcome.
 
     ``y ~ 1 + rewarded + RPE·rewarded + RPE·(1 − rewarded)``. Within an outcome class RPE is
@@ -316,19 +321,24 @@ def fit_rpe_terms(df: pd.DataFrame, y: str) -> pd.Series:
     Parameters
     ----------
     df : pandas.DataFrame
-        Responded trials with ``rewarded``, ``RPE_all`` and column ``y``.
+        Responded trials with ``rewarded``, ``rpe_col`` and column ``y``.
     y : str
         Response column.
+    rpe_col : str
+        RPE column (default ``RPE_earned``, Rachel's convention).
+    covariates : sequence of str
+        Extra nuisance columns (e.g. ``response_time``: low-value choices are slower, so more of
+        the cue response falls inside a window aligned to the outcome).
 
     Returns
     -------
     pandas.Series
         ``intercept, reward, rpe_rew, rpe_unrew`` (units of ``y`` per unit RPE), and ``n``.
     """
-    d = df[["rewarded", "RPE_all", y]].dropna()
+    d = df[["rewarded", rpe_col, y, *covariates]].dropna()
     r = d["rewarded"].to_numpy(float)
-    rpe = d["RPE_all"].to_numpy(float)
-    X = np.c_[np.ones(len(d)), r, rpe * r, rpe * (1 - r)]
+    rpe = d[rpe_col].to_numpy(float)
+    X = np.c_[np.ones(len(d)), r, rpe * r, rpe * (1 - r), d[list(covariates)].to_numpy(float)]
     beta, *_ = np.linalg.lstsq(X, d[y].to_numpy(float), rcond=None)
     return pd.Series(dict(intercept=beta[0], reward=beta[1], rpe_rew=beta[2], rpe_unrew=beta[3],
                           n=len(d)))
