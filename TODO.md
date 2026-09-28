@@ -4,6 +4,79 @@ Deferred work items. Newest first. Dates are YYYY-MM-DD.
 
 ---
 
+## Upgrade the environment's package versions (post-3.12)
+
+_Logged 2026-09-28. Follows the Python 3.12 migration (library `PYTHON_311_UPGRADE_PLAN.md`)._
+
+**Where things stand.** The capsule runs Python 3.12, but `environment/py39-constraints.txt` holds
+every package at its 3.9-era version. That was deliberate, so the migration changed only Python.
+Most held versions are the *last releases that supported 3.9* (numpy 2.0.2, scipy 1.13.0,
+matplotlib 3.9.4, scikit-learn 1.6.1, scanpy 1.10.3). The AIND libraries installed from `@main`
+(basic-analysis, data-utils, behavior-video-analysis) already track latest.
+
+**Findings (checked 2026-09-28):**
+- **`aind-ephys-utils` 0.0.15 (Dockerfile pin, from 2023):** no live code imports it (only
+  `archive/reference/F_ephys_behavior_action&outcome.ipynb`). basic-analysis uses exactly one
+  function, `align.to_events` in `licks/lick_analysis.py`, and that function is **identical** in
+  0.4.0 (signature and body). 0.4.0 adds an xarray toolkit and pulls in `ipympl`.
+- **`aind-dynamic-foraging-models` 0.16.0 → 0.18.0:** purely additive (new published-bandit
+  generative models). `logistic_regression`, the only module basic-analysis uses (via
+  `compute_side_bias` in `metrics/trial_metrics.py`), is untouched.
+- **pynwb 3.0.0 / hdmf 4.3.1 can stay.** Nothing else requires newer. But **hdmf 4.3.1 requires
+  `pandas<3`**, so keeping them keeps pandas at 2.3.3 (the final 2.x). pandas 3 needs hdmf ≥ 6.1,
+  which brings pynwb ≥ 4.2 and a newer hdmf-zarr (data-utils caps `hdmf_zarr<0.14`, and 0.14 needs
+  zarr 3). So **pandas 3 and the NWB stack are one coupled change**.
+- **The major-library upgrade resolves with the NWB stack held**, releasing no other held package.
+  For Linux + Python 3.12, 20 packages change: numpy 2.0.2→2.5.3, scipy 1.13.0→1.18.1, matplotlib
+  3.9.4→3.11.2, scikit-learn 1.6.1→1.9.1, statsmodels 0.14.2→0.15.0, scanpy 1.10.3→1.12.4 (anndata
+  0.10.9→0.11.4), numba 0.60→0.67 (llvmlite 0.43→0.49), scikit-image 0.24→0.26, pyarrow 21→25,
+  contourpy 1.3→1.4, plus the two AIND bumps above and small new transitive deps (`formulaic`,
+  `interface-meta`, `ipympl`, `fast-array-utils`, `scverse-misc`, `session-info2`). The wheel check
+  finds nothing new: the only source-built or compiled-without-3.12-wheel packages are the six
+  already verified in the migration.
+- **Unused heavy installs:** no live code imports spikeinterface, open-ephys-python-tools,
+  wavpack-numcodecs, pymupdf or PyPDF2 (spikeinterface and PyPDF2 appear only in archived reference
+  notebooks). hdmf-zarr is used only by `backup_nwb_utils_dynamicforaging.py`, and basic-analysis
+  needs it anyway, so it stays.
+
+**Plan.** Same workflow as the migration: branch `env/deps-upgrade` from `wild`, a duplicate
+capsule on it, validate, then merge into `wild` and promote to `main` once verified.
+
+- [ ] **Step 1: AIND bumps + major libraries (one rebuild).** The AIND bumps are no-ops for the
+      code paths used, so they don't need a separate rebuild.
+  - `py39-constraints.txt`: `aind-dynamic-foraging-models==0.18.0`. Delete the lines for numpy,
+    scipy, matplotlib, contourpy, scikit-learn, statsmodels, scanpy, anndata, numba, llvmlite,
+    scikit-image and pyarrow, or set them to the versions above so the upgrade is pinned
+    exactly. **Keep `pandas==2.3.3`** and the pynwb/hdmf/hdmf-zarr/zarr/numcodecs lines.
+  - `Dockerfile`: `aind-ephys-utils==0.0.15` → `0.4.0`; `scipy==1.13.0` (twice, including the
+    scanpy-layer tripwire), `statsmodels==0.14.2`, `scikit-image==0.24.0` and `pyarrow==21.0.0`
+    → new versions; update the scanpy comment.
+  - Rename `py39-constraints.txt` → `constraints.txt` (and the Dockerfile `COPY`/`-c` lines), since
+    it no longer holds 3.9 versions. Keep `py39-freeze.txt` as the historical baseline.
+  - **Validate:** all `code/*.py` import. `env_00_reference_sessions` against the
+    `env_reference_py39` asset: this time "close" rows are expected (numpy/scipy numerics), and
+    every DIFF needs an explanation. Spot-check notebooks by library:
+    - scikit-learn: `eph_01`, `eph_05`, `kin_03`, `kin_06`, `kin_07`, `fip_03`
+    - statsmodels: `eph_08`
+    - scanpy: `eph_09`
+    - numba/UMAP: `kin_03`
+    - `compute_side_bias` via `fip_utils`: a `fip_` notebook
+    
+    Compare a few key numbers (e.g. RT-encoding T-statistics, UMAP embedding shape and
+    structure) with the current outputs.
+- [ ] **Step 2 (optional): drop unused heavy installs** (spikeinterface[full],
+      open-ephys-python-tools, wavpack-numcodecs, pymupdf, pypdf2) in a separate rebuild. That
+      means a smaller image, faster builds, and no more source-compiled wavpack. Validate with
+      the import check + one notebook. Keep them if the archived reference notebooks should stay
+      runnable.
+- [ ] **Deferred, only if needed: pandas 3 + NWB stack** (pandas 3.x, hdmf ≥ 6.1, pynwb ≥ 4.2,
+      hdmf-zarr/zarr per data-utils' cap). Its own branch and comparison. pandas 3 changes
+      behaviour: copy-on-write, a `str` dtype for text, and `datetime64[us]` by default
+      (`env_00` already reports that last one as a "note"). Revisit if a library you depend on
+      starts requiring pandas 3 or pynwb 4.
+
+---
+
 ## Move analysis inputs out of `/root/capsule/scratch` into data assets
 
 _Logged 2026-09-25, during the Python 3.12 migration (library `PYTHON_311_UPGRADE_PLAN.md`,
