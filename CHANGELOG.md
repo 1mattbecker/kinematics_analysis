@@ -4,6 +4,18 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-28
 
+### `fip_05` section 3: latency split by outcome; the "NE 0.2 s after DA" lag was the omission dip
+
+- Fig 3a adds unrewarded trials (dashed), each outcome scaled by the animal's rewarded peak.
+- Latency (argmax 0–1.5 s after the cue) now counts a trial only if both signals peak ≥ 1 z above
+  baseline inside the window (`MIN_PEAK_Z`); 87% of rewarded and 76% of unrewarded trials pass.
+- Split by outcome, rewarded-trial latencies match (DA 0.55 s, NE 0.57 s; +19 ms, n.s.). On
+  unrewarded trials DA peaks at 0.25 s and dips while NE peaks at 0.40 s. The previous pooled
+  result (NE 198 ms later, 9/9) came from mixing the two. The peak of the averaged trace is
+  reported too (rewarded: DA 0.58, NE 0.48 s; DA's response has two components).
+- The latency correlation now uses section 2's categories: total ρ = 0.22, within rewarded 0.10,
+  within unrewarded 0.06, residual after outcome + RPE 0.09.
+
 ### `fip_05`: section 2 is total / within-outcome / residual; tuning similarity moves to section 1
 
 - **Signal and noise correlation removed.** "Signal" r correlated the two signals' *predicted*
