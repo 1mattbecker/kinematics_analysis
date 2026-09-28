@@ -4,6 +4,21 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-28
 
+### `fip_06_rpe_split.ipynb`: RPE-sign split vs outcome split for RPE slopes
+
+Rachel's `add_AUC_and_rpe_slope` fits RPE_earned ≥ 0 and < 0 separately. That differs from an
+outcome split only for unrewarded trials with Q_chosen = 0 (1,400, 1.0%; no rewarded trial has
+Q = 1). 854 come from 37 sessions whose `forget_rate_unchosen` was fit at 1.0, and 465 from
+before the session's first reward. The forget = 1 trials look like omissions (10/10 animals for
+DA). Rachel's split puts them on the reward line: in the example session, that turns the DA reward
+slope from −0.85 into +1.32. Pooled, DA's reward-side slope goes from +0.36 to +0.15, and NE is
+unchanged. Session-start trials resemble neither group. Recommendation: split by outcome and drop
+trials before the first reward. Rachel's slopes recomputed with her function match her
+`rpe_slope.csv` exactly (229 session-channels).
+
+New local environment `.venv-fip` (Python 3.12) with Rachel's libraries at the Dockerfile pin;
+see CLAUDE.md.
+
 ### `fip_05`: RPE is `RPE_earned`, extra-water trials excluded, time-resolved RPE regression
 
 - **RPE column.** `RPE_all` → `RPE_earned` (earned reward − Q_chosen, from the per-session

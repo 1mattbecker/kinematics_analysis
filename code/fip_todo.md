@@ -7,6 +7,17 @@ Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
 
 ---
 
+## 2026-09-28
+
+- **Take the RPE-split finding to Rachel** (`fip_06`). Her RPE ≥ 0 group contains the 1% of
+  omissions with Q_chosen = 0. They inflate her DA reward-side slope, and in sessions whose
+  rewarded RPEs span a narrow range they set it. Also worth raising: 37/301 sessions fit
+  `forget_rate_unchosen` at its bound of 1.0.
+- **Move fip_05 onto Rachel's code** (agreed plan): load with `dummy_nwb.load`, use her `data_z`,
+  `data_z_*_baseline` and `data_z_norm`, use `alignment.event_triggered_response`, report her
+  RPE slope (outcome split, pre-first-reward trials dropped) as the headline, and cut
+  `fip_coupling.py` down to the analyses the libraries don't have. Run on `.venv-fip`.
+
 ## 2026-09-27
 
 **`fip_05_da_ne_rpe_coupling.ipynb` added** (see `CHANGELOG.md` 2026-09-27). Run locally only.

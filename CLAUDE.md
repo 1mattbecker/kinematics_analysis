@@ -60,6 +60,11 @@ kinematics_analysis/
 └── CHANGELOG.md        # Notable changes, newest first
 ```
 
+**Local FIP environment:** `.venv-fip` (Python 3.12, created with `uv`) holds `rachel-analysis-utils@864550d`
+(the Dockerfile pin), `aind-dynamic-foraging-data-utils@32e8dbe`, `aind-dynamic-foraging-basic-analysis@8ec194f`
+and `aind_analysis_arch_result_access`, with versions held by `environment/py39-constraints.txt`. Use it
+for `fip_*` notebooks that call Rachel's code locally. The older `.venv` (3.9) cannot install her package.
+
 **Import constraint:** notebooks import repo modules by bare name
 (`from data_loading import ...`), so active `.py` modules must stay **flat in `code/`**.
 Only notebooks relocate into `archive/`, where they don't need to run.
@@ -175,6 +180,7 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 | `fip_03_da_ne_commonality` | How much of the motion-energy variance DA and NE explain is unique to each and how much is shared? |
 | `fip_04_da_ne_xcorr` | Do DA and NE co-vary across animals? Same-hemisphere DA × NE cross-correlation and coherence over every curated session of both FIP assets (`DA_NE_4channels`, `DANE_3channels_curated`), with animal as the unit |
 | `fip_05_da_ne_rpe_coupling` | How are the DA and NE (LC-axon) RPE signals related? In order: RPE coding in each, trial-by-trial signal vs noise correlation of outcome responses, timing/magnitude of phasic transients, tonic/baseline coupling by timescale (raw vs task-residual), and how often each has a large transient without the other. Reads the CSV-curated parquet assets directly through `fip_coupling.py`, so it also runs locally |
+| `fip_06_rpe_split` | Rachel's RPE slopes split trials by RPE sign; splitting by outcome differs only for unrewarded trials with Q_chosen = 0 (1%). Where they come from (forget rate fit at 1.0; before the first reward), what they look like, and how moving them changes the slopes. Runs on `.venv-fip` with Rachel's functions |
 
 ### `val_*` — detection validation
 

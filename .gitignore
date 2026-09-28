@@ -152,3 +152,6 @@ dmypy.json
 # Local VS Code multi-root workspaces — these point at machine-specific paths
 # (e.g. ../.venv/src/...) and are not portable to other machines or Code Ocean.
 *.code-workspace
+
+# local Python 3.12 env for the fip_* notebooks (Rachel's libraries at the Dockerfile pins)
+.venv-fip/
