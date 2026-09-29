@@ -8,8 +8,10 @@ Deferred work items. Newest first. Dates are YYYY-MM-DD.
 
 _Logged 2026-09-28. Follows the Python 3.12 migration (library `PYTHON_311_UPGRADE_PLAN.md`)._
 
-**Status (2026-09-28):** Steps 1 and 2 are implemented together on branch `env/deps-upgrade`
-(one rebuild); validation in a duplicate capsule is pending.
+**Status (2026-09-29): Steps 1 and 2 done** (together, one rebuild, branch `env/deps-upgrade`,
+merged into `wild`). Validation: `env_00` 0 DIFF / 9 close vs `env_reference_py39` (asset
+`env_reference_py312_deps`); spot-check notebooks all ran after one fix (`eph_05`'s removed
+`RidgeCV` argument). See CHANGELOG 2026-09-28. Remaining: the deferred pandas 3 + NWB item.
 
 **Where things stand.** The capsule runs Python 3.12, but `environment/py39-constraints.txt` holds
 every package at its 3.9-era version. That was deliberate, so the migration changed only Python.
@@ -47,7 +49,7 @@ matplotlib 3.9.4, scikit-learn 1.6.1, scanpy 1.10.3). The AIND libraries install
 **Plan.** Same workflow as the migration: branch `env/deps-upgrade` from `wild`, a duplicate
 capsule on it, validate, then merge into `wild` and promote to `main` once verified.
 
-- [ ] **Step 1: AIND bumps + major libraries (one rebuild).** The AIND bumps are no-ops for the
+- [x] **Step 1: AIND bumps + major libraries (one rebuild).** The AIND bumps are no-ops for the
       code paths used, so they don't need a separate rebuild.
   - `py39-constraints.txt`: `aind-dynamic-foraging-models==0.18.0`. Delete the lines for numpy,
     scipy, matplotlib, contourpy, scikit-learn, statsmodels, scanpy, anndata, numba, llvmlite,
@@ -69,7 +71,7 @@ capsule on it, validate, then merge into `wild` and promote to `main` once verif
     
     Compare a few key numbers (e.g. RT-encoding T-statistics, UMAP embedding shape and
     structure) with the current outputs.
-- [ ] **Step 2: drop unused heavy installs** (spikeinterface[full],
+- [x] **Step 2: drop unused heavy installs** (spikeinterface[full],
       open-ephys-python-tools, wavpack-numcodecs, pymupdf, pypdf2). Folded into Step 1's rebuild
       (decided 2026-09-28). That means a smaller image, faster builds, and no more
       source-compiled wavpack. Removing them also drops their exclusive dependencies (neo,

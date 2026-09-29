@@ -4,7 +4,7 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-28
 
-### Environment: package upgrade (branch `env/deps-upgrade`, pending validation)
+### Environment: package upgrade (`env/deps-upgrade` -> `wild`)
 
 The 3.12 image held every package at its 3.9-era version. This moves the major scientific
 libraries to current releases, with pandas and the NWB stack held back:
@@ -22,6 +22,15 @@ libraries to current releases, with pandas and the NWB stack held back:
   those two lines.
 - `environment/py39-constraints.txt` is renamed `environment/constraints.txt`; its header
   records the history. `py39-freeze.txt` stays as the 3.9 baseline.
+- **`eph_05`:** `RidgeCV(store_cv_values=False)` → `RidgeCV()`. scikit-learn 1.7 removed the
+  argument (already the default). Under 1.9 it raised `TypeError`, which the fit loop's
+  `except` swallowed, so the notebook reported "Fit 0 units" instead of failing.
+- **Validated** in a duplicate capsule on the branch:
+  - `env_00_reference_sessions` against `env_reference_py39` (both reference sessions, 17 parquet
+    files + quality stats each): 0 DIFF, 9 checks "close" (within rtol 1e-6 / atol 1e-9), the rest
+    identical. Outputs saved as the data asset `env_reference_py312_deps`.
+  - Ran without errors after the eph_05 fix: eph_01, eph_05, eph_08, eph_09, kin_03, kin_06,
+    kin_07, and fip_03 rebuilt without its cache.
 
 ### `fip_07_da_ne_summary.ipynb`: DA × NE summary figures
 
