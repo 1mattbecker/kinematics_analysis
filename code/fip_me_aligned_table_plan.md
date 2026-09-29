@@ -12,7 +12,7 @@ attaches one asset instead of ~200 raw-behavior and ME assets.
 |---|---|
 | ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29; 10 June 808054 sessions rerunning from `.mp4` (batch run `342a45f7`) |
 | Video-CSV QC (thresholds, Harp slip) | **In progress — settle before building the table** (see below) |
-| Move 31 leftover test ME results to `motion_energy/test/` | To do |
+| 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | `code/build_me_table.py` | Not started |
 | `fip_utils` loader switch | Not started |
 
