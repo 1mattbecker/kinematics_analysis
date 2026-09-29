@@ -11,7 +11,7 @@ attaches one asset instead of ~200 raw-behavior and ME assets.
 | Item | State |
 |---|---|
 | ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29; 10 June 808054 sessions rerunning from `.mp4` (batch run `342a45f7`) |
-| Video-CSV QC (thresholds, Harp slip) | **In progress — settle before building the table** (see below) |
+| Video-CSV QC (thresholds, Harp slip) | Run on all 97 sessions 2026-09-29 → `metadata/video_csv_qc_fip.csv`. **18 sessions have Harp slip** (see below); decide how the analysis treats them |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | `code/build_me_table.py` | Not started |
 | `fip_utils` loader switch | Not started |
@@ -106,26 +106,41 @@ threshold flags the frames *between* drops, whose Harp times are also wrong.
 
 **Goal here: identify affected sessions, not correct them.**
 
-**Findings on an 8-session sample (both cameras):**
+**Results on all 97 sessions × 2 cameras** (`metadata/video_csv_qc_fip.csv`, one row per camera,
+column `qc_class`):
 
-- 7 sessions clean: no frame gaps, no backward steps, no flags at 2× or 0.5×. Normal
-  Harp/camera jitter is ~0.05 ms (p99), max ~0.09 ms, so 0.5× (1 ms) raises no false flags.
-- `behavior_816212_2025-12-05_13-47-41`: ~187,000 single-frame drops per camera (~6.8%).
-  2× flagged none; 0.5× flagged all, none off a frame gap. Camera clock ran ~374 s longer
-  than Harp over the session, i.e. Harp times ~6 min early by the end.
-- Clean sessions still show 16–37 frames (30–75 ms) of end-to-end clock difference from
-  clock-rate drift, so a slip check needs a tolerance, not zero.
-- MP4 decoded frames == CSV rows for every sampled camera (no transcode loss).
+| Session class | Sessions | What it means |
+|---|---|---|
+| `ok` | 64 | No frame gaps, no backward steps, no 0.5× flags. |
+| `harp_glitch` | 15 | No frame drops. 1–3 isolated Harp values are off and step back (mostly ~983 ms, a few 2–6 ms), identically in both cameras, so it's the shared Harp stream, not the camera. Affects only those rows; everything else is fine. |
+| `frame_drops_harp_slip` | 18 | 140,000–333,000 single-frame drops per camera (5–12% of frames), starting within the first 5 s and continuing every minute, about one every 7–11 frames. Harp times don't show the drops, so they slip by the drop count: **280–670 s early by session end.** Harp time is wrong for essentially the whole session. |
 
-**Proposed QC per camera (to confirm on all 97 sessions):**
+- **Affected animals:** 816212 (all 8 sessions), 816214 (all 5), 818586 (3: 2025-12-22,
+  2025-12-24, 2026-01-02), 818585 (1: 2025-12-22), 808054 (1: 2025-09-26). All Sept 2025 –
+  Jan 2026. None of the 10 June 808054 sessions the fip_05/07 ME analysis has used so far are affected.
+- **Threshold comparison:** the 2× threshold flagged **0** of the 7.9 million drops (all
+  single-frame); it only caught the ~983 ms Harp glitches (74 flags). The 0.5× threshold
+  flagged every drop plus the Harp glitches, and nothing else: normal jitter is ≤ 0.05 ms at
+  p99, ≤ 0.11 ms max, 10× below the 1 ms threshold.
+- **Normal clock drift:** in `ok` cameras, camera span − Harp span is −8.9 to −36.5 frames
+  (18–73 ms) over a session. Slip in affected sessions equals the drop count to within that.
+- **Transcode:** MP4 decoded frames == CSV rows for all 194 cameras (both layouts).
+- **ME rows vs timestamps:** the ME trace has one value per MP4 frame = one per CSV row, so
+  row alignment holds even in affected sessions; only the Harp time on each row is wrong.
+  The camera-time column is still right, so a correction would be possible later, but it is
+  out of scope here.
 
-| Metric | Flag when |
+**QC per camera for the build (0.5× threshold):**
+
+| Metric | Class |
 |---|---|
-| `frame_gaps`, `frames_dropped` (frame-number steps ≠ 1) | > 0 |
-| backward steps in frame / Harp / camera time | > 0 |
-| `flag_0.5x`: frames with `|ΔHarp − ΔCamera| > 0.5 × interval` | > 0 |
-| `clock_slip_frames`: (camera span − Harp span) / interval | beyond normal drift (tolerance TBD from the full run) |
-| MP4 decoded frames − CSV rows | ≠ 0 |
+| frame-number steps ≠ 1 (`frame_gaps`, `frames_dropped`) | any → `frame_drops_harp_slip` |
+| `\|ΔHarp − ΔCamera\| > 0.5 × interval` without a frame gap, or backward Harp/camera steps | any → `harp_glitch` (flag those rows) |
+| `clock_slip_frames` = (camera span − Harp span) / interval | outside −60…+10 → review (not seen in `ok` sessions) |
+| MP4 decoded frames − CSV rows | ≠ 0 → `transcode_mismatch` |
 
-Affected sessions are marked in `index.csv` (and excluded or handled in the analysis);
-no correction is applied.
+Store the class and counts in `index.csv`; for `harp_glitch`, set `harp_time` to NaN on the
+flagged rows. No other correction.
+
+**Open question:** how the analysis treats the 18 `frame_drops_harp_slip` sessions: exclude
+them, or add a camera-clock correction later.
