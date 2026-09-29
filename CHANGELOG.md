@@ -4,6 +4,25 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-09-28
 
+### Environment: package upgrade (branch `env/deps-upgrade`, pending validation)
+
+The 3.12 image held every package at its 3.9-era version. This moves the major scientific
+libraries to current releases, with pandas and the NWB stack held back:
+
+- **Upgraded:** numpy 2.0.2 → 2.5.3, scipy 1.13.0 → 1.18.1, matplotlib 3.9.4 → 3.11.2,
+  scikit-learn 1.6.1 → 1.9.1, statsmodels 0.14.2 → 0.15.0, scanpy 1.10.3 → 1.12.4 (anndata
+  0.10.9 → 0.11.4), numba 0.60 → 0.67 (llvmlite 0.43 → 0.49), scikit-image 0.24 → 0.26,
+  pyarrow 21 → 25, contourpy 1.3 → 1.4, aind-ephys-utils 0.0.15 → 0.4.0,
+  aind-dynamic-foraging-models 0.16.0 → 0.18.0.
+- **Held:** pandas 2.3.3, pynwb 3.0.0, hdmf 4.3.1 (requires pandas<3), hdmf-zarr, zarr.
+- **Removed** (no live code uses them): spikeinterface, open-ephys-python-tools,
+  wavpack-numcodecs, pymupdf, PyPDF2. The only import of any of them is an unused
+  `import spikeinterface as si` / `from PyPDF2 import PdfMerger` in
+  `archive/reference/F_ephys_behavior_action&outcome.ipynb`, whose first cell now fails on
+  those two lines.
+- `environment/py39-constraints.txt` is renamed `environment/constraints.txt`; its header
+  records the history. `py39-freeze.txt` stays as the 3.9 baseline.
+
 ### `fip_07_da_ne_summary.ipynb`: DA × NE summary figures
 
 New notebook collecting `fip_04` and `fip_05` on the CSV-curated assets (9 animals, 97 sessions):
