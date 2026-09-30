@@ -17,8 +17,9 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 | Scratch QC (`metadata/video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; kept as a record of the 2026-09-29 survey |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | Session → ME asset mapping | Done 2026-09-30: `metadata/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
-| `code/build_me_table.py` | Written 2026-09-30; tested locally on 4 sessions, dry pass on all 97 done (below). Workstation run not yet done |
-| `fip_utils` loader switch | Not started |
+| `code/build_me_table.py` | Written 2026-09-30; tested locally on 4 sessions, dry pass on all 97, then run in a workstation (same result) |
+| Data asset | Built 2026-09-30 in a cloud workstation (`12af263`, library `41e5b59`): 178 cameras ok, 16 refused, 5.8 GB; asset `90c2d0a7-82e3-4abf-b205-e398c2f7736e`, mounted at `/root/capsule/data/fip_motion_energy_aligned` |
+| `fip_utils` loader switch | Done 2026-09-30 (below); notebooks not re-run |
 
 ## Decisions
 
@@ -249,7 +250,30 @@ Roughly 25–35 MB per camera compressed, ~5–7 GB in total.
   its neighbours. Downsampling to analysis rates happens after that, as now. Only
   `peri_event` (interpolates on timestamps) was already safe.
 
-## `fip_utils` changes (after the build)
+## `fip_utils` changes (done 2026-09-30)
+
+What landed: `load_me_index`, `me_sessions(camera, exclude_actions)`, `load_me(session_id,
+camera)` and `MotionEnergyRefused` (a `ValueError`); `motion_energy_to_session(session_id,
+df_trials, ...)` now reads the table (new signature; `locate_me_assets` and `_get_va` are gone);
+`process_session` takes `camera`. The ME cells of `fip_00`–`fip_03` call the new functions;
+`fip_03`'s cache file is renamed so a cache built with the old loader is not reused. Checked
+locally on the 4 test sessions: the grid has one sample per exposure (rows − 1 + frames lost),
+values after a 2-exposure step are halved, offset and session time are exact, refusals raise.
+
+- **Frame times are not perfectly even.** Within a session they wander 0.26–0.57 ms (13–29% of a
+  frame) from any uniform grid, with either `frame_interval_s` or span / exposures as the step.
+  So each grid sample is a linear mix of neighbouring frames, weighted at most ~70/30; ME is
+  placed within 0.6 ms. Negligible at the 20–40 Hz analysis rates.
+- **Sample-count check** (`aind-dynamic-foraging-data-utils`, `-basic-analysis` as in
+  `.venv-fip`): `enrich_fip_in_df_trials` / `extract_*_window` select trial windows by
+  timestamp; `zscore_fip` and `remove_tonic_df_fip`'s baseline are per-sample means (right
+  once the grid is even); `event_triggered_response` with `interpolate=True` (the default, used
+  by `fip_psth_inner_compute` at 40 Hz and `peri_event`) slices by time and interpolates, using
+  the mean step only to pad the window. Counted in samples: `threshold_onsets`' `min_run` and
+  `fip_03`'s Welch rate (rows / span, now exactly the camera rate). Nothing needs changing
+  beyond the even grid.
+
+The original plan for this section:
 
 - New `load_me(session_id, camera="BottomCamera")` reading the Parquet file and the index
   row, refusing cameras with `status != "ok"`, and returning ME normalised by

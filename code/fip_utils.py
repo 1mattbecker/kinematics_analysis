@@ -567,141 +567,198 @@ def streak_go_cues(df_trials: pd.DataFrame, bin_fn) -> Optional[np.ndarray]:
 
 # ── Motion energy ─────────────────────────────────────────────────────────────
 
-_VA = None
+#: Aligned motion-energy table under ``data_root`` (asset 90c2d0a7-82e3-4abf-b205-e398c2f7736e,
+#: built by ``build_me_table.py``): per session and camera, the corrected Harp time and
+#: ``me_clean`` of every video frame, plus ``index.csv`` with each camera's timing status.
+ME_TABLE_NAME = "fip_motion_energy_aligned"
+
+_ME_INDEX: Dict[str, pd.DataFrame] = {}
 
 
-def _get_va():
-    """Import ``video_alignment`` lazily and cache it.
-
-    Deferred so that merely importing ``fip_utils`` cannot trigger the pip-install
-    fallback as a side effect. ``video_alignment`` is on the package's ``main`` branch and
-    the Dockerfile installs @main, so the plain import normally succeeds; the fallback only
-    covers a from-scratch env that has not run postInstall yet.
-    """
-    global _VA
-    if _VA is None:
-        import importlib
-        import subprocess
-        import sys
-
-        try:
-            from aind_dynamic_foraging_behavior_video_analysis import video_alignment as va
-        except ModuleNotFoundError:
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install", "-q",
-                "git+https://github.com/AllenNeuralDynamics/"
-                "aind-dynamic-foraging-behavior-video-analysis.git@main",
-            ])
-            importlib.invalidate_caches()
-            from aind_dynamic_foraging_behavior_video_analysis import video_alignment as va
-        _VA = va
-    return _VA
+class MotionEnergyRefused(ValueError):
+    """The ME table build refused this camera (``index.csv`` ``status`` is not ``ok``)."""
 
 
-def locate_me_assets(
-    session_id: str, data_root: str = DEFAULT_DATA_ROOT
-) -> Tuple[str, str]:
-    """``(video_csv, me_path)`` for a session.
+def load_me_index(data_root: str = DEFAULT_DATA_ROOT) -> pd.DataFrame:
+    """``index.csv`` of the aligned ME table: one row per session x camera.
 
-    Both assets are matched by ``subject_date``; the behavior folders carry an
-    acquisition-time suffix (e.g. ``behavior_808054_2025-09-02_10-38-37``), so we glob.
+    Adds ``ses_idx`` (``<subject>_<date>``, the form of ``nwb.session_id``) to the table's
+    ``session`` (the raw asset name, ``behavior_<subject>_<date>_<time>``). Read once per
+    ``data_root`` and cached.
 
     Raises
     ------
     FileNotFoundError
-        If either the behavior-video or the motion-energy asset is missing, so a
-        multi-session loop can skip the session.
+        If the ME table asset is not attached under ``data_root``.
     """
-    subject, date = session_id.split("_")[:2]
-
-    beh = [
-        d
-        for d in sorted(glob.glob(os.path.join(data_root, "behavior_%s_%s_*" % (subject, date))))
-        if "motionenergy" not in d
-    ]
-    if not beh:
-        raise FileNotFoundError("no behavior-video asset for %s_%s" % (subject, date))
-    video_csv = os.path.join(beh[0], "behavior-videos", "bottom_camera.csv")
-    if not os.path.exists(video_csv):
-        raise FileNotFoundError("missing %s" % video_csv)
-
-    me_dirs = sorted(
-        glob.glob(os.path.join(data_root, "behavior_%s_%s_*motionenergy*" % (subject, date)))
-    )
-    if not me_dirs:
-        raise FileNotFoundError("no motion-energy asset for %s_%s" % (subject, date))
-    hits = glob.glob(
-        os.path.join(me_dirs[0], "**", "bottom_camera_motion_energy_clean.npy"), recursive=True
-    )
-    if not hits:
-        raise FileNotFoundError("me .npy not found under %s" % me_dirs[0])
-    return video_csv, hits[0]
+    path = os.path.join(data_root, ME_TABLE_NAME, "index.csv")
+    if path not in _ME_INDEX:
+        if not os.path.exists(path):
+            raise FileNotFoundError("ME table not attached: %s" % path)
+        index = pd.read_csv(path)
+        index["ses_idx"] = index["session"].str.split("_").str[1:3].str.join("_")
+        _ME_INDEX[path] = index
+    return _ME_INDEX[path]
 
 
-def motion_energy_to_session(
-    me_path: str,
-    video_csv: str,
-    df_trials: pd.DataFrame,
-    go_cue_col: str = "goCue_start_time_raw",
-) -> Tuple[np.ndarray, np.ndarray, float]:
-    """Per-frame motion energy on the session clock (t=0 at the first go cue).
-
-    After padding (below) ``me[i]`` is 1-to-1 with row ``i`` of the camera CSV, so
-    ``session_time = behavior_time(frame) - first_go_cue_raw``, which is exactly how
-    ``df_fip['timestamps']`` is built. Routed through the ``video_alignment`` helpers so
-    the offset semantics and the CSV-layout detection stay in one place, shared with
-    aind-dynamic-foraging-behavior-video-analysis.
+def me_sessions(
+    camera: str = "BottomCamera",
+    exclude_actions: Sequence[str] = (),
+    data_root: str = DEFAULT_DATA_ROOT,
+) -> List[str]:
+    """Session ids (``<subject>_<date>``) with usable motion energy for ``camera``.
 
     Parameters
     ----------
-    me_path : str
-        ``bottom_camera_motion_energy_clean.npy``.
-    video_csv : str
-        The camera CSV for the same session.
-    df_trials : pandas.DataFrame
-        Needs ``trial`` and ``go_cue_col`` (absolute behaviour clock).
-    go_cue_col : str
-        Column holding the raw (unzeroed) go-cue times.
+    camera : str
+        ``BottomCamera`` or ``SideCameraRight``.
+    exclude_actions : sequence of str
+        Timing actions to leave out, e.g. ``("re-index",)`` for the frame-drop sessions or
+        ``("fix glitches",)`` for the Harp-glitch ones. Refused cameras are always left out.
+    data_root : str
+        Where Code Ocean mounts attached assets.
+
+    Returns
+    -------
+    list of str
+        Sorted session ids, matching ``nwb.session_id``.
+    """
+    index = load_me_index(data_root)
+    usable = (
+        (index["camera"] == camera)
+        & (index["status"] == "ok")
+        & ~index["action"].isin(list(exclude_actions))
+    )
+    return sorted(index.loc[usable, "ses_idx"])
+
+
+def load_me(
+    session_id: str, camera: str = "BottomCamera", data_root: str = DEFAULT_DATA_ROOT
+) -> Tuple[np.ndarray, np.ndarray, dict]:
+    """Motion energy for one camera, normalised per exposure, on an even Harp-time grid.
+
+    Reads the camera's file from the ME table and does two things before anything else sees
+    the trace:
+
+    1. **Per-exposure ME.** ``aind-motion-energy`` differences consecutive *saved* frames, so
+       after a dropped frame a value spans 2 (or more) exposures and carries about that
+       multiple of the motion. Each value is divided by the exposures it spans,
+       ``diff(frame_number)``. Not by ``diff(harp_time) / frame interval``: Harp time comes in
+       32 µs ticks, so single-exposure steps read 1,984 or 2,016 µs and would scale ordinary
+       frames by ±1.6% of noise. Unchanged (divided by 1) on sessions without drops.
+    2. **Even sampling.** Linear interpolation on ``harp_time`` onto a grid at the camera
+       rate (``1 / frame_interval_s``), so a dropped exposure becomes one interpolated sample
+       and code that counts samples (``threshold_onsets``' ``min_run``, Welch on the raw
+       rate) sees a uniform series.
+
+    Frame 0 has no ME value (the table stores NaN there), so the grid starts at frame 1.
+
+    Parameters
+    ----------
+    session_id : str
+        ``<subject>_<date>``, as ``nwb.session_id``.
+    camera : str
+        ``BottomCamera`` or ``SideCameraRight``.
+    data_root : str
+        Where Code Ocean mounts attached assets.
 
     Returns
     -------
     tuple
-        ``(t_session, me, offset)``.
+        ``(t_harp, me, info)``: grid times on the Harp clock (s), per-exposure ME on that
+        grid, and the camera's ``index.csv`` row as a dict.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the table has no row for this session and camera, so a multi-session loop can skip.
+    MotionEnergyRefused
+        If the build refused the camera (``info['error']`` says why).
+    ValueError
+        If the file does not match its index row (a length mismatch is never truncated).
     """
-    va = _get_va()
+    index = load_me_index(data_root)
+    rows = index[(index["ses_idx"] == session_id) & (index["camera"] == camera)]
+    if len(rows) == 0:
+        raise FileNotFoundError("no %s motion energy for %s in the ME table" % (camera, session_id))
+    if len(rows) > 1:
+        raise ValueError("%d ME table rows for %s %s" % (len(rows), session_id, camera))
+    info = rows.iloc[0].to_dict()
+    if info["status"] != "ok":
+        raise MotionEnergyRefused(
+            "%s %s refused by the ME table build: %s" % (session_id, camera, info["error"])
+        )
 
-    me = np.load(me_path)
-    # Old/flat camera CSVs (e.g. bottom_camera.csv) ship headerless in DEFAULT_COLUMNS order;
-    # read_video_csv applies that only when needed and auto-detects the AIND header layout
-    # otherwise, so we don't have to know which layout THIS session's CSV uses.
-    cam = va.read_video_csv(video_csv, columns=list(va.DEFAULT_COLUMNS))
-    time_col = next(c for c in va.TIME_COLUMN_ALIASES if c in cam.columns)
+    frames = pd.read_parquet(
+        os.path.join(data_root, ME_TABLE_NAME, info["session"], "%s.parquet" % camera),
+        columns=["harp_time", "frame_number", "me_clean"],
+    )
+    if len(frames) != info["n_frames"]:
+        raise ValueError(
+            "%s %s: %d rows in the file, index.csv says %d"
+            % (session_id, camera, len(frames), info["n_frames"])
+        )
+    harp = frames["harp_time"].to_numpy(float)
+    exposures = np.diff(frames["frame_number"].to_numpy())
+    if (exposures < 1).any():
+        raise ValueError("%s %s: frame numbers do not increase" % (session_id, camera))
 
-    # aind-motion-energy emits a consecutive-frame difference: one fewer value than frames
-    # (no value for frame 0). Pad a leading 0 so me[i] is the motion AT frame i, 1-to-1 with
-    # camera rows. Decided from the ME metadata (n_me_frames vs n_frames_decoded) so this
-    # auto-disables once the library pads upstream; fall back to the row count if absent.
-    meta_path = me_path.replace("_motion_energy_clean.npy", "_me_metadata.json")
-    if os.path.exists(meta_path):
-        with open(meta_path) as fh:
-            me_meta = json.load(fh)
-        pad = me_meta["n_me_frames"] == me_meta["n_frames_decoded"] - 1
-    else:
-        pad = (len(cam) - len(me)) == 1
-    if pad:
-        me = np.insert(me, 0, 0.0)
+    # Per-exposure ME (step 1); row 0 has no value
+    me = frames["me_clean"].to_numpy(float)[1:] / exposures
+    t = harp[1:]
+    finite = np.isfinite(me)
 
-    if len(me) != len(cam):  # should match now; warn only on a genuine mismatch
-        n = min(len(me), len(cam))
-        print("WARNING: %d ME vs %d CSV rows after pad; truncating to %d" % (len(me), len(cam), n))
-        me, cam = me[:n], cam.iloc[:n]
+    # Even grid at the camera rate (step 2)
+    dt = float(info["frame_interval_s"])
+    t_harp = t[0] + np.arange(int(np.floor((t[-1] - t[0]) / dt)) + 1) * dt
+    return t_harp, np.interp(t_harp, t[finite], me[finite]), info
 
-    first_go_cue = float(df_trials.sort_values("trial")[go_cue_col].iloc[0])  # absolute clock
-    offset = va.compute_video_session_offset(video_csv, first_go_cue)
-    first_frame = va.get_first_frame_behavior_time(video_csv)
-    video_t = va.behavior_time_to_video_time(cam[time_col].to_numpy(float), first_frame)
-    t_session = va.video_time_to_session_time(video_t, offset)
-    return t_session, np.asarray(me, float), offset
+
+def motion_energy_to_session(
+    session_id: str,
+    df_trials: pd.DataFrame,
+    go_cue_col: str = "goCue_start_time_raw",
+    camera: str = "BottomCamera",
+    data_root: str = DEFAULT_DATA_ROOT,
+) -> Tuple[np.ndarray, np.ndarray, float]:
+    """Motion energy on the session clock (t=0 at the first go cue), evenly sampled.
+
+    ``t_session = harp_time - first_go_cue``: go cues and camera triggers are both on the
+    Harp Behavior clock, and ``df_fip['timestamps']`` is zeroed at the same go cue. Uses the
+    table's corrected Harp time, so the frame-drop sessions are placed right (the raw CSV
+    column put ME up to 280–670 s early there by session end).
+
+    ``t_session`` is **not** a position in the video file: after a drop it runs ahead of
+    ``row / fps``. To find a frame (clips, BEAST), ``searchsorted`` an event on the
+    per-frame ``harp_time`` in the table instead.
+
+    Parameters
+    ----------
+    session_id : str
+        ``<subject>_<date>``, as ``nwb.session_id``.
+    df_trials : pandas.DataFrame
+        Needs ``trial`` and ``go_cue_col`` (absolute Harp clock).
+    go_cue_col : str
+        Column holding the raw (unzeroed) go-cue times.
+    camera : str
+        ``BottomCamera`` or ``SideCameraRight``.
+    data_root : str
+        Where Code Ocean mounts attached assets.
+
+    Returns
+    -------
+    tuple
+        ``(t_session, me, offset)``, with ``me`` from :func:`load_me` and
+        ``offset = first_go_cue - harp_time[0]`` (s from the first frame to the first go cue).
+
+    Raises
+    ------
+    FileNotFoundError, MotionEnergyRefused, ValueError
+        As :func:`load_me`.
+    """
+    t_harp, me, info = load_me(session_id, camera, data_root)
+    first_go_cue = float(df_trials.sort_values("trial")[go_cue_col].iloc[0])  # Harp clock
+    return t_harp - first_go_cue, me, first_go_cue - float(info["harp_start"])
 
 
 def attach_me_to_df_fip(
@@ -922,21 +979,28 @@ def window_mean(series: pd.Series, lo: float, hi: float) -> float:
 
 # ── Multi-session ─────────────────────────────────────────────────────────────
 
-def process_session(nwb, data_root: str = DEFAULT_DATA_ROOT, onset_kw: Optional[dict] = None) -> dict:
+def process_session(
+    nwb,
+    data_root: str = DEFAULT_DATA_ROOT,
+    onset_kw: Optional[dict] = None,
+    camera: str = "BottomCamera",
+) -> dict:
     """Run the single-session pipeline and return a dict for cross-session analyses.
 
-    Mirrors the single-session path exactly, reusing :func:`build_meta`,
-    :func:`locate_me_assets` and :func:`motion_energy_to_session`.
+    Mirrors the single-session path exactly, reusing :func:`build_meta` and
+    :func:`motion_energy_to_session`.
 
     Parameters
     ----------
     nwb : object
         One curated session.
     data_root : str
-        Where Code Ocean mounts attached assets.
+        Where Code Ocean mounts attached assets (the ME table among them).
     onset_kw : dict, optional
         Passed to :func:`threshold_onsets` for the motion-energy onsets. Defaults to
         ``{'z_thresh': 2.5, 'refractory': 0.5, 'min_run': 3}``.
+    camera : str
+        Camera whose motion energy to use.
 
     Returns
     -------
@@ -947,7 +1011,8 @@ def process_session(nwb, data_root: str = DEFAULT_DATA_ROOT, onset_kw: Optional[
     Raises
     ------
     ValueError, FileNotFoundError
-        When df_trials or the ME/video assets are missing, so the caller can skip.
+        When df_trials is missing, the session has no ME, or the ME table refused the camera
+        (:class:`MotionEnergyRefused`, a ValueError), so the caller can skip.
     """
     if onset_kw is None:
         onset_kw = {"z_thresh": 2.5, "refractory": 0.5, "min_run": 3}
@@ -967,8 +1032,9 @@ def process_session(nwb, data_root: str = DEFAULT_DATA_ROOT, onset_kw: Optional[
         )
         df_trials_enr = df_trials
 
-    video_csv, me_path = locate_me_assets(nwb.session_id, data_root)
-    t_me, me, _offset = motion_energy_to_session(me_path, video_csv, nwb.df_trials)
+    t_me, me, _offset = motion_energy_to_session(
+        nwb.session_id, nwb.df_trials, camera=camera, data_root=data_root
+    )
     me_z = zscore(me)
     me_onsets = threshold_onsets(t_me, me_z, already_z=True, **onset_kw)
 

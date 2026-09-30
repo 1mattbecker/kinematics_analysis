@@ -213,7 +213,10 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 (computes `out_*` outbound metrics into per-session parquets) · `attach_data.ipynb` ·
 `test_session_wrapper.ipynb` (batch runner wrapping `run_batch_analysis`; mostly commented
 out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py` /
-`TransferToNWB.py` / `backup_nwb_utils_dynamicforaging.py`.
+`TransferToNWB.py` / `backup_nwb_utils_dynamicforaging.py` · `build_me_table.py` (aligned
+motion-energy table for the FIP sessions, run in a cloud workstation; `build_me_asset_map.py`
+maps sessions to ME assets, `check_leading_lost_frames.py` is the lick-triggered-ME timing check;
+see `fip_me_aligned_table_plan.md`).
 
 ### Repo modules (`code/*.py`, flat by necessity)
 
@@ -229,7 +232,7 @@ out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py
 | `ccf_utils.py` | CCF conversions — `pir_to_lps`, `ccf_pts_convert_to_mm`, `project_to_plane` |
 | `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
 | `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
-| `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`; `use_curation=False` for assets curated at build time, e.g. `DANE_3channels_curated`, which `build_meta` reads from the event names), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock, signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
+| `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`; `use_curation=False` for assets curated at build time, e.g. `DANE_3channels_curated`, which `build_meta` reads from the event names), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock (from the aligned ME table, asset `fip_motion_energy_aligned`: `load_me`, `me_sessions`, `motion_energy_to_session`), signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
 | `fip_coupling.py` | Machinery for `fip_05` (numpy/pandas/scipy only, no CO libraries): pairs same-side `latNAcc` DA with `PL` LC-axon NE from the CSV-curated parquet assets (`inventory_pairs`, `choose_side`, `load_pairs` with a cache), per-trial baseline/response/latency measures and RPE regressions, an FIR task-event model for task-residual signals, band-limited correlation with circular-shift nulls, transient detection/pairing/context labels |
 
 `spatial_encoding.py` and `spatial_axes.py` are deliberately separate: *where* a statistic is

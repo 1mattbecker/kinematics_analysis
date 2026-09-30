@@ -16,6 +16,13 @@ log with more events than exposures in `818586_2026-01-16` and two 816212 bottom
 In `818586_2026-01-16` the cameras missed the first 2.65 s of triggers
 (`code/check_leading_lost_frames.py`), reported as library issue #8.
 
+Built in a workstation (asset `90c2d0a7-82e3-4abf-b205-e398c2f7736e`, 5.8 GB). `fip_utils` now
+reads ME from it: `load_me` divides by `diff(frame_number)` and resamples to an even grid,
+`motion_energy_to_session(session_id, df_trials)` is `harp_time − first go cue` (new signature;
+`locate_me_assets` removed), refused cameras raise `MotionEnergyRefused`, `me_sessions` selects
+by action. `fip_00`–`fip_03` ME cells updated (not re-run); `fip_03`'s cache file is renamed so
+the old-loader cache is rebuilt.
+
 ### Environment: pin the video-analysis library at v0.1.0 (`wild`)
 
 `environment/Dockerfile` now installs `aind-dynamic-foraging-behavior-video-analysis` at tag
