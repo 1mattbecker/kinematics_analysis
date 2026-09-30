@@ -2,6 +2,19 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-30
+
+### Environment: pin the video-analysis library (`wild`)
+
+`environment/Dockerfile` now installs `aind-dynamic-foraging-behavior-video-analysis` at
+`5738b32` (its `main` before the video timing QC merge) instead of `@main`, so merging that
+library change does not alter this capsule on its next image build. The QC replaces the timing
+check in `integrate_keypoints_with_video_time`: keypoint `time_raw` is corrected for dropped frames
+and Harp glitches, header-row video CSVs load, and sessions whose Harp clock steps are refused.
+Verified before the merge with `code/verify_video_timing_qc.ipynb` (ok sessions identical; glitch
+sessions differ by 8 µs on one row, nothing downstream). Move the pin, rebuild, and re-run the
+batch deliberately to adopt it.
+
 ## 2026-09-28
 
 ### Environment: package upgrade (`env/deps-upgrade` -> `wild`)

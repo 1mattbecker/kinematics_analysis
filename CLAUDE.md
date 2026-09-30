@@ -81,8 +81,10 @@ says "the library", it means this one.
 - **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
   branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
-  to `@main` — so anything merged to `main` reaches the capsule on its next image build.
-  There is no version pin to shield against upstream changes.
+  to a commit (since 2026-09-30; `5738b32`, library `main` before the video timing QC merge).
+  Library changes reach the capsule only when that pin is moved deliberately, then the image
+  rebuilt. Moving it past the video timing QC merge changes `time_raw` for drop/glitch sessions
+  and refuses Harp clock-step sessions; see the library's `VIDEO_TIMING_QC_PLAN.md`.
 - **Import path:** `aind_dynamic_foraging_behavior_video_analysis`. `requires-python = ">=3.9"`
   today; it will move to `">=3.11"` once every consumer capsule and branch is on 3.11+ (the
   library's `PYTHON_311_UPGRADE_PLAN.md`, Stage 3). This capsule's `wild` branch runs 3.12.
@@ -110,7 +112,7 @@ One test: **would another AIND project doing tongue kinematics want this, unchan
   `tongue_quality_stats.json`), runs in the batch pipeline, or is generic to tongue-kinematics
   sessions — keypoint I/O and filtering, segmentation, aggregation (including `out_*`),
   trial/lick annotation, QC stats, lick detection, video/NWB lookup, clip extraction,
-  raster/PSTH primitives. It must stay stable: the capsule installs it from `main` unpinned.
+  raster/PSTH primitives. It must stay stable: other consumers take `main` when they move their pins.
 - **This repo:** analysis built *on top of* the intermediates for the LC-NE RT-encoding
   question — encoding models, per-unit registries, spatial topography and axes, figure style.
   Free to churn.
