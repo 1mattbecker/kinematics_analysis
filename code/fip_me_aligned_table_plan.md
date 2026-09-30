@@ -17,7 +17,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 | Scratch QC (`metadata/video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; kept as a record of the 2026-09-29 survey |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | Session → ME asset mapping | Done 2026-09-30: `metadata/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
-| `code/build_me_table.py` | Written 2026-09-30; tested locally on 4 sessions; dry pass on all 97 done (below). Code Ocean run not yet done |
+| `code/build_me_table.py`, `code/capture_me_table.py` | Written 2026-09-30; build tested locally on 4 sessions, dry pass on all 97 done (below); capture request checked with `--dry-run`. Code Ocean run not yet done |
 | `fip_utils` loader switch | Not started |
 
 ## Decisions
@@ -267,9 +267,25 @@ Roughly 25–35 MB per camera compressed, ~5–7 GB in total.
 
 ## Where it runs
 
-`code/build_me_table.py` in this repo, one Code Ocean run, results saved as one data asset.
-Needs an environment rebuild for the `v0.1.0` pin (already on this branch).
-Re-runnable: skips sessions whose files exist unless `--force`.
+`code/build_me_table.py` as a script in a cloud workstation of this capsule, on
+`fip-motion-energy`, after the environment is rebuilt for the `v0.1.0` pin; then
+`code/capture_me_table.py` captures the output folder as one result data asset (stored in AIND
+scratch like the ME results, tagged `fip-me-aligned`). Re-runnable: skips sessions whose files
+exist unless `--force`. Estimated ~10 min for the build with 4 workers (local test: 4 sessions
+in 16 s; dry pass of all 97 in 5.5 min), ~5 GB (28 MB per camera × 178).
+
+In the workstation, from `/root/capsule`:
+
+1. `git switch fip-motion-energy && git pull`; confirm the library import is `v0.1.0`
+   (`python -c "import aind_dynamic_foraging_behavior_video_analysis as m; print(m.__version__)"`).
+2. `cd code && python build_me_table.py --dry-run --workers $(nproc)`: expect 178 ok, 16 refused,
+   as in `metadata/me_dry_run_fip.csv`.
+3. `python build_me_table.py --workers $(nproc)`: writes `/root/capsule/results/fip_motion_energy_aligned/`.
+   If it stops, run it again; built sessions are skipped.
+4. Capture (needs `API_SECRET` and `CO_DOMAIN`, and `codeocean<0.17` since the server is 4.7.3):
+   `python -m venv /tmp/co016 && /tmp/co016/bin/pip install -q "codeocean>=0.16,<0.17"`, then
+   `/tmp/co016/bin/python capture_me_table.py --dry-run` and, if the request looks right, without
+   `--dry-run`. It refuses an incomplete build or one from uncommitted code.
 
 ## Before building
 
