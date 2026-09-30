@@ -33,56 +33,52 @@ RUN apt-get update \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Every pip install below uses -c /py39-constraints.txt, which holds each package at its
-# version from the Python 3.9 baseline (environment/py39-freeze.txt). Change a version there,
-# not here, to upgrade it deliberately.
-COPY py39-constraints.txt /
+# Every pip install below uses -c /constraints.txt, which fixes the version of each package
+# (see its header for history). Change a version there, not here, to upgrade it deliberately.
+COPY constraints.txt /
 
 # jupyterlab and ipywidgets: this base image has no IDE, and a hand-edited Dockerfile blocks
 # Code Ocean's automatic IDE install. They move from 3.6 / 7.7 to current versions (JupyterLab
 # 3.6 doesn't fit this base). No code in this repo uses ipywidgets directly.
-RUN pip install -U --no-cache-dir -c /py39-constraints.txt \
+# aind-dynamic-foraging-behavior-video-analysis is pinned to tag v0.1.0 (41e5b59), which adds the
+# video timing QC. To go back to the last version without it, pin tag pre-video-timing-qc
+# (5738b32) instead, rebuild, and re-run the batch.
+RUN pip install -U --no-cache-dir -c /constraints.txt \
     jupyterlab \
     ipywidgets \
-    aind-ephys-utils==0.0.15 \
+    aind-ephys-utils==0.4.0 \
     hdmf-zarr==0.11.0 \
     fastparquet==2024.11.0 \
-    open-ephys-python-tools==0.1.7 \
     pillow==10.3.0 \
-    pyarrow==21.0.0 \
-    pymupdf==1.24.2 \
+    pyarrow==25.0.1 \
     pynwb==3.0.0 \
-    pypdf2==3.0.1 \
-    scipy==1.13.0 \
+    scipy==1.18.1 \
     seaborn==0.13.2 \
-    spikeinterface[full]==0.100.0 \
-    statsmodels==0.14.2 \
-    wavpack-numcodecs==0.1.5 \
+    statsmodels==0.15.0 \
     zarr==2.18.2 \
     aind_analysis_arch_result_access --upgrade \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@main#egg=aind-dynamic-foraging-behavior-video-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@41e5b5901b132a32b5042859fbeeeed5f4dbc839#egg=aind-dynamic-foraging-behavior-video-analysis \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \
-    scikit-image==0.24.0 \
+    scikit-image==0.26.0 \
     trimesh==4.11.0
     # hdmf==3.12.2 \
     # aind_dynamic_foraging_data_utils==0.1.5
 
 # rachel-analysis-utils requires Python >=3.10, which this image meets, so the
 # --ignore-requires-python workaround needed on 3.9 is gone.
-RUN pip install --no-cache-dir -c /py39-constraints.txt \
+RUN pip install --no-cache-dir -c /constraints.txt \
     -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@864550d55356ecb4906d05801cdae694bd000fde#egg=rachel-analysis-utils
 
 # scanpy, for eph_09_structural_axes' MERFISH axis (reads adata_mer_subset_2_2k.h5ad).
-# Held at 1.10.3 (the 3.9 baseline) by the constraints file, so the migration changes as little
-# as possible. It was pinned there only because 1.10.4+ need Python >=3.10, so it can be
-# bumped now. scipy is re-asserted as a tripwire: if scanpy ever wants to move it, the build
-# fails loudly instead of silently changing numpy/scipy under the rest of the pins.
-RUN pip install --no-cache-dir -c /py39-constraints.txt \
+# Version set in the constraints file (1.12.4 since the 2026-09-28 package upgrade). scipy is
+# re-asserted as a tripwire: if scanpy ever wants to move it, the build fails loudly instead of
+# silently changing numpy/scipy under the rest of the pins.
+RUN pip install --no-cache-dir -c /constraints.txt \
     scanpy \
-    scipy==1.13.0
+    scipy==1.18.1
 
 COPY postInstall /
 RUN /postInstall

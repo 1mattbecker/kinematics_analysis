@@ -19,8 +19,9 @@ and code editing. Data lives on Code Ocean — do not expect data files to be pr
 
 - **Python 3.12.** Every active branch (`wild`, `main`, `kinematics-manuscript`) runs the
   Python 3.12 Code Ocean image as of 2026-09-25, so 3.10+ syntax (`X | None`, `match`) is fine
-  in this repo's own code. Package versions are held at the 3.9-era baseline by
-  `environment/py39-constraints.txt`. Change a version there, deliberately, to upgrade it.
+  in this repo's own code. Package versions are fixed by `environment/constraints.txt`
+  (pandas stays 2.x until the NWB stack moves). Change a version there, deliberately, to
+  upgrade it.
   Code headed for the library (`aind-dynamic-foraging-behavior-video-analysis`) must still
   run on Python 3.11.
 - **Do not modify anything in `/environment`.** That folder controls the Code Ocean
@@ -62,7 +63,8 @@ kinematics_analysis/
 
 **Local FIP environment:** `.venv-fip` (Python 3.12, created with `uv`) holds `rachel-analysis-utils@864550d`
 (the Dockerfile pin), `aind-dynamic-foraging-data-utils@32e8dbe`, `aind-dynamic-foraging-basic-analysis@8ec194f`
-and `aind_analysis_arch_result_access`, with versions held by `environment/py39-constraints.txt`. Use it
+and `aind_analysis_arch_result_access`, with versions held by the constraints file (built from `environment/py39-constraints.txt`, before the
+2026-09-28 package upgrade; rebuild it against `environment/constraints.txt` to match the capsule). Use it
 for `fip_*` notebooks that call Rachel's code locally. The older `.venv` (3.9) cannot install her package.
 
 **Import constraint:** notebooks import repo modules by bare name
@@ -79,8 +81,11 @@ says "the library", it means this one.
 - **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
   branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
-  to `@main` — so anything merged to `main` reaches the capsule on its next image build.
-  There is no version pin to shield against upstream changes.
+  to a commit: tag `v0.1.0` (`41e5b59`, 2026-09-30), which adds the video timing QC. Library
+  changes reach the capsule only when that pin is moved deliberately, then the image rebuilt.
+  To go back to the version before the QC, pin tag `pre-video-timing-qc` (`5738b32`). The QC
+  corrects `time_raw` for drop/glitch sessions and refuses Harp clock-step sessions; see the
+  library's `VIDEO_TIMING_QC_PLAN.md`.
 - **Import path:** `aind_dynamic_foraging_behavior_video_analysis`. `requires-python = ">=3.9"`
   today; it will move to `">=3.11"` once every consumer capsule and branch is on 3.11+ (the
   library's `PYTHON_311_UPGRADE_PLAN.md`, Stage 3). This capsule's `wild` branch runs 3.12.
@@ -108,7 +113,7 @@ One test: **would another AIND project doing tongue kinematics want this, unchan
   `tongue_quality_stats.json`), runs in the batch pipeline, or is generic to tongue-kinematics
   sessions — keypoint I/O and filtering, segmentation, aggregation (including `out_*`),
   trial/lick annotation, QC stats, lick detection, video/NWB lookup, clip extraction,
-  raster/PSTH primitives. It must stay stable: the capsule installs it from `main` unpinned.
+  raster/PSTH primitives. It must stay stable: other consumers take `main` when they move their pins.
 - **This repo:** analysis built *on top of* the intermediates for the LC-NE RT-encoding
   question — encoding models, per-unit registries, spatial topography and axes, figure style.
   Free to churn.

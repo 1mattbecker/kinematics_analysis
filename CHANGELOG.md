@@ -2,7 +2,50 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-09-30
+
+### Environment: pin the video-analysis library at v0.1.0 (`wild`)
+
+`environment/Dockerfile` now installs `aind-dynamic-foraging-behavior-video-analysis` at tag
+`v0.1.0` (`41e5b59`) instead of `@main`. That release adds the video timing QC to
+`integrate_keypoints_with_video_time`: keypoint `time_raw` is corrected for dropped frames and
+Harp glitches, header-row video CSVs load, and sessions whose Harp clock steps are refused (they
+raise and are skipped by `run_batch_analysis`). The batch uses each session's Harp trigger log
+when present. Verified with `code/verify_video_timing_qc.ipynb`: ok sessions identical, glitch
+sessions differ by 8 µs on one row with nothing downstream changed, clock-step sessions refused.
+
+Rollback: pin tag `pre-video-timing-qc` (`5738b32`, library `main` just before the QC), rebuild,
+and re-run the batch.
+
 ## 2026-09-28
+
+### Environment: package upgrade (`env/deps-upgrade` -> `wild`)
+
+The 3.12 image held every package at its 3.9-era version. This moves the major scientific
+libraries to current releases, with pandas and the NWB stack held back:
+
+- **Upgraded:** numpy 2.0.2 → 2.5.3, scipy 1.13.0 → 1.18.1, matplotlib 3.9.4 → 3.11.2,
+  scikit-learn 1.6.1 → 1.9.1, statsmodels 0.14.2 → 0.15.0, scanpy 1.10.3 → 1.12.4 (anndata
+  0.10.9 → 0.11.4), numba 0.60 → 0.67 (llvmlite 0.43 → 0.49), scikit-image 0.24 → 0.26,
+  pyarrow 21 → 25, contourpy 1.3 → 1.4, aind-ephys-utils 0.0.15 → 0.4.0,
+  aind-dynamic-foraging-models 0.16.0 → 0.18.0.
+- **Held:** pandas 2.3.3, pynwb 3.0.0, hdmf 4.3.1 (requires pandas<3), hdmf-zarr, zarr.
+- **Removed** (no live code uses them): spikeinterface, open-ephys-python-tools,
+  wavpack-numcodecs, pymupdf, PyPDF2. The only import of any of them is an unused
+  `import spikeinterface as si` / `from PyPDF2 import PdfMerger` in
+  `archive/reference/F_ephys_behavior_action&outcome.ipynb`, whose first cell now fails on
+  those two lines.
+- `environment/py39-constraints.txt` is renamed `environment/constraints.txt`; its header
+  records the history. `py39-freeze.txt` stays as the 3.9 baseline.
+- **`eph_05`:** `RidgeCV(store_cv_values=False)` → `RidgeCV()`. scikit-learn 1.7 removed the
+  argument (already the default). Under 1.9 it raised `TypeError`, which the fit loop's
+  `except` swallowed, so the notebook reported "Fit 0 units" instead of failing.
+- **Validated** in a duplicate capsule on the branch:
+  - `env_00_reference_sessions` against `env_reference_py39` (both reference sessions, 17 parquet
+    files + quality stats each): 0 DIFF, 9 checks "close" (within rtol 1e-6 / atol 1e-9), the rest
+    identical. Outputs saved as the data asset `env_reference_py312_deps`.
+  - Ran without errors after the eph_05 fix: eph_01, eph_05, eph_08, eph_09, kin_03, kin_06,
+    kin_07, and fip_03 rebuilt without its cache.
 
 ### `fip_07_da_ne_summary.ipynb`: DA × NE summary figures
 

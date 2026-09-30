@@ -8,6 +8,11 @@ Deferred work items. Newest first. Dates are YYYY-MM-DD.
 
 _Logged 2026-09-28. Follows the Python 3.12 migration (library `PYTHON_311_UPGRADE_PLAN.md`)._
 
+**Status (2026-09-29): Steps 1 and 2 done** (together, one rebuild, branch `env/deps-upgrade`,
+merged into `wild`). Validation: `env_00` 0 DIFF / 9 close vs `env_reference_py39` (asset
+`env_reference_py312_deps`); spot-check notebooks all ran after one fix (`eph_05`'s removed
+`RidgeCV` argument). See CHANGELOG 2026-09-28. Remaining: the deferred pandas 3 + NWB item.
+
 **Where things stand.** The capsule runs Python 3.12, but `environment/py39-constraints.txt` holds
 every package at its 3.9-era version. That was deliberate, so the migration changed only Python.
 Most held versions are the *last releases that supported 3.9* (numpy 2.0.2, scipy 1.13.0,
@@ -35,14 +40,16 @@ matplotlib 3.9.4, scikit-learn 1.6.1, scanpy 1.10.3). The AIND libraries install
   finds nothing new: the only source-built or compiled-without-3.12-wheel packages are the six
   already verified in the migration.
 - **Unused heavy installs:** no live code imports spikeinterface, open-ephys-python-tools,
-  wavpack-numcodecs, pymupdf or PyPDF2 (spikeinterface and PyPDF2 appear only in archived reference
-  notebooks). hdmf-zarr is used only by `backup_nwb_utils_dynamicforaging.py`, and basic-analysis
+  wavpack-numcodecs, pymupdf or PyPDF2. The only imports are two unused lines
+  (`import spikeinterface as si`, `from PyPDF2 import PdfMerger`) in
+  `archive/reference/F_ephys_behavior_action&outcome.ipynb`. wavpack-numcodecs is a zarr codec for
+  compressed raw ephys; live code reads only behavior-event timestamps from NWB zarr. hdmf-zarr is used only by `backup_nwb_utils_dynamicforaging.py`, and basic-analysis
   needs it anyway, so it stays.
 
 **Plan.** Same workflow as the migration: branch `env/deps-upgrade` from `wild`, a duplicate
 capsule on it, validate, then merge into `wild` and promote to `main` once verified.
 
-- [ ] **Step 1: AIND bumps + major libraries (one rebuild).** The AIND bumps are no-ops for the
+- [x] **Step 1: AIND bumps + major libraries (one rebuild).** The AIND bumps are no-ops for the
       code paths used, so they don't need a separate rebuild.
   - `py39-constraints.txt`: `aind-dynamic-foraging-models==0.18.0`. Delete the lines for numpy,
     scipy, matplotlib, contourpy, scikit-learn, statsmodels, scanpy, anndata, numba, llvmlite,
@@ -64,11 +71,11 @@ capsule on it, validate, then merge into `wild` and promote to `main` once verif
     
     Compare a few key numbers (e.g. RT-encoding T-statistics, UMAP embedding shape and
     structure) with the current outputs.
-- [ ] **Step 2 (optional): drop unused heavy installs** (spikeinterface[full],
-      open-ephys-python-tools, wavpack-numcodecs, pymupdf, pypdf2) in a separate rebuild. That
-      means a smaller image, faster builds, and no more source-compiled wavpack. Validate with
-      the import check + one notebook. Keep them if the archived reference notebooks should stay
-      runnable.
+- [x] **Step 2: drop unused heavy installs** (spikeinterface[full],
+      open-ephys-python-tools, wavpack-numcodecs, pymupdf, pypdf2). Folded into Step 1's rebuild
+      (decided 2026-09-28). That means a smaller image, faster builds, and no more
+      source-compiled wavpack. Removing them also drops their exclusive dependencies (neo,
+      probeinterface, quantities, zmq, distinctipy, cuda-*, PyMuPDFb); nothing else changes.
 - [ ] **Deferred, only if needed: pandas 3 + NWB stack** (pandas 3.x, hdmf ≥ 6.1, pynwb ≥ 4.2,
       hdmf-zarr/zarr per data-utils' cap). Its own branch and comparison. pandas 3 changes
       behaviour: copy-on-write, a `str` dtype for text, and `datetime64[us]` by default
