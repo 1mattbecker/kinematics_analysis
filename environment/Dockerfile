@@ -40,6 +40,9 @@ COPY constraints.txt /
 # jupyterlab and ipywidgets: this base image has no IDE, and a hand-edited Dockerfile blocks
 # Code Ocean's automatic IDE install. They move from 3.6 / 7.7 to current versions (JupyterLab
 # 3.6 doesn't fit this base). No code in this repo uses ipywidgets directly.
+# aind-dynamic-foraging-behavior-video-analysis is pinned to tag v0.1.0 (41e5b59), which adds the
+# video timing QC. To go back to the last version without it, pin tag pre-video-timing-qc
+# (5738b32) instead, rebuild, and re-run the batch.
 RUN pip install -U --no-cache-dir -c /constraints.txt \
     jupyterlab \
     ipywidgets \
@@ -56,7 +59,7 @@ RUN pip install -U --no-cache-dir -c /constraints.txt \
     aind_analysis_arch_result_access --upgrade \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@5738b32953f9e54a59893e9e1db88bef977100cb#egg=aind-dynamic-foraging-behavior-video-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@41e5b5901b132a32b5042859fbeeeed5f4dbc839#egg=aind-dynamic-foraging-behavior-video-analysis \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \
     scikit-image==0.26.0 \

@@ -81,10 +81,11 @@ says "the library", it means this one.
 - **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
   branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
-  to a commit (since 2026-09-30; `5738b32`, library `main` before the video timing QC merge).
-  Library changes reach the capsule only when that pin is moved deliberately, then the image
-  rebuilt. Moving it past the video timing QC merge changes `time_raw` for drop/glitch sessions
-  and refuses Harp clock-step sessions; see the library's `VIDEO_TIMING_QC_PLAN.md`.
+  to a commit: tag `v0.1.0` (`41e5b59`, 2026-09-30), which adds the video timing QC. Library
+  changes reach the capsule only when that pin is moved deliberately, then the image rebuilt.
+  To go back to the version before the QC, pin tag `pre-video-timing-qc` (`5738b32`). The QC
+  corrects `time_raw` for drop/glitch sessions and refuses Harp clock-step sessions; see the
+  library's `VIDEO_TIMING_QC_PLAN.md`.
 - **Import path:** `aind_dynamic_foraging_behavior_video_analysis`. `requires-python = ">=3.9"`
   today; it will move to `">=3.11"` once every consumer capsule and branch is on 3.11+ (the
   library's `PYTHON_311_UPGRADE_PLAN.md`, Stage 3). This capsule's `wild` branch runs 3.12.
