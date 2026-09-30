@@ -9,8 +9,8 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 Per `code/fip_me_aligned_table_plan.md`. `metadata/me_assets_fip.csv` maps the 97
 `used_in_fip05_07` sessions to their ME result assets from the batch manifests
 (`code/build_me_asset_map.py`). `code/build_me_table.py` writes per-frame corrected Harp time
-and `me_clean` per camera, timed by the library's `video_timing_qc` from the trigger log;
-`code/capture_me_table.py` captures the output as one data asset from a cloud workstation.
+and `me_clean` per camera, timed by the library's `video_timing_qc` from the trigger log; it runs
+in a cloud workstation and the output folder is saved as one data asset.
 Dry pass: 178 cameras ok, 16 refused and excluded for now (6 Harp clock-step sessions; trigger
 log with more events than exposures in `818586_2026-01-16` and two 816212 bottom cameras).
 In `818586_2026-01-16` the cameras missed the first 2.65 s of triggers
