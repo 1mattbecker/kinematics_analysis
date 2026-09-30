@@ -6,7 +6,8 @@
 
 Writes ``metadata/me_assets_fip.csv``: one row per ``used_in_fip05_07`` session
 in ``metadata/me_sessions_fip_curated.csv``, with ``raw_session``,
-``me_asset_id``, ``me_asset_name`` and ``me_run_id``.
+``me_asset_id``, ``me_asset_name``, ``me_run_id`` and ``raw_asset_id`` (the
+behavior asset the ME run read).
 
 The mapping comes only from the batch launcher's manifests
 (``aind-motion-energy-batch-capsule/results/batch_manifest_<run id>.json``),
@@ -145,6 +146,7 @@ def main():
                 "me_asset_id": asset.id,
                 "me_asset_name": asset.name,
                 "me_run_id": run,
+                "raw_asset_id": record["input_asset_id"],
             }
         )
 
