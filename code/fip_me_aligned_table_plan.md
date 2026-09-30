@@ -133,26 +133,64 @@ Roughly 25–35 MB per camera compressed, ~5–7 GB in total.
   | Harp glitch | 15 | `fix glitches` | 1–3 rows move by up to ~983 ms, back into line |
   | frame drops | 18 | `re-index` | Nearly every row moves later, by up to 280–670 s at session end; times now step by 2 IFI after each drop |
 
-- **Session clock.** `motion_energy_to_session` computes `harp_time − first go cue` for each
-  row: it never turns a row number into a time with fps, so the subtraction caveat in
-  `video_alignment` does not apply. Row 0's time is the same raw and corrected (row 0 is
-  never re-indexed, and a glitch on the first row is refused), so the offset helpers still
-  agree. FIP and go-cue times are on the same Harp clock, so corrected ME lines up with
-  photometry in drop sessions; uncorrected, it drifted by up to 670 s by the end.
-- **Uneven sampling.** Corrected times have gaps at drops. `peri_event` interpolates onto a
-  20 Hz grid; `norm_xcorr` takes signals already on a common grid, so it needs resampled
-  input (as now). `threshold_onsets`' `min_run` counts samples, not time: in drop sessions
-  a run of *n* samples is slightly longer. Minor; note it in the analysis.
-- **ME after a drop.** The value spans the real interval `harp_time[i] − harp_time[i−1]`
-  (2 IFI after a single drop; ~10% of rows in drop sessions). Handled in analysis, not here.
-- **Video positions** (clips, not this table): after correction, event → frame by
-  `searchsorted` on `harp_time`, then frame / fps. Not needed for ME.
+- **Session clock: what `motion_energy_to_session` computes.** With `h` the per-row Harp
+  array it is given and `g` the first go cue (both on the Harp clock):
+
+  ```
+  first_frame = h_csv[0]                    # get_first_frame_behavior_time (raw CSV row 0)
+  offset      = g − h_csv[0]                # compute_video_session_offset
+  video_t     = h − h_csv[0]                # behavior_time_to_video_time
+  t_session   = video_t − offset = h − g    # video_time_to_session_time
+  ```
+
+  `h_csv[0]` cancels, so each row's session time is its own Harp time minus one constant.
+  Nothing assumes even spacing, so **the result is exactly as right as `h`**:
+
+  - **Today `h` is the raw CSV column, which is wrong in the 18 drop sessions.** Arrival-order
+    pairing gives row *n* trigger *n*'s time, but row *n* was exposed later (at trigger
+    `frame_number[n] − frame_number[0]`). ME is placed too early by (frames lost so far) × IFI,
+    growing through the session to 280–670 s at the end. Subtracting the go cue carries the
+    error through unchanged. Checked on `816214_2025-12-02` bottom (172,631 frames lost): the
+    current path is 86 / 172 / 259 / 345 s early at ¼ / ½ / ¾ / end, and the end value equals
+    frames lost × IFI exactly. Clean and glitch-only sessions are right today except on the
+    1–3 glitch rows. (Per the 2026-09-29 survey, the 10 June 808054 sessions fip_05/07 have
+    used for ME so far have no drops.)
+  - **With corrected `harp_time` as `h`, it is right.** Same session, same four calls: 0.000 µs
+    from `harp_time − g`. This holds even if `first_frame` and `offset` still come from the
+    raw CSV, because `h_csv[0]` cancels. (It also equals corrected row 0: exactly in CSV
+    mode, within one 32 µs tick in log mode; row 0 is never re-indexed, and a glitch on it
+    is refused.) FIP and
+    go-cue times are on the same Harp clock, so corrected ME lines up with photometry.
+- **`video_t` is not a file position after correction.** `video_alignment` calls `h − h[0]`
+  "seconds into the video", i.e. row × IFI (the file position when the MP4's frame rate is
+  the recording rate). With raw Harp in a drop session it matches row × IFI (raw Harp
+  advances one IFI per saved row; off only on glitch rows), but it places events on the
+  wrong frames. With corrected Harp it advances two IFI across each drop while the file
+  advances one frame, so it runs ahead of row × IFI by (frames lost so far) × IFI: 345 s at
+  the end of the session above. Inside `motion_energy_to_session` this cancels and does no harm; nothing
+  may reuse corrected `video_t` (or `offset` + session time) to seek a video. For that
+  (clips, BEAST): event → frame index by `searchsorted` on `harp_time`, then index / fps.
+  `offset` is only printed in the FIP notebooks, never used to seek.
+- **Uneven sampling.** Corrected times have gaps at drops (steps of 1 or 2 IFI in the session
+  above; 5–12% of rows are 2 IFI in drop sessions). `peri_event` interpolates onto a 20 Hz
+  grid, and `norm_xcorr` takes signals already on a common grid, so both are fine.
+  `threshold_onsets`' `min_run` counts samples, not seconds: a run of *n* samples is
+  slightly longer in drop sessions. **`fip_03` Welch on raw ME** computes
+  `fps = rows / span` and treats the samples as evenly spaced: in drop sessions that gives
+  467.6 instead of 500 (above) and the spectrum is wrong with either raw or corrected times;
+  resample onto an even grid first, or exclude drop sessions from that cell.
+- **ME after a drop.** The value is the difference from the previous saved frame, so it spans
+  the real interval `harp_time[i] − harp_time[i−1]` (2 IFI after a single drop). The build
+  stores it as computed; the analysis accounts for the real interval.
 
 ## `fip_utils` changes (after the build)
 
 - New `load_me(session_id, camera="bottom_camera")` reading the Parquet file and the index row.
-- `motion_energy_to_session` takes `harp_time` from the table: `t_session = harp_time −
-  first_go_cue`; `locate_me_assets` and the padding logic go away.
+- `motion_energy_to_session` computes `t_session = harp_time − first_go_cue` from the
+  table's corrected `harp_time`, directly (no `video_t` in between, so it cannot be reused
+  as a file position); `locate_me_assets`, the raw-CSV read and the padding logic go away.
+  Until this lands, the current function misplaces ME in the 18 drop sessions: do not use
+  them with it.
 - Account for the real time step in ME (e.g. divide by `diff(harp_time)` or by
   `diff(frame_number)`); to be settled in the analysis, not the build.
 - Session selection option: exclude cameras by `action` / `status` from `index.csv`.
