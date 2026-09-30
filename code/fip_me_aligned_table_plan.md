@@ -13,7 +13,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 |---|---|
 | ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29 (runs `ce719ee8`, `2b3a9315`). The 10 808054 sessions from 2025-09-02 to 2025-09-15 (ME first computed June 2026, from `.avi`) rerun from `.mp4` (run `342a45f7`); manifest not yet pulled |
 | Video timing QC and correction | In the library: `video_timing_qc`, released in `v0.1.0` (`41e5b59`, merged to `main`). The build calls it; nothing is reimplemented here |
-| Library pin | `wild` pins `v0.1.0`. `fip-motion-energy` still pins `@main` and is 10 commits behind `wild`: merge `wild` in before building |
+| Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which now pins `v0.1.0` (`41e5b59`). Environment not yet rebuilt |
 | Scratch QC (`metadata/video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; kept as a record of the 2026-09-29 survey |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | `code/build_me_table.py` | Not started |
@@ -236,12 +236,12 @@ Roughly 25–35 MB per camera compressed, ~5–7 GB in total.
 ## Where it runs
 
 `code/build_me_table.py` in this repo, one Code Ocean run, results saved as one data asset.
-Needs the `v0.1.0` pin (merge `wild` into `fip-motion-energy`) and an environment rebuild.
+Needs an environment rebuild for the `v0.1.0` pin (already on this branch).
 Re-runnable: skips sessions whose files exist unless `--force`.
 
 ## Before building
 
-1. Merge `wild` into `fip-motion-energy` to get the `v0.1.0` pin; rebuild the environment.
+1. ~~Merge `wild` into `fip-motion-energy` to get the `v0.1.0` pin~~ (done); rebuild the environment.
 2. Pull the rerun manifest (`342a45f7`) and check all 10 completed from `.mp4`.
 3. Dry pass on all 97 (timing only, no ME, no writes): confirm the expected actions above,
    that the trigger log's event count equals exposures for every camera (open question 3 in
