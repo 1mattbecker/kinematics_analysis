@@ -16,7 +16,8 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 | Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which now pins `v0.1.0` (`41e5b59`). Environment not yet rebuilt |
 | Scratch QC (`metadata/video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; kept as a record of the 2026-09-29 survey |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
-| `code/build_me_table.py` | Not started |
+| Session → ME asset mapping | Done 2026-09-30: `metadata/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
+| `code/build_me_table.py` | Written 2026-09-30; tested locally on 4 sessions; dry pass on all 97 done (below). Code Ocean run not yet done |
 | `fip_utils` loader switch | Not started |
 
 ## Decisions
@@ -51,6 +52,37 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 - **Even sampling before any alignment.** The loader returns ME on an even time grid;
   nothing downstream gets the uneven per-frame samples (see "Uneven sampling").
 - **Library pinned by commit:** `v0.1.0` (`41e5b59`); the SHA is recorded in the output.
+
+## Dry pass (2026-09-30)
+
+All 97 sessions have a trigger log, so every camera is timed from it. 178 cameras accepted,
+16 refused (9 sessions). Accepted cameras all pass `clock_rates_agree` (+6 to +16 ppm), match
+the video frame count, have exactly one log event per exposure, and pad one leading NaN.
+
+| Survey group | Sessions | Result |
+|---|---|---|
+| clean | 64 | 64 `use harp as written` |
+| Harp glitch | 15 | 10 `fix glitches`; 5 refused (clock step) |
+| frame drops | 18 | 17 `re-index` (2 with the bottom camera refused, trigger log); 1 refused (clock step) |
+
+**Excluded for now, as the QC refuses them (decided 2026-09-30).** The build already refuses
+them; nothing is overridden.
+
+- Harp clock step (`harp_evenly_spaced`, both cameras): `800886_2025-08-26`,
+  `808054_2025-09-09`, `809491_2025-11-13`, `815334_2025-11-04`, `816212_2025-12-10`,
+  `818585_2025-12-10`. One or two rows per session where Harp advances −1.3 to +0.7 ms
+  instead of 2 ms and stays 1.3–3.3 ms behind; paired steps are ~640,005 rows (~1,280 s)
+  apart. This contradicts "≤ 2 ms, only seen before Sep 2025" above. `808054_2025-09-09`
+  (expected `fix glitches`) is one of the 10 sessions fip_05/07 already use ME from.
+  `809491_2025-11-13` also has a 444 s pause in triggers at row 70.
+- Trigger log has more events than exposures: `818586_2026-01-16` (both cameras; 1,326 /
+  1,328 extra) and the bottom camera of `816212_2025-11-13` and `816212_2025-12-02` (1 extra;
+  their side cameras are accepted). In `818586_2026-01-16` the unmatched triggers are at the
+  **start**: lick-triggered ME peaks at −2.65 s with frames on the first *n* triggers (the
+  CSV's pairing) and at 0 with frames on the last *n*
+  (`code/check_leading_lost_frames.py`, figures in `docs/video_timing_qc/`). The CSV alone
+  would misplace every frame by 2.65 s there, and the survey called it clean. For the two
+  816212 cameras the end cannot be told (one frame, 2 ms). Reported to the library as an issue.
 
 ## Inputs
 
@@ -252,5 +284,5 @@ Re-runnable: skips sessions whose files exist unless `--force`.
 
 ## Open questions
 
-1. If the dry pass finds log/CSV mismatches: refuse (current decision) or allow CSV alone for
-   those cameras.
+1. ~~If the dry pass finds log/CSV mismatches: refuse or allow CSV alone.~~ Refuse (2026-09-30):
+   the CSV alone is wrong by 2.65 s in `818586_2026-01-16` (see "Dry pass").
