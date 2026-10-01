@@ -450,6 +450,10 @@
 			"mount": "behavior_763590_2025-05-01_10-59-16_videoprocessed_2025-10-29_21-59-06"
 		},
 		{
+			"id": "90c2d0a7-82e3-4abf-b205-e398c2f7736e",
+			"mount": "fip_motion_energy_aligned"
+		},
+		{
 			"id": "912a5b0d-7ab3-4282-b575-bf7cf5ea85e2",
 			"mount": "behavior_758017_2025-02-07_14-11-05_videoprocessed_2025-10-28_23-21-23"
 		},
