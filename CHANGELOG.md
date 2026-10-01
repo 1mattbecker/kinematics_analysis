@@ -2,6 +2,18 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-01
+
+### `men_00`: motion energy described against the task (`fip-motion-energy`)
+
+New `men_*` series. `code/men_00_motion_energy_description.ipynb` + `code/men_utils.py` describe
+ME from both cameras (aligned ME table) against go cues, choices, outcomes and licks in the FIP
+sessions: a lick-triggered clock check, trial averages, rewarded vs unrewarded, responded vs no
+response (plus isolated no-response trials), instructed vs uninstructed lick bouts, ME events
+with vs without licking (shifted-lick chance), running mean over the session with lick rate, and
+ME by reward/failure streak entering the trial. Animal is the unit. Checked locally on the 4 test
+sessions (3 animals); not yet run on Code Ocean.
+
 ## 2026-09-30
 
 ### Aligned motion-energy table for the FIP sessions (`fip-motion-energy`)

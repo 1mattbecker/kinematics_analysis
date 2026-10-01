@@ -188,6 +188,12 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 | `fip_07_da_ne_summary` | Summary of `fip_04` + `fip_05` on the CSV-curated assets, one set of conventions (+ lag = NE later; DA vermillion, NE blue, rewarded orange, unrewarded grey). Fig 1 xcorr/coherence, Fig 2 large transients with a schematic, Fig 3 task responses via Rachel's pipeline (`dummy_nwb`, `get_average_signal_window`, `event_triggered_response`, `Qch-binned3`), drawn once per window (Rachel 0.33–1 s; early/late/full). Fig 3 inputs cached (~15 min first build) |
 | `fip_06_rpe_split` | Rachel's RPE slopes split trials by RPE sign; splitting by outcome differs only for unrewarded trials with Q_chosen = 0 (1%). Where they come from (forget rate fit at 1.0; before the first reward), what they look like, and how moving them changes the slopes. Runs on `.venv-fip` with Rachel's functions |
 
+### `men_*` — motion energy (behavior only)
+
+| Notebook | Question |
+|---|---|
+| `men_00_motion_energy_description` | What does motion energy (bottom and side cameras, aligned ME table) look like against the task? Lick-triggered clock check; trial averages by go cue and choice; rewarded vs unrewarded; responded vs no response; instructed (≤2 s after go cue) vs uninstructed lick bouts; ME events with vs without licking against a shifted-lick chance level; running mean over the session; reward/failure streaks. Reads trials/licks from the CSV-curated FIP assets (no photometry). Runs locally on `.venv-fip` given `ME_DATA_ROOT` |
+
 ### `val_*` — detection validation
 
 | Notebook | Question |
@@ -233,6 +239,7 @@ see `fip_me_aligned_table_plan.md`).
 | `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
 | `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
 | `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`; `use_curation=False` for assets curated at build time, e.g. `DANE_3channels_curated`, which `build_meta` reads from the event names), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock (from the aligned ME table, asset `fip_motion_energy_aligned`: `load_me`, `me_sessions`, `motion_energy_to_session`), signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
+| `men_utils.py` | Machinery for the `men_*` series: session inventory (ME table × trial/event parquets), ME bin-averaged to 100 Hz on the session clock via `fu.motion_energy_to_session`, per-session normalisation, lick bouts and instructed/uninstructed labels, ME event detection, lick association with a circular-shift null, NaN-aware peri-event/window/rolling means, animal-level averaging and mean ± SEM plotting |
 | `fip_coupling.py` | Machinery for `fip_05` (numpy/pandas/scipy only, no CO libraries): pairs same-side `latNAcc` DA with `PL` LC-axon NE from the CSV-curated parquet assets (`inventory_pairs`, `choose_side`, `load_pairs` with a cache), per-trial baseline/response/latency measures and RPE regressions, an FIR task-event model for task-residual signals, band-limited correlation with circular-shift nulls, transient detection/pairing/context labels |
 
 `spatial_encoding.py` and `spatial_axes.py` are deliberately separate: *where* a statistic is
