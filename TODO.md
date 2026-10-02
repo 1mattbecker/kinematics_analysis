@@ -1,6 +1,7 @@
 # TODO — kinematics_analysis
 
-Deferred work items. Newest first. Dates are YYYY-MM-DD.
+Deferred work items. Newest first. Dates are YYYY-MM-DD. FIP and motion-energy work
+(`fip_*`, `men_*`) is tracked in `code/fip_todo.md`.
 
 ---
 

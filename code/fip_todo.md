@@ -1,242 +1,87 @@
-# fip_* to-do
+# fip_* / men_* to-do
 
-Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
-`fip_01_movement_value_coding.ipynb`, `fip_02_ne_only_events.ipynb`,
-`fip_03_da_ne_commonality.ipynb`, `fip_04_da_ne_xcorr.ipynb`, `fip_05_da_ne_rpe_coupling.ipynb`). Kept separate from `TODO.md`/`REORG.md`, which track the
-`kin_*`/`eph_*` port plan. Newest first, dated `YYYY-MM-DD`.
+Open work for the FIP and motion-energy notebooks (`fip_00`–`fip_07`, `men_00`). `TODO.md` tracks
+the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-02.
 
 ---
 
-## 2026-10-02
+## Plan: motion energy × FIP
 
-- **Helper clean-up** (see `helper_cleanup.md`): `fip_coupling.py` is merged into `fip_utils.py`;
-  generic code is in `signal_utils`, `stats_utils`, `plot_utils`, `behavior_utils`. `fip_00`–`fip_04`
-  are lint-checked only; run them on Code Ocean before trusting their figures.
-- **"Pass 2" (2026-09-15) is closed without moving to `plot_fip`.** Its
-  `fip_psth_multiple_inner_compute` pools over sessions, while these notebooks use the animal as the
-  unit, and it would need motion energy injected into every `df_fip` as a channel. `fip_00`'s
-  pooling uses `stats_utils` / `plot_utils` instead. Per-timepoint hierarchical bootstrap remains
-  available through `aind_hierarchical_bootstrap` (`st.hier_bootstrap`) if a final figure needs it.
+All analyses run on one dataset: the CSV-curated assets (`fu.load_pairs`, 9 animals, 97 sessions)
+with the aligned motion-energy table (`fu.motion_energy_to_session`). The animal is the unit.
+Steps 2–5 share one new notebook (`fip_08`).
 
-## 2026-09-28
+1. **Check the motion-energy data.** Attach the 4-channel rebuild as `DANE_4channels_curated`,
+   then run `men_00` on Code Ocean. Use its lick-triggered check to confirm the clock in every
+   session and camera, and pick the camera. Decide on 808054_2025-09-05 (odd ME spectrum, few
+   onsets) and animal 816212 (outlier in every coupling measure; refused cameras).
+2. **FIP variance explained by movement beyond the task.** Add lagged motion energy to the task
+   model in `fu.task_residuals` (go cue, outcome, lick kernels) and measure the variance it adds,
+   for DA and for NE, per animal. Compare with and without slow drift removed, so engagement does
+   not inflate it. This replaces porting `fip_03`.
+3. **Movement as a confound of the RPE results.** Add motion energy in the outcome window to
+   `fu.fit_rpe_terms` and check whether NE's RPE slope and DA's reward term change.
+4. **NE solo transients.** Align motion energy to solo and partnered NE and DA transients
+   (`fip_05` section 5), across animals and by task context.
+5. **Movement with and without licking.** Align DA and NE to motion-energy events without
+   licking, and to instructed vs uninstructed lick bouts (`men_00` definitions).
+6. **Timing around movement onset.** DA and NE relative to motion-energy onsets, including onsets
+   in the go cue → choice window ("anticipatory movement"). Lags describe the measured signals;
+   GCaMP and dLight kinetics differ.
+7. **Slow coupling.** Running-mean motion energy as the engagement covariate for tonic DA/NE and
+   for `fip_05`'s negative 2–10 min residual correlation.
 
-- **Take the RPE-split finding to Rachel** (`fip_06`). Her RPE ≥ 0 group contains the 1% of
-  omissions with Q_chosen = 0. They inflate her DA reward-side slope, and in sessions whose
-  rewarded RPEs span a narrow range they set it. Also worth raising: 37/301 sessions fit
-  `forget_rate_unchosen` at its bound of 1.0.
-- **Move fip_05 onto Rachel's code** (agreed plan): load with `dummy_nwb.load`, use her `data_z`,
-  `data_z_*_baseline` and `data_z_norm`, use `alignment.event_triggered_response`, report her
-  RPE slope (outcome split, pre-first-reward trials dropped) as the headline, and cut
-  the CSV-asset part of `fip_utils.py` (formerly `fip_coupling.py`) down to the analyses the
-  libraries don't have. Run on `.venv-fip`.
-
-## 2026-09-27
-
-**`fip_05_da_ne_rpe_coupling.ipynb` added** (see `CHANGELOG.md` 2026-09-27). Run locally only.
-
-- **Attach the 4-channel rebuild on Code Ocean.** Locally it is
-  `results-ddcccb0f-f18f-44a6-a2b1-caba680d28a1` (Rachel's grouped wrapper, 2026-09-22,
-  CSV-curated). It is not in `.codeocean/datasets.json`. The notebook looks for it at
-  `/root/capsule/data/DANE_4channels_curated`, so either attach it under that name or edit
-  `ASSET_CANDIDATES`.
-- **808056 is missing from the rebuild.** It was fip_04's most strongly coupled animal (40
-  sessions, peak r 0.62). Ask Rachel whether it was dropped by curation or left out. 809487 and
-  815334 are new in the rebuild, and 816214's usable side changed from L to R.
-- **Behavior-model dependence.** RPE/value come from the Q-learning fit in `df_trials`. A refit
-  or a different model family would change section 1–2 numbers; the noise correlation is the
-  quantity most sensitive to model misfit.
-- **Engagement model for the slow bands.** The 2–10 min residual correlation is negative
-  (−0.12). It is a partial correlation given event timing. An explicit engagement covariate (lick
-  rate, trial rate, running reward rate) would say whether there is any tonic co-modulation left.
-- **Kinetics.** NE's +0.2 s latency could be GCaMP vs dLight kinetics. Deconvolving with
-  published indicator kernels, or comparing with an nLight/GRAB-NE cohort, would separate them.
-- **Runtime.** About 27 min locally, mostly the parquet inventory and loading. The pair cache
-  skips the load after the first run.
+Not planned: porting `fip_03` as it is (step 2 supersedes it), more single-session work in
+`fip_00`–`fip_02`, directional or causal claims.
 
 ---
 
-## 2026-09-25
+## Open items
 
-**`fip_04_da_ne_xcorr.ipynb` added** (see `CHANGELOG.md` 2026-09-25). Synthetic-validated only.
+### Code Ocean runs
+- Run `fip_00`–`fip_04` with the 2026-10-02 helper modules; they have only been lint-checked.
+  `fip_03` rebuilds its cache (file renamed).
+- Copy figures headed for a paper from `scratch/figures` to `/results`.
 
-- **First CO run (`DA_NE_4channels` only): 144 sessions, 5 animals.** The asset holds 7 animals
-  (808054, 808056, 809488, 809491, 813929, 816212, 816214); 809488 is `drop_all` and 813929 loses
-  both PL fibers, so its 28 sessions have no pair. 809487 and 815334 are in the curation JSON
-  but not in the asset. Curation drops are applied by region label after the misconnect remap
-  (`_apply_channel_drops_to_nwb` maps `G_x` through `correct_mapping`), so no good fiber is lost.
-- **Grand-mean coherence was significant over 0–4.5 Hz and 6.5–10 Hz** (peak 0.57 at 8.8 Hz) in
-  that run, not only fip_03's 0.12–0.45 Hz band. Broad high-frequency coherence between two green
-  channels looks like shared artifact or crosstalk; check per animal before reading f/g. 816212
-  has peak r ≈ 0.00 while 808056 has 0.62.
-- **`DANE_3channels_curated` added as a second asset** (8 different animals, curated at build time
-  with the CSV curation, so loaded with `use_curation=False`). Only `PL(L)-LCAxonCa` survives
-  curation (39 sessions), so its pairs are all left-side `latNAcc(L)-DA`. Ask Rachel whether
-  `latNAcc` is the same placement as the older asset's `NAc`; if not, report the cohorts
-  separately. `medNAcc(R)-DA` is not paired (no right-side NE).
-- **Environment pin stays at `864550d`.** Upstream `main` replaced the JSON curation with CSVs in
-  `aind_bwnm_fiber_data_curation_utils` (not installed) and removed `apply_curation_nwb_list`;
-  `load_nwb_list` is unchanged, so pre-curated assets load fine on the pin.
-- **Contralateral control.** Every animal also has the opposite-side NAc dLight. DA(contra) × NE
-  would show whether the coupling is lateralized. Bilateral dLight is r ≈ 0.98 in 808054, so a
-  near-identical result is the expected outcome.
-- The Wilcoxon on peak lag has many exact-zero ties, so scipy falls back to the normal
-  approximation and warns. Report the lag with the bootstrap CI if the test is unstable.
+### Questions for Rachel
+- 808056 is missing from the 4-channel rebuild; it was the most strongly coupled animal in `fip_04`.
+- Is `latNAcc` the same placement as the older asset's `NAc`?
+- The RPE-split finding (`fip_06`): RPE = 0 omissions in her RPE ≥ 0 group, and 37/301 sessions
+  with `forget_rate_unchosen` fit at 1.0.
+- What window the `pearsonR` series uses, and what `bright` means in `dff-bright_mc-iso-IRLS`.
 
----
+### Analyses
+- Move `fip_05` onto Rachel's code (agreed): `dummy_nwb.load`, her `data_z` / `data_z_norm`,
+  `event_triggered_response`, her RPE slope with the outcome split and pre-first-reward trials
+  dropped; keep in `fip_utils` only what the libraries don't have.
+- Contralateral control: DA from the opposite NAc × NE.
+- Behavior-model dependence: RPE and value come from one Q-learning fit; a refit or another model
+  family would change `fip_05` sections 1–2.
+- Indicator kinetics: deconvolve with published kernels, or compare with an nLight/GRAB-NE cohort.
+- Decide whether `fip_04` (older asset) is retired in favour of `fip_07`.
 
-## 2026-09-23
+### Older asset (`DA_NE_4channels`, JSON curation)
+- Bilateral NAc dLight correlates at r ≈ 0.98 in 808054, and `pick_example` picks a hemisphere by
+  tie-break; make the choice explicit if this asset stays in use.
+- One session has a `no_fiber` channel; `NAc(L)-rAch` is missing from one of 808054's sessions.
+- Moving to rachel-analysis-utils' CSV curation API would need `parse_event`, `build_meta` and
+  `pick_example` reworked. Only needed if this asset stays in use; the environment is pinned to
+  `864550d`, which still has the JSON API.
 
-From the first real Code Ocean run of `fip_03` (see `CHANGELOG.md` 2026-09-23):
-
-- **Ask Rachel two things.** What window length the `pearsonR` series uses — its DA x NE value
-  is +0.034 against section 3's +0.29, and a rolling window shorter than the ~2-8 s shared
-  component would explain the gap entirely. And what `bright` denotes in the variant name
-  `dff-bright_mc-iso-IRLS` (the rest reads as dF/F, motion-corrected against the isosbestic
-  by iteratively reweighted least squares).
-- **`NAc(L)-dLight` x `NAc(R)-dLight` = +0.983** across all 10 sessions, with `max|diff|` = 0.77
-  so they are not duplicates. Bilateral NAc DA at r = 0.98 is high enough to be worth raising;
-  subject 808054 is the one with per-session `misconnect_fixes` in curation.
-- **DA is recorded bilaterally and `pick_example` picks a hemisphere by tie-break** — both
-  dLight channels have identical sample counts, so it takes whichever sorts first. The two are
-  ~98% identical so section 5/6 results barely depend on it, but the choice should be explicit.
-- **Should sections 5 and 6 be high-passed?** Motion energy has its own slow structure
-  (engagement declining across a session). If DA and NE each track it independently, drift
-  inflates the *unique* components rather than the shared one. Run section 6 both ways and
-  compare; if the components move materially that difference belongs in section 7.
-- **One session has a channel labelled `no_fiber`**, and `NAc(L)-rAch` appears in 9 of 10
-  sessions. Curation gaps, not urgent.
+### Library
+- Move the bout helpers in `behavior_utils` into the video-analysis library (PR, then rebuild).
 
 ---
 
-## 2026-09-22
+## Closed
 
-**`fip_03_da_ne_commonality.ipynb` added** (see `CHANGELOG.md` 2026-09-22). Validated statically
-and against synthetic data; never run on Code Ocean. Open items:
-
-- **Run it on Code Ocean.** Run `fip_02` first as a smoke test — no `fip_*` notebook has executed
-  against real data (item 4 below), so the first real run of `fip_03` will surface any
-  `fip_utils` bug its predecessors would have found. Expect ~15 min after
-  `load_curated_sessions()`. Confirm §2 prints 10 sessions / 1 subject.
-- **Sweep the two switches.** Re-run with `ME_TRANSFORM = "raw"` and compare §6's partition
-  against the `log1p` run; if the three components move materially, motion energy's right tail is
-  driving the split and §7 should say so. Then re-run with `TARGET = "events"` and confirm the
-  Poisson path reports D² in place of R² throughout.
-- **Animal-level inference.** The binding constraint is that motion energy exists for 10 sessions
-  from one animal. Two routes: swap the behavioral target to lick/choice events from `df_trials`
-  (~172 curated sessions, 20 subjects), which needs a different event source in §2 and a
-  bootstrap over animals in §6; or run `aind-motion-energy` (capsule 5110154) over more of the
-  20 subjects' behavior-video assets to widen the existing path.
-- **Figure destination.** §1 writes to `/root/capsule/scratch/figures/fip`, which a reproducible
-  run does not preserve. Anything headed for a paper figure needs copying to `/results`.
-- **Open parameter choices**, all with defaults in place and none yet checked against real data:
-  the lag basis (`N_BASIS = 8`, log-warped over −2 to +5 s), block CV geometry (`N_BLOCKS = 5`,
-  `EMBARGO_S = 7.0`), and whether `fu.pick_example` silently taking one fiber per region is
-  acceptable when a session has two dLight fibers.
-
----
-
-## 2026-09-15 (1)
-
-**The `fip_utils.py` extraction logged below is DONE** (see `CHANGELOG.md` 2026-09-15 (3)).
-`code/fip_utils.py` now carries the shared setup and all three notebooks import it. Remaining
-`fip_*` work, newest first:
-
-- **Pin `environment/Dockerfile` to a rachel-analysis-utils commit that still has the JSON
-  curation API.** NOT DONE — CLAUDE.md puts `/environment` off limits, so this needs a human.
-  Upstream `main` (`b7b7487`, 2026-09-14, "CSV-based data curation inputs") deleted
-  `apply_curation_nwb_list`; `data_curation_helpers.py` is now `load_curation` +
-  `apply_curation_df_fip`. The Dockerfile installs `@main` unpinned, and the cached image still
-  has the old API — the next rebuild breaks `fu.load_curated_sessions`, and then
-  `parse_event` / `build_meta` / `pick_example`, which key off `event` looking like
-  `G_1_dff-poly` and off `intended_measurement` existing. Change line 60 to:
-
-      -e git+https://github.com/AllenNeuralDynamics/rachel-analysis-utils.git@864550d55356ecb4906d05801cdae694bd000fde#egg=rachel-analysis-utils
-
-  Pin `864550d` (2026-09-02) verified to carry: `apply_curation_nwb_list(nwb_list, curation,
-  drop_borderline=False)` with the signature we call; all five private helpers in `nwb_utils`
-  (so `fu.patch_curation_helpers` resolves); `DA_NE_4channel_datacuration_firstpass.json`; and
-  `analysis_utils.py` at 177 lines, 3.9-compile-clean, with `enrich_df_trials`. The adjacent
-  Dockerfile comment ("no deps", hence the isolated `--ignore-requires-python` layer) stays
-  accurate: `dependencies = []` at the pin *and* at main. Note the failure mode at main is not a
-  resolution conflict but an undeclared import — `data_curation_helpers.py` does
-  `from aind_bwnm_fiber_data_curation_utils import data` at module top level while declaring it
-  nowhere, so pip installs nothing for it and the import raises `ModuleNotFoundError`.
-
-- **Migrate curation to the CSV API and unpin.** A real migration, not a swap: the new
-  `apply_curation_df_fip` overwrites `df_fip['event']` with target names, needs a `patch_cord`
-  column from `nwb_utils.split_fiber`, wants to run *before* `enrich_fip_in_df_trials`, and
-  drops `intended_measurement` — so `fu.parse_event`, `fu.build_meta` and `fu.pick_example` all
-  need rework, and the new dependency must be added to the image.
-
-- **Pass 2: move `fip_00`'s multi-session section onto the upstream PSTH machinery.**
-  `session_etr_mean` + `aggregate_series` + `collect_region_etr` + `plot_by_subject` (the four
-  functions deliberately left in `fip_00` cell 36 rather than moved into `fip_utils`) collapse
-  into `plot_fip.plot_fip_psth_compare_alignments(nwb_list, alignments=[per-session dicts],
-  channel=..., data_column="data_z", error_type="sem_over_sessions")`. Compatible: Rachel's
-  `get_dummy_nwbs` builds `dummy_nwb(df_trials_i, df_events_i, df_fip_i)`, so `df_events` exists
-  and the `nu.create_df_events` branch never fires. Requires ME as a pseudo-channel for every
-  session, i.e. flipping on `BUILD_NWB_LIST_ME` (already implemented in `fip_00`'s last cell);
-  its memory cost must be re-measured. Use `error_type="sem_over_sessions"` first — upstream's
-  own docstring advises deferring hierarchical bootstrap until analyses are finalized — with
-  `hb_sem` + `aggregate_bootstrap_statistics` (per-timepoint p-values, which we have no
-  equivalent for today) held for final figures. **Expect figures to change:**
-  `fip_psth_inner_compute` hardcodes `output_sampling_rate=40` vs. `fu.peri_event`'s `fs=20`,
-  and the error band changes from a manual session->subject rollup. That is why it is a separate
-  pass from the extraction.
-  `window_mean` and Analysis 3 stay hand-rolled — `trial_metrics.get_average_signal_window` adds
-  a per-trial column to `df_trials`, whereas `window_mean` averages an ETR-mean Series over
-  relative time. Different semantics, not a substitute.
-
-- **Run Pass 1 on Code Ocean.** The extraction is verified statically only (py_compile,
-  nbformat, nbconvert+compile, pyflakes); nothing has executed against real data. Run `fip_02`,
-  then `fip_01`, then `fip_00` *including* the multi-session section, and confirm:
-  `process_session` still skips ME-less sessions gracefully; Analyses 1-4 and the cross-session
-  table reproduce; `fip_02`'s NE-only / NE+DA counts match their pre-refactor values (the
-  `ddof=0`->`ddof=1` change should move no onsets — if counts shift by more than a couple of
-  events, investigate rather than accept); and peak RSS after `fu.load_curated_sessions()` stays
-  at or below the ~43 GB measured with the old in-notebook `del`.
-
-- **"Anticipatory movement during CS+Delay"** — the 4th figure originally requested alongside
-  `fip_01`'s three, still skipped. This dynamic-foraging task has no literal CS+/delay epoch;
-  the closest structural analog is the goCue->choice RT window. Revisit once there is a clearer
-  definition of what epoch/comparison is wanted.
-
-## 2026-09-14 (2) — superseded, kept for context
-
-
-- **`fip_utils.py` extraction is now overdue.** A 3rd notebook (`fip_02_ne_only_events.ipynb`)
-  duplicates the same setup cells (data loading, curation + memory fix, session select,
-  `pick_example`/`EXAMPLE_SPECS`, motion-energy-on-the-FIP-clock, `zscore`/`threshold_onsets`/
-  `peri_event`) already duplicated once between `fip_00` and `fip_01`. Do the extraction logged
-  below before a 4th notebook makes it worse.
-- `fip_02_ne_only_events.ipynb` deliberately does **not** run the `enrich_fip_in_df_trials`/
-  `remove_tonic_df_fip` per-trial baseline pipeline `fip_01` uses — it only needs continuous-time
-  `data_z` (from `zscore_fip` directly), since its analysis is onset-based, not per-trial. Worth
-  keeping in mind when `fip_utils.py` is extracted: the shared module should expose the
-  z-scoring/attach step and the per-trial pipeline as separable pieces, not one bundled function.
-
-## 2026-09-14 (1) — superseded, kept for context
-
-- **Extract shared setup into `code/fip_utils.py`.** `fip_00_explore.ipynb` and
-  `fip_01_movement_value_coding.ipynb` currently duplicate ~150 lines of setup (session load,
-  curation + the `apply_curation_nwb_list` missing-helper patch, `motion_energy_to_session`,
-  `threshold_onsets`, `peri_event`, `zscore`, `attach_me_to_df_fip`). Factor into a flat module
-  once `fip_01`'s approach has stabilized, following the `plotstyle.py`/`encoding_plots.py`
-  pattern already used in this repo. Note: `fip_01`'s `attach_me_to_df_fip` stores raw `me`
-  (not `me_z` like `fip_00`'s) — reconcile which convention the shared version uses when this
-  is extracted (see `fip_01`'s Deviations-from-Rachel's-pipeline note in its implementation
-  plan for why raw is preferred).
-- **Verify `import rachel_analysis_utils.analysis_utils` on Code Ocean.** A local
-  `python3.9 -m py_compile` against a fresh clone of `main` succeeds cleanly — the nested-quote
-  f-string bug `TODO.md`'s Python-3.11-upgrade section cites (`analysis_utils.py:294`) appears
-  to have been fixed upstream (current file is 177 lines). `fip_01_movement_value_coding.ipynb`
-  already tries `enrich_df_trials` directly with a local fallback; if the CO run confirms the
-  import works, (a) switch `fip_00_explore.ipynb`'s multi-session section from its local
-  `enrich_streaks` reimplementation to `enrich_df_trials` directly, and (b) update `TODO.md`'s
-  Python-3.11-upgrade rationale — item 2 no longer blocks on this specific function, though the
-  base-image upgrade may still be worth doing for other reasons.
-- **"Anticipatory movement during CS+Delay"** — the 4th figure originally requested alongside
-  `fip_01`'s three, skipped for that first pass. This dynamic-foraging task has no literal
-  CS+/delay epoch; the closest structural analog is the goCue→choice RT window (movement
-  building in anticipation of choice/outcome, analogous to anticipatory licking in Pavlovian
-  paradigms). Revisit once there's a clearer definition of what epoch/comparison is wanted.
+- `fip_utils` extraction; `fip_coupling` merged into `fip_utils`; shared helper modules
+  (2026-10-02, `helper_cleanup.md`).
+- Dockerfile pinned to rachel-analysis-utils `864550d`.
+- Rachel's `analysis_utils` imports on Python 3.12; local fallback removed.
+- "Pass 2" onto `plot_fip`: not done, by decision. It pools over sessions and needs motion energy as
+  a `df_fip` channel; `fip_00` uses `stats_utils` / `plot_utils`.
+- `fip_04`'s 5–10 Hz coherence: noise floor of low-passed signals (`fip_05`).
+- `fip_05`'s "NE 0.2 s after DA": produced by DA's omission dip; latencies match on rewarded trials.
+- `fip_03` with motion energy for one animal only: superseded by the motion-energy table and plan
+  step 2. Its open choices (switch sweeps, lag basis, CV geometry, high-pass) carry into step 2.
