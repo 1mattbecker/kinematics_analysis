@@ -1,35 +1,37 @@
 """
-fip_utils.py — shared setup for the ``fip_*`` notebook series.
+fip_utils.py — shared code for the ``fip_*`` notebook series (and ``men_*``'s trial tables).
 
-One home for the load → curate → session-setup preamble that
-``fip_00_explore.ipynb``, ``fip_01_movement_value_coding.ipynb`` and
-``fip_02_ne_only_events.ipynb`` previously each carried their own copy of
-(~490 duplicated lines across the three).
+Two data paths, one per kind of FIP asset:
 
-Scope
------
-This module owns *plumbing*: locating and loading the saved parquet hierarchy,
-applying curation, picking a session and its example channels, putting motion
-energy on the FIP clock, and the small signal helpers (z-score, onset
-detection, peri-event alignment, cross-correlation).
+* **NWB-list assets with JSON curation** (``DA_NE_4channels``; ``fip_00``–``fip_04``):
+  :func:`load_curated_sessions` reads the saved parquet hierarchy with Rachel's
+  ``load_nwb_list`` and applies the JSON curation; :func:`select_session`, :func:`build_meta`,
+  :func:`pick_example` set up one session; :func:`process_session` adds motion energy.
+* **CSV-curated assets read directly** (``DANE_3channels_curated``, the 4-channel rebuild;
+  ``fip_05``, ``fip_07``, ``men_00``): :func:`find_asset_root`, :func:`inventory_pairs`,
+  :func:`choose_side`, :func:`load_pairs` put same-side DA/NE pairs on a uniform grid;
+  :func:`trial_measures`, :func:`fit_rpe_terms`, :func:`residualize`, :func:`task_residuals`
+  measure them. (This was ``fip_coupling.py``.)
 
-It deliberately does **not** own the choice of FIP normalization. The three
-``aind_dynamic_foraging_data_utils.enrich_dfs`` entry points are three
-*different* normalizations, not three steps of one pipeline:
+Motion energy on the FIP clock (:func:`load_me`, :func:`motion_energy_to_session`) serves both.
+Generic signal code is in ``signal_utils``, across-animal statistics in ``stats_utils``, task
+context and lick bouts in ``behavior_utils``.
+
+This module does **not** own the choice of FIP normalization. The three
+``aind_dynamic_foraging_data_utils.enrich_dfs`` entry points are three different
+normalizations, not three steps of one pipeline:
 
 * ``zscore_fip``              -> whole-session ``data_z``
-* ``enrich_fip_in_df_trials`` -> re-cuts signals into per-trial windows
-                                 (z-scores internally; a prior ``zscore_fip``
-                                 would double-process)
+* ``enrich_fip_in_df_trials`` -> re-cuts signals into per-trial windows (z-scores internally;
+                                 a prior ``zscore_fip`` would double-process)
 * ``remove_tonic_df_fip``     -> per-trial ``data_z_*_baseline`` / ``_norm``
 
-Which one a notebook runs defines what "elevated" means for
-:func:`threshold_onsets` and what its AUC figures measure, so that call stays
-visible in each notebook. What this module provides is the bridge into that
-pipeline — :func:`attach_me_to_df_fip`, which takes **raw** motion energy
-precisely because those functions z-score ``data`` themselves.
+Which one a notebook runs defines what "elevated" means for onset detection and what its AUC
+figures measure, so that call stays visible in each notebook. :func:`attach_me_to_df_fip`
+bridges motion energy into that pipeline and takes **raw** motion energy because those
+functions z-score ``data`` themselves.
 
-Usage (notebooks run with ``code/`` as cwd on Code Ocean)::
+Usage (notebooks run with ``code/`` as cwd)::
 
     %load_ext autoreload
     %autoreload 2
@@ -37,14 +39,12 @@ Usage (notebooks run with ``code/`` as cwd on Code Ocean)::
 
     nwb_list = fu.load_curated_sessions()
     nwb, df_fip, df_trials = fu.select_session(nwb_list, 0)
-    meta = fu.build_meta(df_fip)
-    examples = fu.pick_examples(meta, df_fip)
 
-``autoreload`` matters here: a session load is tens of GB and several minutes,
-so without it every edit to this file costs a kernel restart and a full reload.
+``autoreload`` matters for the NWB path: a session load is tens of GB and several minutes.
 
-Data lives on Code Ocean; nothing in this module runs against local data.
-Python 3.9-compatible syntax only (see CLAUDE.md).
+Clock: every time is session time (s from the first go cue), shared by
+``df_fip['timestamps']`` and the ``*_in_session`` trial columns. A loaded pair is on a uniform
+``fs``-Hz grid starting at ``t0``; sample ``i`` sits at ``t0 + i / fs``.
 """
 
 from __future__ import annotations
@@ -53,10 +53,15 @@ import gc
 import glob
 import json
 import os
+import pickle
+import re
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
+
+import signal_utils as su
 
 import fastparquet  # noqa: F401  # load_nwb_list uses pd.read_parquet(engine="fastparquet")
 
@@ -648,7 +653,7 @@ def load_me(
        frames by ±1.6% of noise. Unchanged (divided by 1) on sessions without drops.
     2. **Even sampling.** Linear interpolation on ``harp_time`` onto a grid at the camera
        rate (``1 / frame_interval_s``), so a dropped exposure becomes one interpolated sample
-       and code that counts samples (``threshold_onsets``' ``min_run``, Welch on the raw
+       and code that counts samples (``signal_utils.threshold_onsets``' ``min_run``, Welch on the raw
        rate) sees a uniform series.
 
     Frame 0 has no ME value (the table stores NaN there), so the grid starts at frame 1.
@@ -829,81 +834,371 @@ def attach_me_to_df_fip(
     return pd.concat([df_fip, me_rows], ignore_index=True)
 
 
-# ── Signal helpers ────────────────────────────────────────────────────────────
+# ── CSV-curated assets: loading ───────────────────────────────────────────────
 
-def zscore(y) -> np.ndarray:
-    """Z-score a 1D array, ignoring NaNs.
+#: Same-side DA and NE labels. ``medNAcc`` is left out so every animal contributes one DA site
+#: (lateral NAc); ``-unconfirmed`` PL fibers never survive curation and are excluded anyway.
+DA_RE = re.compile(r"^latNAcc\((L|R)\)-DA$")
+NE_RE = re.compile(r"^PL\((L|R)\)-LCAxonCa$")
 
-    Uses ``ddof=1`` to match ``aind_dynamic_foraging_data_utils.enrich_dfs.zscore_fip``
-    (``scipy.stats.zscore(x, ddof=1, nan_policy='omit')``), so a trace z-scored here and
-    the same trace's ``data_z`` column agree. Prefer ``data_z`` when it is available; this
-    is for array-only paths where df_fip has not been enriched.
-
-    Returns the mean-centred array unchanged when the standard deviation is zero or
-    non-finite, rather than dividing by it.
-    """
-    y = np.asarray(y, float)
-    sd = np.nanstd(y, ddof=1)
-    if not np.isfinite(sd) or sd == 0:
-        return y - np.nanmean(y)
-    return (y - np.nanmean(y)) / sd
+#: Trial columns carried into the cache. ``RPE_*`` / ``Q_*`` come from the behavioral model fit
+#: (``QLearning_L1F1_CK1_softmax``, fit per session by the AIND analysis-architecture pipeline) via
+#: ``aind_dynamic_foraging_data_utils.enrich_dfs.enrich_df_trials_fm``:
+#: ``RPE_earned = earned_reward − Q_chosen``; ``RPE_all`` adds ``extra_reward`` (unearned water).
+#: Rachel's analyses (``rachel_analysis_utils.analysis_utils.enrich_df_trials``) use ``RPE_earned``.
+TRIAL_COLS = [
+    "trial", "goCue_start_time_in_session", "choice_time_in_session",
+    "reward_outcome_time_in_session", "animal_response", "earned_reward", "extra_reward",
+    "RPE_earned", "RPE_all",
+    "Q_chosen", "Q_unchosen", "Q_sum", "num_reward_past", "response_time",
+]
 
 
-def threshold_onsets(
-    t,
-    y,
-    z_thresh: float = 2.5,
-    refractory: float = 0.5,
-    min_run: int = 1,
-    already_z: bool = False,
-    min_run_s: Optional[float] = None,
-) -> np.ndarray:
-    """Causal upward threshold crossings of a z-scored trace (no smoothing).
-
-    An onset is the first sample that rises above ``z_thresh`` SD and then stays above for
-    at least ``min_run`` **samples** (not seconds). That rejects single-sample spikes
-    without smoothing or shifting timing, so the onset time is the true first crossing.
-    ``refractory`` (seconds) collapses repeats so one bout is counted once.
+def find_asset_root(candidates: Sequence[str]) -> Optional[str]:
+    """First candidate directory that holds ``df_curation_*.csv`` files.
 
     Parameters
     ----------
-    t : array_like
-        Timestamps, same length as ``y``.
-    y : array_like
-        Signal. Already z-scored when ``already_z``, else z-scored internally by
-        :func:`zscore`.
-    z_thresh : float
-        Threshold in SD.
-    refractory : float
-        Minimum spacing between reported onsets, in seconds.
-    min_run : int
-        Number of consecutive samples that must stay above threshold.
-    already_z : bool
-        Set True when passing an upstream ``data_z`` column, so it is not z-scored twice.
-    min_run_s : float, optional
-        The run length in seconds instead, converted with the median sample interval of
-        ``t``; overrides ``min_run``. Use it when the sample rate differs between callers
-        (motion energy at the camera rate vs a resampled grid).
+    candidates : sequence of str
+        Directories to try in order. For each, the directory itself and its ``data/``
+        subfolder are checked (Rachel's wrapper output nests the hierarchy under ``data/``).
 
     Returns
     -------
-    numpy.ndarray
-        Onset times, in ``t``'s units.
+    str or None
+        The directory that directly contains the subject folders, or None if none match.
     """
-    z = np.asarray(y, float) if already_z else zscore(y)
-    if min_run_s is not None:
-        min_run = max(1, int(round(min_run_s / np.median(np.diff(np.asarray(t, float))))))
-    above = z > z_thresh  # NaN compares False -> treated as below threshold
-    idx = np.where((~above[:-1]) & above[1:])[0] + 1
-    if min_run > 1 and len(idx):  # require the crossing to persist (causal spike rejection)
-        idx = np.array(
-            [i for i in idx if i + min_run <= len(above) and above[i:i + min_run].all()],
-            dtype=int,
-        )
-    times = np.asarray(t, float)[idx]
-    if len(times):  # enforce refractory period
-        times = times[np.insert(np.diff(times) > refractory, 0, True)]
-    return times
+    for c in candidates:
+        for d in (c, os.path.join(c, "data")):
+            if glob.glob(os.path.join(d, "df_curation_*.csv")):
+                return d
+    return None
+
+
+def inventory_pairs(asset_roots: Dict[str, str]) -> pd.DataFrame:
+    """One row per (session, hemisphere) that has both a DA and an NE fiber.
+
+    Parameters
+    ----------
+    asset_roots : dict
+        ``{asset_name: root}`` with roots from :func:`find_asset_root`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``asset, subject, session, side, da_event, ne_event, path``.
+    """
+    import pyarrow.parquet as pq
+
+    rows = []
+    for asset, root in asset_roots.items():
+        for f in sorted(glob.glob(os.path.join(root, "*", "*", "df_fip.parquet"))):
+            events = set(pq.read_table(f, columns=["event"]).column("event").to_pylist())
+            da = {DA_RE.match(e).group(1): e for e in events if DA_RE.match(e)}
+            ne = {NE_RE.match(e).group(1): e for e in events if NE_RE.match(e)}
+            session_dir = os.path.dirname(f)
+            for side in sorted(set(da) & set(ne)):
+                rows.append(dict(asset=asset, subject=os.path.basename(os.path.dirname(session_dir)),
+                                 session=os.path.basename(session_dir), side=side,
+                                 da_event=da[side], ne_event=ne[side], path=session_dir))
+    return pd.DataFrame(rows)
+
+
+def choose_side(inv: pd.DataFrame, min_sessions: int = 3) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Hold each animal to one hemisphere and drop animals with too few sessions.
+
+    Parameters
+    ----------
+    inv : pandas.DataFrame
+        From :func:`inventory_pairs`.
+    min_sessions : int
+        Animals with fewer same-side sessions than this are dropped.
+
+    Returns
+    -------
+    kept : pandas.DataFrame
+        The rows of ``inv`` used downstream.
+    table : pandas.DataFrame
+        Per animal: sessions per side, the side used, and whether the animal is kept.
+    """
+    table = pd.crosstab(inv["subject"], inv["side"])
+    for s in ("L", "R"):
+        if s not in table:
+            table[s] = 0
+    table["asset"] = inv.groupby("subject")["asset"].first()
+    table["side_used"] = np.where(table["L"] >= table["R"], "L", "R")
+    table["n_used"] = np.where(table["side_used"] == "L", table["L"], table["R"])
+    table["kept"] = table["n_used"] >= min_sessions
+    side_of = table["side_used"]
+    kept = inv[(inv["side"] == inv["subject"].map(side_of))
+               & inv["subject"].map(table["kept"])].reset_index(drop=True)
+    return kept, table[["asset", "L", "R", "side_used", "n_used", "kept"]]
+
+
+def _load_one(row, fs: float, pre_s: float, post_s: float) -> dict:
+    fip = pd.read_parquet(os.path.join(row.path, "df_fip.parquet"),
+                          columns=["timestamps", "data", "event"])
+    trials = pd.read_parquet(os.path.join(row.path, "df_trials.parquet"))
+    events = pd.read_parquet(os.path.join(row.path, "df_events.parquet"),
+                             columns=["timestamps", "event"])
+    cues = trials["goCue_start_time_in_session"].dropna().to_numpy()
+    t0 = float(cues.min() - pre_s)
+    grid = np.arange(t0, float(cues.max() + post_s), 1.0 / fs)
+    traces = {}
+    for name, ev in (("da", row.da_event), ("ne", row.ne_event)):
+        g = fip[fip["event"] == ev].sort_values("timestamps")
+        g = g[np.isfinite(g["data"])]
+        traces[name] = np.interp(grid, g["timestamps"].to_numpy(),
+                                 g["data"].to_numpy()).astype(np.float32)
+    cols = [c for c in TRIAL_COLS if c in trials]
+    licks = np.sort(events.loc[events["event"].str.contains("lick"), "timestamps"].to_numpy())
+    return dict(asset=row.asset, subject=row.subject, session=row.session, side=row.side,
+                t0=t0, fs=fs, da=traces["da"], ne=traces["ne"],
+                trials=trials[cols].reset_index(drop=True), licks=licks)
+
+
+def load_pairs(kept: pd.DataFrame, fs: float = 20.0, pre_s: float = 5.0, post_s: float = 10.0,
+               cache_path: Optional[str] = None, verbose: bool = True) -> List[dict]:
+    """Load every kept pair onto a uniform grid covering the task period.
+
+    Parameters
+    ----------
+    kept : pandas.DataFrame
+        From :func:`choose_side`.
+    fs : float
+        Grid rate in Hz (the FIP rate is 20 Hz, so this is a resample onto exact spacing).
+    pre_s, post_s : float
+        Grid runs from ``pre_s`` before the first go cue to ``post_s`` after the last one.
+    cache_path : str, optional
+        If given and present, loaded from there; otherwise written there after loading. The cache
+        is keyed on the session list, so a changed selection reloads.
+    verbose : bool
+        Print progress.
+
+    Returns
+    -------
+    list of dict
+        One dict per session: ``asset, subject, session, side, t0, fs, da, ne, trials, licks``.
+        ``da`` / ``ne`` are dF/F (``data`` column, ``dff-bright_mc-iso-IRLS`` preprocessing),
+        not z-scored.
+    """
+    key = (tuple(kept["path"]), tuple(TRIAL_COLS))  # a changed column list also reloads
+    if cache_path and os.path.exists(cache_path):
+        with open(cache_path, "rb") as fh:
+            cached = pickle.load(fh)
+        if cached.get("key") == key and cached.get("fs") == fs:
+            if verbose:
+                print(f"loaded {len(cached['pairs'])} pairs from cache {cache_path}")
+            return cached["pairs"]
+    pairs = []
+    for i, row in enumerate(kept.itertuples()):
+        pairs.append(_load_one(row, fs, pre_s, post_s))
+        if verbose and (i + 1) % 20 == 0:
+            print(f"  loaded {i + 1} / {len(kept)}")
+    if cache_path:
+        os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
+        with open(cache_path, "wb") as fh:
+            pickle.dump(dict(key=key, fs=fs, pairs=pairs), fh)
+    return pairs
+
+
+# ── CSV-curated assets: per-trial measures ────────────────────────────────────
+
+def trial_measures(pair: dict, windows: Dict[str, Tuple[float, float]],
+                   baseline: Tuple[float, float] = (-1.0, 0.0),
+                   latency_window: Tuple[float, float] = (0.0, 1.5)) -> pd.DataFrame:
+    """Per-trial baseline, outcome-response and peak-latency measures for DA and NE.
+
+    Each signal is z-scored over the session grid first. Response windows are aligned to
+    ``reward_outcome_time_in_session`` and baseline-subtracted (``baseline`` is relative to the
+    go cue, so the pre-trial level is removed from the response). Peak latency is the time of the
+    maximum within ``latency_window`` after the go cue.
+
+    Parameters
+    ----------
+    pair : dict
+        One element of :func:`load_pairs`.
+    windows : dict
+        ``{name: (a, b)}`` response windows in s relative to the outcome.
+    baseline : tuple
+        Pre-cue baseline window relative to the go cue.
+    latency_window : tuple
+        Window after the go cue searched for the peak.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``pair['trials']`` plus ``{sig}_pre``, ``{sig}_{window}``, ``{sig}_lat``, ``{sig}_peak``
+        for ``sig`` in ``da``, ``ne``; ``trial_frac`` (position in session, 0-1); ``rewarded``,
+        ``responded``, ``subject``, ``session``.
+    """
+    tr = pair["trials"].copy()
+    t0, fs = pair["t0"], pair["fs"]
+    cue = tr["goCue_start_time_in_session"].to_numpy()
+    out = tr["reward_outcome_time_in_session"].to_numpy()
+    lags = np.arange(int(round(latency_window[0] * fs)), int(round(latency_window[1] * fs))) / fs
+    for sig in ("da", "ne"):
+        x = su.zscore(pair[sig])
+        pre = su.window_mean_grid(x, t0, fs, cue, *baseline)
+        tr[f"{sig}_pre"] = pre
+        for name, (a, b) in windows.items():
+            tr[f"{sig}_{name}"] = su.window_mean_grid(x, t0, fs, out, a, b) - pre
+        seg = su.peri_event_grid(x, t0, fs, cue, lags)
+        good = np.isfinite(seg).all(axis=1)
+        lat = np.full(len(tr), np.nan)
+        peak = np.full(len(tr), np.nan)
+        lat[good] = lags[np.argmax(seg[good], axis=1)]
+        peak[good] = seg[good].max(axis=1) - pre[good]
+        tr[f"{sig}_lat"] = lat
+        tr[f"{sig}_peak"] = peak
+    tr["responded"] = tr["animal_response"] < 2
+    tr["rewarded"] = tr["earned_reward"].astype(bool) & tr["responded"]
+    tr["trial_frac"] = np.arange(len(tr)) / max(len(tr) - 1, 1)
+    tr["subject"] = pair["subject"]
+    tr["session"] = pair["session"]
+    return tr
+
+
+def fit_rpe_terms(df: pd.DataFrame, y: str, rpe_col: str = "RPE_earned",
+                  covariates: Sequence[str] = ()) -> pd.Series:
+    """OLS of a response on reward and on RPE separately within each outcome.
+
+    ``y ~ 1 + rewarded + RPE·rewarded + RPE·(1 − rewarded)``. Within an outcome class RPE is
+    ``1 − Q_chosen`` (rewarded) or ``−Q_chosen`` (unrewarded), so the two slopes ask whether the
+    response scales with how expected that outcome was. A signed-RPE signal has a positive slope in
+    both classes; a pure outcome signal has zero slopes; an unsigned surprise signal has a positive
+    slope for rewards and a negative one for omissions.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Responded trials with ``rewarded``, ``rpe_col`` and column ``y``.
+    y : str
+        Response column.
+    rpe_col : str
+        RPE column (default ``RPE_earned``, Rachel's convention).
+    covariates : sequence of str
+        Extra nuisance columns (e.g. ``response_time``: low-value choices are slower, so more of
+        the cue response falls inside a window aligned to the outcome).
+
+    Returns
+    -------
+    pandas.Series
+        ``intercept, reward, rpe_rew, rpe_unrew`` (units of ``y`` per unit RPE), and ``n``.
+    """
+    d = df[["rewarded", rpe_col, y, *covariates]].dropna()
+    r = d["rewarded"].to_numpy(float)
+    rpe = d[rpe_col].to_numpy(float)
+    X = np.c_[np.ones(len(d)), r, rpe * r, rpe * (1 - r), d[list(covariates)].to_numpy(float)]
+    beta, *_ = np.linalg.lstsq(X, d[y].to_numpy(float), rcond=None)
+    return pd.Series(dict(intercept=beta[0], reward=beta[1], rpe_rew=beta[2], rpe_unrew=beta[3],
+                          n=len(d)))
+
+
+def residualize(df: pd.DataFrame, y: str, covariates: Sequence[str],
+                group: Optional[str] = "session") -> pd.Series:
+    """Residual of ``y`` after OLS on ``covariates``, fit separately within each ``group``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+    y : str
+    covariates : sequence of str
+        Numeric columns (booleans are cast to float). Interactions are passed as precomputed columns.
+    group : str or None
+        Fit within each level (default per session, which also removes session means).
+
+    Returns
+    -------
+    pandas.Series
+        Aligned to ``df.index``; NaN where ``y`` or any covariate is missing.
+    """
+    out = pd.Series(np.nan, index=df.index)
+    groups = [(None, df)] if group is None else df.groupby(group)
+    for _, g in groups:
+        g = g[[y, *covariates]].dropna()
+        if len(g) <= len(covariates) + 2:
+            continue
+        X = np.c_[np.ones(len(g)), g[list(covariates)].to_numpy(float)]
+        beta, *_ = np.linalg.lstsq(X, g[y].to_numpy(float), rcond=None)
+        out.loc[g.index] = g[y].to_numpy(float) - X @ beta
+    return out
+
+
+# ── CSV-curated assets: task model ────────────────────────────────────────────
+
+def event_design(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0)):
+    """Sparse FIR design matrix of task events for one session.
+
+    One boxcar regressor per lag in ``kernel_s`` for each of: go cue, outcome on rewarded trials,
+    outcome on unrewarded trials, and every lick. Plus an intercept. Kernels are shared across
+    trials, so trial-to-trial amplitude variation (RPE, noise) stays in the residual.
+
+    Returns
+    -------
+    scipy.sparse.csr_matrix
+        ``(n_samples, 4 * n_lags + 1)``.
+    """
+    n = len(pair["da"])
+    fs, t0 = pair["fs"], pair["t0"]
+    tr = pair["trials"]
+    responded = (tr["animal_response"] < 2).to_numpy()
+    rewarded = tr["earned_reward"].astype(bool).to_numpy() & responded
+    out = tr["reward_outcome_time_in_session"].to_numpy()
+    events = [tr["goCue_start_time_in_session"].to_numpy(), out[rewarded],
+              out[responded & ~rewarded], pair["licks"]]
+    lag_i = np.arange(int(round(kernel_s[0] * fs)), int(round(kernel_s[1] * fs)))
+    rows, cols = [], []
+    for e, times in enumerate(events):
+        times = times[np.isfinite(times)]
+        idx = su.grid_index(times, t0, fs)
+        for j, k in enumerate(lag_i):
+            ii = idx + k
+            ii = ii[(ii >= 0) & (ii < n)]
+            rows.append(ii)
+            cols.append(np.full(len(ii), e * len(lag_i) + j))
+    n_col = len(events) * len(lag_i)
+    rows.append(np.arange(n))
+    cols.append(np.full(n, n_col))
+    rows = np.concatenate(rows)
+    cols = np.concatenate(cols)
+    return csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n_col + 1))
+
+
+def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
+                   ridge: float = 1e-3) -> dict:
+    """Split each z-scored signal into a task-evoked fit and a residual.
+
+    Parameters
+    ----------
+    pair : dict
+    kernel_s : tuple
+        Kernel span relative to each event, s.
+    ridge : float
+        Small ridge on the normal equations, for overlapping-lick collinearity.
+
+    Returns
+    -------
+    dict
+        ``{sig: z, sig + '_fit': fitted, sig + '_res': residual, sig + '_r2': fraction explained}``
+        for ``sig`` in ``da``, ``ne``.
+    """
+    X = event_design(pair, kernel_s)
+    XtX = (X.T @ X).toarray()
+    XtX[np.diag_indices_from(XtX)] += ridge
+    out = {}
+    for sig in ("da", "ne"):
+        y = su.zscore(pair[sig])
+        beta = np.linalg.solve(XtX, X.T @ y)
+        fit = X @ beta
+        out[sig] = y
+        out[sig + "_fit"] = fit
+        out[sig + "_res"] = y - fit
+        out[sig + "_r2"] = 1.0 - np.var(y - fit) / np.var(y)
+    return out
+
+
+# ── Signal helpers ────────────────────────────────────────────────────────────
 
 
 def peri_event(
@@ -963,39 +1258,6 @@ def peri_event(
     )
 
 
-def norm_xcorr(a, b, fs, maxlag: float = 3.0) -> Tuple[np.ndarray, np.ndarray]:
-    """Normalised cross-correlation of two equal-length, uniformly-sampled signals.
-
-    ``out[lag] = mean(a[t+lag] * b[t])`` with ``a``, ``b`` z-scored. A peak at POSITIVE lag
-    means **b leads a** (b precedes a by ``lag`` seconds).
-
-    Parameters
-    ----------
-    a, b : array_like
-        Equal-length signals on a common uniform grid.
-    fs : float
-        Sampling rate of that grid, in Hz.
-    maxlag : float
-        Maximum lag to evaluate, in seconds.
-
-    Returns
-    -------
-    tuple of numpy.ndarray
-        ``(lags_in_seconds, correlation)``.
-    """
-    a, b = zscore(a), zscore(b)
-    n = len(a)
-    K = int(round(maxlag * fs))
-    lags = np.arange(-K, K + 1)
-    out = np.empty(len(lags), float)
-    for i, L in enumerate(lags):
-        if L >= 0:
-            out[i] = np.nanmean(a[L:] * b[:n - L])
-        else:
-            out[i] = np.nanmean(a[:n + L] * b[-L:])
-    return lags / float(fs), out
-
-
 def window_mean(series: pd.Series, lo: float, hi: float) -> float:
     """Mean of a time-indexed Series over ``[lo, hi)`` seconds (NaN-safe).
 
@@ -1028,7 +1290,7 @@ def process_session(
     data_root : str
         Where Code Ocean mounts attached assets (the ME table among them).
     onset_kw : dict, optional
-        Passed to :func:`threshold_onsets` for the motion-energy onsets. Defaults to
+        Passed to ``signal_utils.threshold_onsets`` for the motion-energy onsets. Defaults to
         :data:`ME_ONSET_KW`.
     camera : str
         Camera whose motion energy to use.
@@ -1066,8 +1328,8 @@ def process_session(
     t_me, me, _offset = motion_energy_to_session(
         nwb.session_id, nwb.df_trials, camera=camera, data_root=data_root
     )
-    me_z = zscore(me)
-    me_onsets = threshold_onsets(t_me, me_z, already_z=True, **onset_kw)
+    me_z = su.zscore(me)
+    me_onsets = su.threshold_onsets(t_me, me_z, already_z=True, **onset_kw)
 
     return {
         "session_id": nwb.session_id,
