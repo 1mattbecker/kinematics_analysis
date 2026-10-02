@@ -4,6 +4,34 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-02
 
+### Helper clean-up: one implementation per operation (`fip-motion-energy`)
+
+From an audit of functions duplicated across notebooks and modules; item-by-item record in
+`code/helper_cleanup.md`. Results are preliminary, so outputs were allowed to change; each item was
+checked for working as intended.
+
+- **New modules.** `signal_utils` (generic time series, one cross-correlation lag convention,
+  circular-shift nulls), `stats_utils` (animal pooling, mean ± SEM with ddof=1, tests, cluster test,
+  hierarchical bootstrap via `aind_hierarchical_bootstrap`, FDR and Wilson via statsmodels),
+  `plot_utils` (mean ± SEM bands, tidy-ETR plots, strip plots), `behavior_utils` (library lick
+  bouts, bout split, task context), `kin_utils`, `s3_utils`.
+- **`fip_coupling.py` merged into `fip_utils.py`** and deleted; `men_utils` keeps only ME loading.
+  The bout helpers left `ephys_utils` for `behavior_utils` (second user: `men_00`).
+- **Library / standard code used instead of copies:** basic-analysis `annotate_lick_bouts`
+  (`men_00` bouts now use its 0.7 s gap, was 0.5 s), Rachel's `enrich_df_trials` (local copy
+  removed), `aind_hierarchical_bootstrap` (`fip_04`; its CI is on the session-weighted mean),
+  statsmodels FDR / Wilson, the video library's `get_session_prefix` and `find_labeled_video`.
+- **Behaviour changes worth knowing:** `fip_03`'s xcorr null uses a 60 s minimum shift (was 1 s);
+  `fip_02`'s coincidence null a 30 s minimum (was 0 s); `men_00` labels ME events without licking
+  with the FIP task contexts; several SEMs that used ddof=0 now use ddof=1; `window_mean_grid`
+  skips NaN samples.
+- **Bug found on the way:** `eph_00`'s raster cell read an undefined `bundle_cache`; it now calls
+  `make_session_bundle`.
+- **Checked:** `fip_05`, `fip_06`, `fip_07`, `kin_02`, `kin_05`, `kin_06`, `val_04` run locally
+  (outputs unchanged apart from random null draws and the noted changes); `men_00` on a synthetic
+  ME table built on real sessions; every moved helper against its old copy; the rest lint clean.
+  `fip_00`–`fip_04`, `kin_07` and `eph_*` still need a Code Ocean run.
+
 ### Motion energy: task-window z-scores, onset rule in seconds, bin-averaged in `fip_03` (`fip-motion-energy`)
 
 Three fixes to how the `fip_*` notebooks prepare motion energy. Not yet re-run on Code Ocean;

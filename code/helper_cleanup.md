@@ -51,8 +51,8 @@ change; each item is checked for working as intended, not for matching earlier n
 - [x] C14. Same-notebook redefinitions: `test_session_quality` (`plot_combined_summary_compare` ×3, `show_session_video_reel` ×2), `attach_data._parse_vp_dt` ×2
 
 ### D. Finish
-- [ ] D1. Run what runs locally (`fip_05`, `fip_06`, `fip_07`, `men_00` on a test table, `kin_*` on `data/for_local`); static checks on the rest
-- [ ] D2. CLAUDE.md module table, CHANGELOG, `fip_todo.md`
+- [x] D1. Run what runs locally (`fip_05`, `fip_06`, `fip_07`, `men_00` on a test table, `kin_*` on `data/for_local`); static checks on the rest
+- [x] D2. CLAUDE.md module table, CHANGELOG, `fip_todo.md`
 
 ## Notes as items close
 

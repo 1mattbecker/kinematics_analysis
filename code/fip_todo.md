@@ -27,7 +27,8 @@ Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
 - **Move fip_05 onto Rachel's code** (agreed plan): load with `dummy_nwb.load`, use her `data_z`,
   `data_z_*_baseline` and `data_z_norm`, use `alignment.event_triggered_response`, report her
   RPE slope (outcome split, pre-first-reward trials dropped) as the headline, and cut
-  `fip_coupling.py` down to the analyses the libraries don't have. Run on `.venv-fip`.
+  the CSV-asset part of `fip_utils.py` (formerly `fip_coupling.py`) down to the analyses the
+  libraries don't have. Run on `.venv-fip`.
 
 ## 2026-09-27
 

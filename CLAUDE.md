@@ -121,14 +121,15 @@ One test: **would another AIND project doing tongue kinematics want this, unchan
 - **Plots:** the library's plot functions are pipeline QC artefacts written to disk by
   `analyze_tongue_movement_quality`. They carry no styling contract and are not used for
   figures shown in notebooks here; presentation plotting is this repo's job (`plotstyle.py`,
-  `encoding_plots.py`). Do not restyle the library's plotters and do not add plotters there.
+  `plot_utils.py`, `encoding_plots.py`). Do not restyle the library's plotters and do not add plotters there.
 - **Contracts:** a file the library writes and this repo reads is declared next to the writer
   and read through the accessor, never by path — `tongue_quality_stats.json` is read via
   `load_tongue_quality_stats` / `get_quality_summary` in `data_loading.py` and
   `build_all_tongue_movements.py`.
-- **Ambiguous cases** stay here until a second consumer appears: `annotate_movement_bouts` /
-  `classify_bout_times` in `ephys_utils.py`, `build_trial_features` (its column set is chosen
-  for this project's encoding models), `kin_06`'s landmark plot.
+- **Ambiguous cases** stay here until a second consumer appears: `build_trial_features` (its
+  column set is chosen for this project's encoding models), `kin_06`'s landmark plot. The bout
+  helpers (`annotate_movement_bouts`, `classify_bout_times`) got their second consumer (`men_00`)
+  and moved to `behavior_utils.py`; they are library candidates (a library PR).
 - **Layering** is written into the module docstrings on both sides
   (`tongue_kinematics_utils`, `tongue_lickometer_utils`, `tongue_ephys` in the library;
   `ephys_utils` here). Library changes go on a branch of the library repo as a PR; the capsule
@@ -185,7 +186,7 @@ T-statistics compose and can be compared across analyses. Add new per-unit measu
 | `fip_02_ne_only_events` | Do NE and DA transients dissociate around movement onsets? |
 | `fip_03_da_ne_commonality` | How much of the motion-energy variance DA and NE explain is unique to each and how much is shared? |
 | `fip_04_da_ne_xcorr` | Do DA and NE co-vary across animals? Same-hemisphere DA × NE cross-correlation and coherence over every curated session of both FIP assets (`DA_NE_4channels`, `DANE_3channels_curated`), with animal as the unit |
-| `fip_05_da_ne_rpe_coupling` | How are the DA and NE (LC-axon) RPE signals related? In order: RPE coding in each and how alike their outcome/RPE coefficients are (trial, session, animal), trial-by-trial correlation of outcome responses (total, within outcome, residual after outcome + RPE, with response time / trial position / baselines as separate controls), timing/magnitude of phasic transients, tonic/baseline coupling by timescale (raw vs task-residual), and how often each has a large transient without the other. Reads the CSV-curated parquet assets directly through `fip_coupling.py`, so it also runs locally |
+| `fip_05_da_ne_rpe_coupling` | How are the DA and NE (LC-axon) RPE signals related? In order: RPE coding in each and how alike their outcome/RPE coefficients are (trial, session, animal), trial-by-trial correlation of outcome responses (total, within outcome, residual after outcome + RPE, with response time / trial position / baselines as separate controls), timing/magnitude of phasic transients, tonic/baseline coupling by timescale (raw vs task-residual), and how often each has a large transient without the other. Reads the CSV-curated parquet assets directly (`fip_utils.load_pairs`), so it also runs locally |
 | `fip_07_da_ne_summary` | Summary of `fip_04` + `fip_05` on the CSV-curated assets, one set of conventions (+ lag = NE later; DA vermillion, NE blue, rewarded orange, unrewarded grey). Fig 1 xcorr/coherence, Fig 2 large transients with a schematic, Fig 3 task responses via Rachel's pipeline (`dummy_nwb`, `get_average_signal_window`, `event_triggered_response`, `Qch-binned3`), drawn once per window (Rachel 0.33–1 s; early/late/full). Fig 3 inputs cached (~15 min first build) |
 | `fip_06_rpe_split` | Rachel's RPE slopes split trials by RPE sign; splitting by outcome differs only for unrewarded trials with Q_chosen = 0 (1%). Where they come from (forget rate fit at 1.0; before the first reward), what they look like, and how moving them changes the slopes. Runs on `.venv-fip` with Rachel's functions |
 
@@ -223,14 +224,18 @@ out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py
 `TransferToNWB.py` / `backup_nwb_utils_dynamicforaging.py` · `build_me_table.py` (aligned
 motion-energy table for the FIP sessions, run in a cloud workstation; `build_me_asset_map.py`
 maps sessions to ME assets, `check_leading_lost_frames.py` is the lick-triggered-ME timing check;
-see `fip_me_aligned_table_plan.md`).
+all three read S3 through `s3_utils.py`; see `fip_me_aligned_table_plan.md`).
 
 ### Repo modules (`code/*.py`, flat by necessity)
 
 | Module | What it owns |
 |---|---|
+| `signal_utils.py` | Generic time series (numpy/scipy, no domain code), imported as `su`: `zscore`, `threshold_onsets` (run length in samples or s), `bin_to_grid`, grid `peri_event_grid` / `window_mean_grid`, `rolling_mean`, `norm_xcorr` / `circular_xcorr` (**one lag convention: `norm_xcorr(a, b)` peaks at + lag when `a` is later**), `xcorr_shift_null` / `coherence_shift_null` / `band_corr_with_null`, `detect_transients`, `nearest_partner`, `near_any`, `coincidence_null` |
+| `stats_utils.py` | Pooling and tests, imported as `st`: `mean_sem` (ddof=1, per-point n), `group_means` (sessions → animals), `animal_means`, `wilcoxon_animals`, `corr`, `shift_p` / `shift_z`, `cluster_test`, `hier_bootstrap` (wraps `aind_hierarchical_bootstrap`; session-weighted), `fdr_bh` / `wilson_ci` (statsmodels), `stars`, `fmt_p` |
+| `plot_utils.py` | Summary plots, imported as `pu`: `plot_mean_sem`, `plot_etr` (tidy ETR → mean ± SEM), `strip_by_measure`, `strip_by_animal`, `animal_styles`. Style itself stays in `plotstyle.py` |
+| `behavior_utils.py` | Task behaviour shared across series, imported as `bu`: `lick_bouts` (library `annotate_lick_bouts`, 0.7 s gap), `annotate_movement_bouts` / `classify_bout_times` / `get_session_bout_times`, `label_context` (rewarded / unrewarded / cue-no-response / licking / quiet) |
 | `data_loading.py` | Session/unit QC and inclusion filters, `load_units_with_spike_times` |
-| `ephys_utils.py` | `AnalysisConfig`, spike counting, session bundles, `build_all_counts_df` — **and** behavior-derived features that serve ephys alignment (`build_trial_features`, `annotate_movement_bouts`, `classify_bout_times`) |
+| `ephys_utils.py` | `AnalysisConfig`, spike counting (`count_spikes`, `count_spikes_in_window`), `session_offset`, `load_example_session_and_unit`, session bundles, `build_all_counts_df`, `build_trial_features` |
 | `encoding_methods.py` | Generic per-unit encoding — `AnalysisSpec`, `fit_encoding`, OLS/GLM/Spearman/partial |
 | `per_unit_stats_registry.py` | Results store + FDR + cross-analysis `compare`; used by `eph_01/02/03/04/06` |
 | `encoding_plots.py` | Stateless plot functions for encoding results |
@@ -238,13 +243,19 @@ see `fip_me_aligned_table_plan.md`).
 | `spatial_axes.py` | Fitting/comparing 3-D gradient *directions* — linear/CCA/LDA + bootstrap, `compare_bootstrap_directions`, `cone_half_angle`. Coordinate-frame agnostic (takes plain Nx3) |
 | `ccf_utils.py` | CCF conversions — `pir_to_lps`, `ccf_pts_convert_to_mm`, `project_to_plane` |
 | `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
+| `kin_utils.py` | `kin_*` helpers (numpy/pandas only): `coerce_bool`, `load_kps_raw`, `jaw_position` |
 | `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
-| `fip_utils.py` | Shared setup for the whole `fip_*` series (imported as `fu`): curation/loading (`load_curated_sessions`; `use_curation=False` for assets curated at build time, e.g. `DANE_3channels_curated`, which `build_meta` reads from the event names), `parse_event`/`get_trace`/`build_meta`/`pick_example`, trial enrichment, motion energy on the FIP clock (from the aligned ME table, asset `fip_motion_energy_aligned`: `load_me`, `me_sessions`, `motion_energy_to_session`), signal helpers, `process_session`. Deliberately does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook. See `code/fip_todo.md` for a pending Dockerfile pin |
-| `men_utils.py` | Machinery for the `men_*` series: session inventory (ME table × trial/event parquets), ME bin-averaged to 100 Hz on the session clock via `fu.motion_energy_to_session`, per-session normalisation, lick bouts and instructed/uninstructed labels, ME event detection, lick association with a circular-shift null, NaN-aware peri-event/window/rolling means, animal-level averaging and mean ± SEM plotting |
-| `fip_coupling.py` | Machinery for `fip_05` (numpy/pandas/scipy only, no CO libraries): pairs same-side `latNAcc` DA with `PL` LC-axon NE from the CSV-curated parquet assets (`inventory_pairs`, `choose_side`, `load_pairs` with a cache), per-trial baseline/response/latency measures and RPE regressions, an FIR task-event model for task-residual signals, band-limited correlation with circular-shift nulls, transient detection/pairing/context labels |
+| `fip_utils.py` | All FIP code (imported as `fu`). NWB-list path for `fip_00`–`fip_04`: `load_curated_sessions` (JSON curation; `use_curation=False` for assets curated at build time), `select_session`, `build_meta`, `pick_example`, `enrich_trials` (Rachel's `enrich_df_trials`), `process_session`. CSV-curated path for `fip_05`/`fip_07`/`men_00` (was `fip_coupling.py`): `find_asset_root`, `inventory_pairs`, `choose_side`, `load_pairs`, `trial_measures`, `fit_rpe_terms`, `residualize`, `task_residuals`. Motion energy on the FIP clock from the aligned ME table: `load_me`, `me_sessions`, `motion_energy_to_session` (cut to the task ± 30 s), `ME_ONSET_KW` (the one ME onset rule). Does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook |
+| `men_utils.py` | `men_*` loading: `inventory_sessions` (ME table × trial/event parquets), `load_sessions` (ME bin-averaged onto a 100 Hz session grid, lick events kept), `normalise` |
+| `s3_utils.py` | Public-S3 reads over HTTPS for the ME scripts (standard library only): `urlopen` with retries, `download`, `fetch_cached`, `read_json`, `list_keys` |
 
 `spatial_encoding.py` and `spatial_axes.py` are deliberately separate: *where* a statistic is
 large and *in which direction* it changes are different questions with different inputs.
+
+**Before writing a helper, look for one.** Check the libraries first (basic-analysis, data-utils,
+Rachel's utils, `aind_hierarchical_bootstrap`, the video-analysis library, statsmodels), then
+the modules above. If a near match exists, extend it with an optional argument instead of
+copying it. Code needed by two or more notebooks goes in a module, not inline.
 
 ### Things worth knowing before editing
 
