@@ -714,12 +714,25 @@ def load_me(
     return t_harp, np.interp(t_harp, t[finite], me[finite]), info
 
 
+#: Seconds of motion energy kept before the first and after the last go cue. The video runs
+#: for minutes outside the task (about 10 min of setup before the first go cue), and movement
+#: there (handling, adjustment) would otherwise set the SD of every z-score taken over the
+#: trace. Same margin as ``men_utils.load_session``'s grid.
+ME_TASK_PAD_S = 30.0
+
+#: Motion-energy onset rule shared by the ``fip_*`` and ``men_*`` notebooks: an upward
+#: crossing of 2.5 SD that stays above for 30 ms, at most one per 0.5 s. The run length is in
+#: seconds so it means the same at the 500 Hz camera rate and on a resampled grid.
+ME_ONSET_KW = {"z_thresh": 2.5, "refractory": 0.5, "min_run_s": 0.03}
+
+
 def motion_energy_to_session(
     session_id: str,
     df_trials: pd.DataFrame,
     go_cue_col: str = "goCue_start_time_raw",
     camera: str = "BottomCamera",
     data_root: str = DEFAULT_DATA_ROOT,
+    pad_s: Optional[float] = ME_TASK_PAD_S,
 ) -> Tuple[np.ndarray, np.ndarray, float]:
     """Motion energy on the session clock (t=0 at the first go cue), evenly sampled.
 
@@ -727,6 +740,9 @@ def motion_energy_to_session(
     Harp Behavior clock, and ``df_fip['timestamps']`` is zeroed at the same go cue. Uses the
     table's corrected Harp time, so the frame-drop sessions are placed right (the raw CSV
     column put ME up to 280–670 s early there by session end).
+
+    The trace is cut to the task, ``pad_s`` before the first go cue to ``pad_s`` after the
+    last, so a z-score over it is not set by movement during setup (see :data:`ME_TASK_PAD_S`).
 
     ``t_session`` is **not** a position in the video file: after a drop it runs ahead of
     ``row / fps``. To find a frame (clips, BEAST), ``searchsorted`` an event on the
@@ -744,6 +760,8 @@ def motion_energy_to_session(
         ``BottomCamera`` or ``SideCameraRight``.
     data_root : str
         Where Code Ocean mounts attached assets.
+    pad_s : float or None
+        Margin kept around the go cues, in s. ``None`` returns the whole video.
 
     Returns
     -------
@@ -757,8 +775,14 @@ def motion_energy_to_session(
         As :func:`load_me`.
     """
     t_harp, me, info = load_me(session_id, camera, data_root)
-    first_go_cue = float(df_trials.sort_values("trial")[go_cue_col].iloc[0])  # Harp clock
-    return t_harp - first_go_cue, me, first_go_cue - float(info["harp_start"])
+    go_cues = df_trials.sort_values("trial")[go_cue_col].dropna()  # Harp clock
+    first_go_cue = float(go_cues.iloc[0])
+    t_session = t_harp - first_go_cue
+    if pad_s is not None:
+        last = float(go_cues.max()) - first_go_cue
+        keep = (t_session >= -pad_s) & (t_session <= last + pad_s)
+        t_session, me = t_session[keep], me[keep]
+    return t_session, me, first_go_cue - float(info["harp_start"])
 
 
 def attach_me_to_df_fip(
@@ -832,6 +856,7 @@ def threshold_onsets(
     refractory: float = 0.5,
     min_run: int = 1,
     already_z: bool = False,
+    min_run_s: Optional[float] = None,
 ) -> np.ndarray:
     """Causal upward threshold crossings of a z-scored trace (no smoothing).
 
@@ -855,6 +880,10 @@ def threshold_onsets(
         Number of consecutive samples that must stay above threshold.
     already_z : bool
         Set True when passing an upstream ``data_z`` column, so it is not z-scored twice.
+    min_run_s : float, optional
+        The run length in seconds instead, converted with the median sample interval of
+        ``t``; overrides ``min_run``. Use it when the sample rate differs between callers
+        (motion energy at the camera rate vs a resampled grid).
 
     Returns
     -------
@@ -862,6 +891,8 @@ def threshold_onsets(
         Onset times, in ``t``'s units.
     """
     z = np.asarray(y, float) if already_z else zscore(y)
+    if min_run_s is not None:
+        min_run = max(1, int(round(min_run_s / np.median(np.diff(np.asarray(t, float))))))
     above = z > z_thresh  # NaN compares False -> treated as below threshold
     idx = np.where((~above[:-1]) & above[1:])[0] + 1
     if min_run > 1 and len(idx):  # require the crossing to persist (causal spike rejection)
@@ -998,7 +1029,7 @@ def process_session(
         Where Code Ocean mounts attached assets (the ME table among them).
     onset_kw : dict, optional
         Passed to :func:`threshold_onsets` for the motion-energy onsets. Defaults to
-        ``{'z_thresh': 2.5, 'refractory': 0.5, 'min_run': 3}``.
+        :data:`ME_ONSET_KW`.
     camera : str
         Camera whose motion energy to use.
 
@@ -1015,7 +1046,7 @@ def process_session(
         (:class:`MotionEnergyRefused`, a ValueError), so the caller can skip.
     """
     if onset_kw is None:
-        onset_kw = {"z_thresh": 2.5, "refractory": 0.5, "min_run": 3}
+        onset_kw = ME_ONSET_KW
 
     df_trials = getattr(nwb, "df_trials", None)
     if df_trials is None or ALIGN_COL not in df_trials.columns:

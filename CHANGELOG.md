@@ -2,6 +2,27 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-02
+
+### Motion energy: task-window z-scores, onset rule in seconds, bin-averaged in `fip_03` (`fip-motion-energy`)
+
+Three fixes to how the `fip_*` notebooks prepare motion energy. Not yet re-run on Code Ocean;
+`fip_03`'s numbers (44 sessions, partition NE-unique 0.34 / shared 0.095 / DA-unique 0.019) will move.
+
+- **Cut to the task.** `fu.motion_energy_to_session` now returns ME from `ME_TASK_PAD_S` (30 s)
+  before the first go cue to 30 s after the last (`pad_s=None` gives the whole video, the old
+  behaviour). The video starts about 10 min before the task, and setup movement there set the SD of
+  every ME z-score (`process_session`, `fip_00`, and `zscore_fip` in `fip_01`–`fip_03`), so onset
+  counts depended on how much setup each session had. Same margin as `men_00`'s grid.
+- **Onset persistence in seconds.** `fu.threshold_onsets` takes `min_run_s` (converted with the
+  median sample interval). `fu.ME_ONSET_KW` (2.5 SD, 30 ms, 0.5 s refractory) is the one ME onset
+  rule: `process_session`'s default, `fip_00`, `fip_03`'s `ONSET_KW`, and `men_utils.detect_me_events`,
+  which now passes `min_run_s` through. The old `min_run=3` was 3 samples, i.e. 6 ms at 500 fps.
+  FIP-trace onsets (20 Hz, in samples) are unchanged.
+- **`fip_03` bin-averages ME onto its 20 Hz grid** with `men_utils.bin_to_grid` (25 frames per bin)
+  instead of `np.interp`, which took one 500-fps frame per bin and folded fast ME into 0–10 Hz.
+  The cache file is renamed (`fip_03_sessions_me_binned.pkl`) so the old one is not reused.
+
 ## 2026-10-01
 
 ### `men_00`: motion energy described against the task (`fip-motion-energy`)

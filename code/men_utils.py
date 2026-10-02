@@ -247,14 +247,14 @@ def detect_me_events(x: np.ndarray, t0: float, fs: float, z_thresh: float = 2.5,
                      min_run_s: float = 0.03, refractory_s: float = 0.5) -> np.ndarray:
     """Onset times of ME events: upward crossings of ``z_thresh`` that stay above it.
 
-    Same rule as :func:`fip_utils.threshold_onsets` (causal, no smoothing), with the run length
-    given in seconds so it does not depend on ``fs``. ``x`` must already be z-scored.
+    :func:`fip_utils.threshold_onsets` (causal, no smoothing) on the grid; the defaults are
+    :data:`fip_utils.ME_ONSET_KW`. ``x`` must already be z-scored.
     """
     import fip_utils as fu
 
     t = t0 + np.arange(len(x)) / fs
     return fu.threshold_onsets(t, x, z_thresh=z_thresh, refractory=refractory_s,
-                               min_run=max(1, int(round(min_run_s * fs))), already_z=True)
+                               min_run_s=min_run_s, already_z=True)
 
 
 def near_any(times: np.ndarray, refs: np.ndarray, lo: float, hi: float) -> np.ndarray:
