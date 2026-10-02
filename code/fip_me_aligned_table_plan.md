@@ -14,7 +14,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 | ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29 (runs `ce719ee8`, `2b3a9315`). The 10 808054 sessions from 2025-09-02 to 2025-09-15 (ME first computed June 2026, from `.avi`) rerun from `.mp4` (run `342a45f7`); manifest not yet pulled |
 | Video timing QC and correction | In the library: `video_timing_qc`, released in `v0.1.0` (`41e5b59`, merged to `main`). The build calls it; nothing is reimplemented here |
 | Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which now pins `v0.1.0` (`41e5b59`). Environment not yet rebuilt |
-| Scratch QC (`metadata/video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; kept as a record of the 2026-09-29 survey |
+| Scratch QC (`video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; deleted 2026-10-02 (in git history at `59c31b2`) |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | Session → ME asset mapping | Done 2026-09-30: `metadata/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
 | `code/build_me_table.py` | Written 2026-09-30; tested locally on 4 sessions, dry pass on all 97, then run in a workstation (same result) |
@@ -302,7 +302,8 @@ In the workstation, from `/root/capsule`:
 1. `git switch fip-motion-energy && git pull`; confirm the library is `v0.1.0`
    (`python -c "import aind_dynamic_foraging_behavior_video_analysis as m; print(m.__version__)"`).
 2. `cd code && python build_me_table.py --dry-run --workers $(nproc) --report /scratch/me_dry_run.csv`:
-   expect 178 ok, 16 refused, as in `metadata/me_dry_run_fip.csv`.
+   expect 178 ok, 16 refused (the local dry-run report, deleted 2026-10-02, is in git history at
+   `c1b7ddc` as `metadata/me_dry_run_fip.csv`; the asset's `index.csv` holds the same).
 3. `python build_me_table.py --workers $(nproc) --out /scratch/fip_motion_energy_aligned`.
    If it stops, run it again; built sessions are skipped.
 4. Save `/scratch/fip_motion_energy_aligned` as a data asset.
