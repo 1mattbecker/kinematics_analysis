@@ -48,17 +48,27 @@ class AnalysisConfig:
 
 # ── Spike-time utilities ──────────────────────────────────────────────────────
 
+def count_spikes(
+    spike_times_sorted: np.ndarray,
+    event_times,
+    window: Tuple[float, float],
+) -> np.ndarray:
+    """Spikes in ``[event + window[0], event + window[1])`` for each event (0 for NaN events)."""
+    t = np.asarray(event_times, dtype=float)
+    ok = np.isfinite(t)
+    out = np.zeros(len(t), dtype=np.int64)
+    out[ok] = (np.searchsorted(spike_times_sorted, t[ok] + window[1], side="left")
+               - np.searchsorted(spike_times_sorted, t[ok] + window[0], side="left"))
+    return out
+
+
 def count_spikes_in_window(
     spike_times_sorted: np.ndarray,
     t0: float,
     window: Tuple[float, float],
 ) -> int:
-    a, b = t0 + window[0], t0 + window[1]
-    if not np.isfinite(a) or not np.isfinite(b):
-        return 0
-    i0 = np.searchsorted(spike_times_sorted, a, side="left")
-    i1 = np.searchsorted(spike_times_sorted, b, side="left")
-    return int(i1 - i0)
+    """:func:`count_spikes` for a single event time."""
+    return int(count_spikes(spike_times_sorted, [t0], window)[0])
 
 
 def first_spike_latency_in_window(
@@ -163,6 +173,37 @@ def build_trial_features(
 
 # ── Session bundle ────────────────────────────────────────────────────────────
 
+def session_offset(events: pd.DataFrame) -> float:
+    """Raw (Harp) time of the session's first go cue: spike time minus this is session time."""
+    return float(events.loc[events["event"] == "goCue_start_time", "raw_timestamps"].iloc[0])
+
+
+def load_example_session_and_unit(
+    units_with_spikes: pd.DataFrame,
+    base_dirs: List[Path],
+    idx: int = 0,
+) -> dict:
+    """One unit's spike times on the session clock, with its session's intermediate tables.
+
+    Picks row ``idx`` of ``units_with_spikes``, loads the session's intermediates
+    (``load_intermediate_data``) and subtracts :func:`session_offset` from the spike times.
+
+    Returns
+    -------
+    dict
+        ``session, unit_id, spikes_session_time, movs, kins, trials, licks, events``.
+    """
+    row = units_with_spikes.iloc[idx]
+    data = load_intermediate_data(find_session_dir(row.session, roots=base_dirs))
+    return {
+        "session": row.session,
+        "unit_id": row.unit_id,
+        "spikes_session_time": np.asarray(row.spike_times, dtype=float) - session_offset(data["events"]),
+        "movs": data["movs"], "kins": data["kins"], "trials": data["trials"],
+        "licks": data["licks"], "events": data["events"],
+    }
+
+
 def make_session_bundle(
     session: str,
     cfg: AnalysisConfig,
@@ -180,7 +221,7 @@ def make_session_bundle(
         data["movs"], data["trials"], data["licks"], data["kins"], data["events"]
     )
 
-    session_offset = evnts[evnts["event"] == "goCue_start_time"]["raw_timestamps"].iloc[0]
+    offset = session_offset(evnts)
 
     events_dict = get_events_dict(trials, licks, kins)
     E = build_event_df(events_dict)
@@ -203,7 +244,7 @@ def make_session_bundle(
         "Ev": Ev,
         "align_times": align_times,
         "trial_features": trial_features,
-        "session_offset": session_offset,
+        "session_offset": offset,
     }
 
 

@@ -43,7 +43,7 @@ change; each item is checked for working as intended, not for matching earlier n
 - [x] C6. `contiguous_runs` + cluster test (`fip_03`, `fip_04`)
 - [x] C7. `stars` / `sig_stars` / `fmt_p`; `sess_corr` (`fip_05`, `fip_07`)
 - [x] C8. `coerce_bool` (×4 `kin_*`), `load_kps_raw` (`kin_06`, `kin_07`), and `kin_07.get_jaw_y` = `kin_06.load_jaw_from_keypoints` → `kin_utils`
-- [ ] C9. `load_example_session_and_unit` (`eph_00`, `eph_07`); `eph_07.count_spikes` vs `ephys_utils.count_spikes_in_window`
+- [x] C9. `load_example_session_and_unit` (`eph_00`, `eph_07`); `eph_07.count_spikes` vs `ephys_utils.count_spikes_in_window`
 - [x] C10. `_canon_unit` (`encoding_methods`, `per_unit_stats_registry`)
 - [x] C11. `men_00.event_context` vs `fu.label_context`; `per_animal_timecourse` vs `kin_04._interp_to_grid`
 - [ ] C12. `val_03.wilson_ci` → shared; `lickometer_qc.refractory_mask` vs library `filter_timestamps_refractory`
@@ -89,6 +89,11 @@ change; each item is checked for working as intended, not for matching earlier n
   only when the library is missing). Registry q-values checked against statsmodels.
 - **C7, C8.** `fmt_p`, `stars` in `stats_utils` (`eph_09`'s "ns" is now "n.s."). `kin_02`, `kin_05`,
   `kin_06` run locally (`kin_02`/`kin_05` outputs identical to the saved ones); `kin_07` lint only.
+- **C9.** `ephys_utils`: `load_example_session_and_unit(units, base_dirs, idx)`, `session_offset`
+  (also used by `make_session_bundle`), vectorised `count_spikes` (`count_spikes_in_window` calls
+  it); tested equal to both old versions. Found and fixed on the way: `eph_00` cell 16 read an
+  undefined `bundle_cache`; it now calls `make_session_bundle`. `eph_*` lint only (no OpenCV in
+  `.venv-fip`, so the library's video modules do not import locally).
 - **Follow-up, not in this list:** the bout helpers in `behavior_utils` are library candidates
   (a PR to the video-analysis library, then a capsule rebuild). `attach_data`'s asset search could
   use `aind_dynamic_foraging_data_utils.code_ocean_utils` (`get_assets`, `attach_data`); not changed,
