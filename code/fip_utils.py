@@ -482,83 +482,30 @@ def iter_region_signals(sessions: Sequence[dict], region_substr: str) -> Iterato
             yield s, ev
 
 
-def _enrich_trials_fallback(df_trials: pd.DataFrame) -> pd.DataFrame:
-    """3.9-safe reimplementation of the two ``enrich_df_trials`` columns the notebooks need.
-
-    ``num_reward_past`` (run length of consecutive rewarded trials, negated for consecutive
-    unrewarded ones) and ``RPE-binned3``, matching upstream's exact logic. Used only when
-    ``rachel_analysis_utils.analysis_utils`` cannot be imported.
-
-    Unlike upstream this degrades rather than raises: sessions without the reward columns
-    come back unchanged, and ``RPE-binned3`` is skipped when ``RPE_earned`` is absent.
-    """
-    df = df_trials.copy()
-    if "earned_reward" not in df.columns:
-        return df  # streak bins stay off for this session
-
-    extra = df["extra_reward"] if "extra_reward" in df.columns else 0
-    reward_all = df["earned_reward"].astype(float) + (
-        extra if np.isscalar(extra) else extra.astype(float)
-    )
-    df["reward_all"] = reward_all
-
-    # Group by ses_idx when present so streaks never run across a session boundary.
-    if "ses_idx" in df.columns:
-        prev = reward_all.groupby(df["ses_idx"]).shift(1)
-    else:
-        prev = reward_all.shift(1)
-    df["rewarded_prev"] = prev
-
-    run_id = (prev != reward_all).cumsum()             # new id each time reward state flips
-    num = df.groupby(run_id).cumcount() + 1            # 1-indexed position within the run
-    df["num_reward_past"] = num.where(reward_all != 0, -num)  # negate runs of no-reward
-
-    if "RPE_earned" in df.columns:
-        labels = [str(np.round(i, 2)) for i in np.arange(-1, 0.99, 1 / 3)]
-        bins = np.arange(-1, 1.01, 1 / 3)
-        bins[-1] = 1.001
-        df["RPE-binned3"] = pd.cut(df["RPE_earned"], bins=bins, right=True, labels=labels)
-    return df
 
 
 def enrich_trials(df_trials: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
-    """Add ``num_reward_past`` / ``RPE-binned3`` etc., preferring Rachel's own function.
+    """Add ``num_reward_past``, ``RPE-binned3`` and the rest of Rachel's trial columns.
 
-    Calls ``rachel_analysis_utils.analysis_utils.enrich_df_trials`` when it imports, so
-    the notebooks stay on the upstream definition, and falls back to
-    :func:`_enrich_trials_fallback` otherwise.
-
-    Note that upstream is all-or-nothing and needs more columns than the fallback
-    (``RPE_earned``, ``Q_chosen``, ``animal_response``, ``choice_time_in_trial``). Callers
-    looping over many sessions should wrap this in try/except so one incomplete session
-    does not fail the whole loop — see :func:`process_session`.
+    Calls ``rachel_analysis_utils.analysis_utils.enrich_df_trials``. Upstream is all-or-nothing
+    and needs ``RPE_earned``, ``Q_chosen``, ``animal_response`` and ``choice_time_in_trial``, so a
+    loop over many sessions should catch its errors (see :func:`process_session`).
 
     Parameters
     ----------
     df_trials : pandas.DataFrame
         Trial table for one session (or several, keyed by ``ses_idx``).
     verbose : bool
-        Print which path was taken.
+        Unused; kept so existing calls keep working.
 
     Returns
     -------
     pandas.DataFrame
         Enriched trial table.
     """
-    try:
-        from rachel_analysis_utils import analysis_utils as r_analysis
+    from rachel_analysis_utils import analysis_utils as r_analysis
 
-        out = r_analysis.enrich_df_trials(df_trials)
-        if verbose:
-            print("Used rachel_analysis_utils.analysis_utils.enrich_df_trials directly.")
-        return out
-    except Exception as e:
-        if verbose:
-            print(
-                "enrich_df_trials unavailable (%s: %s); using local fallback for "
-                "num_reward_past + RPE-binned3." % (type(e).__name__, e)
-            )
-        return _enrich_trials_fallback(df_trials)
+    return r_analysis.enrich_df_trials(df_trials)
 
 
 def streak_go_cues(df_trials: pd.DataFrame, bin_fn) -> Optional[np.ndarray]:
@@ -1314,8 +1261,8 @@ def process_session(
     if df_trials is None or ALIGN_COL not in df_trials.columns:
         raise ValueError("missing df_trials / %s" % ALIGN_COL)
 
-    # Upstream enrich_df_trials is all-or-nothing and needs more columns than the streak
-    # fallback, so one incomplete session must not fail the whole loop.
+    # Upstream enrich_df_trials is all-or-nothing, so one session missing a column must not fail
+    # the whole loop.
     try:
         df_trials_enr = enrich_trials(df_trials.copy(), verbose=False)
     except Exception as e:

@@ -14,7 +14,7 @@ change; each item is checked for working as intended, not for matching earlier n
 | `behavior_utils.py` (new) | Task-behaviour helpers used by several series: lick bouts (library), bout classification, task context of event times |
 | `fip_utils.py` | All FIP code: absorbs `fip_coupling.py` (which is deleted) |
 | `men_utils.py` | Motion-energy series only (inventory, loading, normalisation); generic pieces move out |
-| `data_loading.py` | + `coerce_bool`, `load_kps_raw` |
+| `kin_utils.py` (new) | `kin_*` helpers: `coerce_bool`, `load_kps_raw`, `jaw_position` (numpy/pandas only, so `kin_*` keep running locally; `data_loading` imports the video library) |
 
 ## Checklist
 
@@ -28,10 +28,10 @@ change; each item is checked for working as intended, not for matching earlier n
 ### B. Use the libraries
 - [x] B1. `men_00` lick bouts from basic-analysis `annotate_lick_bouts` (0.7 s) and labels from `ephys_utils.classify_bout_times`; drop `men_utils.lick_bouts` / `label_bouts`
 - [x] B2. `fip_04.hier_boot_mean` → `aind_hierarchical_bootstrap`
-- [ ] B3. `test_session_quality.get_session_prefix` (×3) → library `tongue_ephys.get_session_prefix`
-- [ ] B4. `kin_00.resolve_labeled_video` → library `find_labeled_video`
-- [ ] B5. `fu._enrich_trials_fallback` → Rachel's `enrich_df_trials` only
-- [ ] B6. `_fdr_bh` (×2, `encoding_methods`, `per_unit_stats_registry`) → statsmodels `multipletests`
+- [x] B3. `test_session_quality.get_session_prefix` (×3) → library `tongue_ephys.get_session_prefix`
+- [x] B4. `kin_00.resolve_labeled_video` → library `find_labeled_video`
+- [x] B5. `fu._enrich_trials_fallback` → Rachel's `enrich_df_trials` only
+- [x] B6. `_fdr_bh` (×2, `encoding_methods`, `per_unit_stats_registry`) → statsmodels `multipletests`
 - [ ] B7. `fip_00` multi-session ETR helpers → `plot_fip` PSTH machinery, or record why not
 
 ### C. One copy of each helper
@@ -41,14 +41,14 @@ change; each item is checked for working as intended, not for matching earlier n
 - [x] C4. Z-score: `fc.zscore` (ddof 0, not NaN-safe) vs `fu.zscore`
 - [x] C5. Per-animal averaging: `fc.animal_means`, `fip_04.animal_means` / `grand_mean`, `fip_05.stack_animal`, `fip_07.animal_stack`, `mu.animal_traces`; SEM with ddof=1 and per-point n
 - [x] C6. `contiguous_runs` + cluster test (`fip_03`, `fip_04`)
-- [ ] C7. `stars` / `sig_stars` / `fmt_p`; `sess_corr` (`fip_05`, `fip_07`)
-- [ ] C8. `coerce_bool` (×4 `kin_*`), `load_kps_raw` (`kin_06`, `kin_07`)
+- [x] C7. `stars` / `sig_stars` / `fmt_p`; `sess_corr` (`fip_05`, `fip_07`)
+- [x] C8. `coerce_bool` (×4 `kin_*`), `load_kps_raw` (`kin_06`, `kin_07`), and `kin_07.get_jaw_y` = `kin_06.load_jaw_from_keypoints` → `kin_utils`
 - [ ] C9. `load_example_session_and_unit` (`eph_00`, `eph_07`); `eph_07.count_spikes` vs `ephys_utils.count_spikes_in_window`
-- [ ] C10. `_canon_unit` (`encoding_methods`, `per_unit_stats_registry`)
+- [x] C10. `_canon_unit` (`encoding_methods`, `per_unit_stats_registry`)
 - [x] C11. `men_00.event_context` vs `fu.label_context`; `per_animal_timecourse` vs `kin_04._interp_to_grid`
 - [ ] C12. `val_03.wilson_ci` → shared; `lickometer_qc.refractory_mask` vs library `filter_timestamps_refractory`
 - [ ] C13. Scripts: `list_keys` / `read_json` (`build_me_table`, `build_me_asset_map`), `check_leading_lost_frames.fetch` vs `build_me_table.download`
-- [ ] C14. Same-notebook redefinitions: `test_session_quality` (`plot_combined_summary_compare` ×3, `show_session_video_reel` ×2), `attach_data._parse_vp_dt` ×2
+- [x] C14. Same-notebook redefinitions: `test_session_quality` (`plot_combined_summary_compare` ×3, `show_session_video_reel` ×2), `attach_data._parse_vp_dt` ×2
 
 ### D. Finish
 - [ ] D1. Run what runs locally (`fip_05`, `fip_06`, `fip_07`, `men_00` on a test table, `kin_*` on `data/for_local`); static checks on the rest
@@ -76,5 +76,20 @@ change; each item is checked for working as intended, not for matching earlier n
 - **C11.** `men_00`'s `event_context` replaced by `bu.label_context` (the FIP transient contexts).
   `men_00.per_animal_timecourse` (minutes from first cue, per animal) and
   `kin_04._interp_to_grid` (fraction of session, per session) answer different questions; both stay.
+- **B3, C14.** `test_session_quality_analysis`: one `plot_combined_summary_compare` and one
+  `show_session_video_reel` (the last version of each, in the first cell that calls it; the
+  superseded cells are deleted), `get_session_prefix` from the library. `attach_data`: cell 4 uses
+  cell 3's helpers instead of redefining them.
+- **B4.** `kin_00.resolve_labeled_video` wraps the library's `find_labeled_video`; its JSON lookup
+  ended in the same `/root/capsule/data` glob.
+- **B5.** Rachel's `enrich_df_trials` imports on 3.12 and gives the same `num_reward_past` as the
+  local copy (checked on a real session); the copy is gone.
+- **B6, C10.** `encoding_methods` and `per_unit_stats_registry` use `st.fdr_bh`; the registry takes
+  `_canon_unit` and the session-prefix function from `encoding_methods` (library, with a local copy
+  only when the library is missing). Registry q-values checked against statsmodels.
+- **C7, C8.** `fmt_p`, `stars` in `stats_utils` (`eph_09`'s "ns" is now "n.s."). `kin_02`, `kin_05`,
+  `kin_06` run locally (`kin_02`/`kin_05` outputs identical to the saved ones); `kin_07` lint only.
 - **Follow-up, not in this list:** the bout helpers in `behavior_utils` are library candidates
-  (a PR to the video-analysis library, then a capsule rebuild).
+  (a PR to the video-analysis library, then a capsule rebuild). `attach_data`'s asset search could
+  use `aind_dynamic_foraging_data_utils.code_ocean_utils` (`get_assets`, `attach_data`); not changed,
+  since it attaches assets and cannot be tested here.

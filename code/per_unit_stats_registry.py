@@ -33,14 +33,15 @@ Usage
 
 from __future__ import annotations
 
-import re
 import warnings
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-from statsmodels.stats.multitest import multipletests
+
+from encoding_methods import _canon_unit, _get_session_prefix_pkg as _get_session_prefix_default
+from stats_utils import fdr_bh
 
 
 # ============================================================
@@ -50,28 +51,6 @@ _KEY_COLS = ["session_prefix", "unit"]
 
 # Every registered entry gets normalized to this schema.
 _STAT_COLS = ["t", "p", "q", "coef", "sig_fdr", "n_trials"]
-
-
-def _get_session_prefix_default(s: str) -> str:
-    return re.sub(r'_\d{2}-\d{2}-\d{2}$', '', str(s))
-
-
-def _canon_unit(x) -> str:
-    try:
-        return str(int(float(x)))
-    except Exception:
-        return str(x)
-
-
-def _fdr_bh(pvals: np.ndarray, alpha: float = 0.05) -> np.ndarray:
-    """Benjamini-Hochberg FDR. Returns q-values (NaN where p is NaN)."""
-    p = np.asarray(pvals, dtype=float)
-    q = np.full_like(p, np.nan)
-    m = np.isfinite(p)
-    if m.any():
-        _, q_vals, _, _ = multipletests(p[m], alpha=alpha, method='fdr_bh')
-        q[m] = q_vals
-    return q
 
 
 class PerUnitStatsRegistry:
@@ -179,7 +158,7 @@ class PerUnitStatsRegistry:
         if q_col and q_col in out.columns:
             out["q"] = out[q_col].astype(float)
         else:
-            out["q"] = _fdr_bh(out["p"].values, self.alpha)
+            out["q"] = fdr_bh(out["p"].values)
 
         out["sig_fdr"] = out["q"] < self.alpha
 
@@ -266,7 +245,7 @@ class PerUnitStatsRegistry:
             out["t"]    = df[t_col].astype(float) if t_col in df.columns else np.nan
             out["p"]    = df[p_col].astype(float) if p_col in df.columns else np.nan
             out["coef"] = df[coef_col].astype(float) if coef_col in df.columns else np.nan
-            out["q"] = _fdr_bh(out["p"].values, self.alpha)
+            out["q"] = fdr_bh(out["p"].values)
             out["sig_fdr"] = out["q"] < self.alpha
             out["n_trials"] = np.nan
 

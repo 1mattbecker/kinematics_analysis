@@ -63,7 +63,8 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy.stats import spearmanr
-from statsmodels.stats.multitest import multipletests
+
+from stats_utils import fdr_bh
 
 try:
     from aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys import (
@@ -72,7 +73,7 @@ try:
 except ImportError:
     import re as _re
 
-    def _get_session_prefix_pkg(s: str) -> str:
+    def _get_session_prefix_pkg(s: str) -> str:  # same regex as the library; used without it
         return _re.sub(r"_\d{2}-\d{2}-\d{2}$", "", str(s))
 
 
@@ -101,13 +102,6 @@ def _add_session_prefix(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _fdr_bh(pvals: np.ndarray, alpha: float) -> np.ndarray:
-    """Return BH-FDR q-values; NaN where p is NaN."""
-    q = np.full_like(pvals, np.nan, dtype=float)
-    valid = np.isfinite(pvals)
-    if valid.any():
-        _, q[valid], _, _ = multipletests(pvals[valid], alpha=alpha, method="fdr_bh")
-    return q
 
 
 def _rho_to_t(rho: np.ndarray, n: np.ndarray) -> np.ndarray:
@@ -300,7 +294,7 @@ def fit_ols(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
             rows.append(base)
 
     out = pd.DataFrame(rows).reset_index(drop=True)
-    out["q"] = _fdr_bh(out["p"].to_numpy(), spec.fdr_alpha)
+    out["q"] = fdr_bh(out["p"].to_numpy())
     out["sig_fdr"] = out["q"] < spec.fdr_alpha
 
     n_valid = int(out["T"].notna().sum())
@@ -347,7 +341,7 @@ def run_spearman(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
 
     out = pd.DataFrame(rows).reset_index(drop=True)
     out["T"] = _rho_to_t(out["coef"].to_numpy(), out["n_trials"].to_numpy())
-    out["q"] = _fdr_bh(out["p"].to_numpy(), spec.fdr_alpha)
+    out["q"] = fdr_bh(out["p"].to_numpy())
     out["sig_fdr"] = out["q"] < spec.fdr_alpha
 
     n_valid = int(out["T"].notna().sum())
@@ -425,7 +419,7 @@ def fit_glm(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
             rows.append(base)
 
     out = pd.DataFrame(rows).reset_index(drop=True)
-    out["q"] = _fdr_bh(out["p"].to_numpy(), spec.fdr_alpha)
+    out["q"] = fdr_bh(out["p"].to_numpy())
     out["sig_fdr"] = out["q"] < spec.fdr_alpha
 
     n_valid = int(out["T"].notna().sum())
@@ -509,7 +503,7 @@ def run_partial(df: pd.DataFrame, spec: AnalysisSpec) -> AnalysisResult:
         rows.append({**base, "coef": r_part, "T": t, "p": p, "n_trials": n_used})
 
     out = pd.DataFrame(rows).reset_index(drop=True)
-    out["q"] = _fdr_bh(out["p"].to_numpy(), spec.fdr_alpha)
+    out["q"] = fdr_bh(out["p"].to_numpy())
     out["sig_fdr"] = out["q"] < spec.fdr_alpha
 
     n_valid = int(out["T"].notna().sum())
