@@ -16,7 +16,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 | Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which now pins `v0.1.0` (`41e5b59`). Environment not yet rebuilt |
 | Scratch QC (`video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; deleted 2026-10-02 (in git history at `59c31b2`) |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
-| Session → ME asset mapping | Done 2026-09-30: `metadata/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
+| Session → ME asset mapping | Done 2026-09-30: `inputs/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
 | `code/build_me_table.py` | Written 2026-09-30; tested locally on 4 sessions, dry pass on all 97, then run in a workstation (same result) |
 | Data asset | Built 2026-09-30 in a cloud workstation (`12af263`, library `41e5b59`): 178 cameras ok, 16 refused, 5.8 GB; asset `90c2d0a7-82e3-4abf-b205-e398c2f7736e`, mounted at `/root/capsule/data/fip_motion_energy_aligned` |
 | `fip_utils` loader switch | Done 2026-09-30 (below); notebooks not re-run |
@@ -87,8 +87,9 @@ them; nothing is overridden.
 
 ## Inputs
 
-- **Sessions:** rows of `metadata/me_sessions_fip_curated.csv` with `used_in_fip05_07`
-  (97); `raw_session` is the raw asset name.
+- **Sessions:** rows of `inputs/me_sessions_fip_curated.csv` with `used_in_fip05_07`
+  (97); `raw_session` is the raw asset name. Made by looping over the curated FIP data assets
+  (script not in this repo); see `inputs/README.md`.
 - **ME result per session — explicit, never "newest by tag":** from the batch launcher's
   manifests (`aind-motion-energy-batch-capsule`, runs `ce719ee8`, `2b3a9315`, and the rerun
   `342a45f7`). ~31 leftover test results share the `motion-energy` tag, including

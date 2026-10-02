@@ -53,6 +53,7 @@ kinematics_analysis/
 │   └── archive/        # Superseded/scratch notebooks (provenance only, not run)
 │       └── reference/  # Collaborator notebooks kept for reference
 ├── data/for_local/     # Small local subset for development (see Data below)
+├── inputs/            # Small input tables scripts read (session lists, asset maps); see its README
 ├── environment/        # Docker + postinstall scripts (DO NOT MODIFY)
 ├── metadata/           # Project metadata
 ├── .codeocean/         # Code Ocean config (DO NOT MODIFY)

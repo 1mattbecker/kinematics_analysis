@@ -43,7 +43,7 @@ REPO = Path(__file__).resolve().parent.parent
 FIG_DIR = REPO / "docs" / "video_timing_qc"
 OPEN_DATA_URL = "https://aind-open-data.s3.amazonaws.com"
 SCRATCH_URL = "https://aind-scratch-data.s3.amazonaws.com/matt.becker/motion_energy"
-ME_ASSETS_CSV = REPO / "metadata" / "me_assets_fip.csv"
+ME_ASSETS_CSV = REPO / "inputs" / "me_assets_fip.csv"
 
 SESSION = "behavior_818586_2026-01-16_09-19-39"
 CONTROL = "behavior_818586_2026-01-15_09-18-12"  # same mouse and rig, log count matches

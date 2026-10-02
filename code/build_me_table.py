@@ -21,7 +21,7 @@ Output (``--out``)::
 
 Inputs are read over anonymous HTTPS: raw sessions from ``aind-open-data``,
 ME results from ``aind-scratch-data`` (folders named in
-``metadata/me_assets_fip.csv``). Only CSVs, trigger logs, ME metadata and
+``inputs/me_assets_fip.csv``). Only CSVs, trigger logs, ME metadata and
 ``.npy`` files are read, never videos.
 
 Usage (from ``code/``)::
@@ -60,8 +60,8 @@ from aind_dynamic_foraging_behavior_video_analysis import video_timing_qc as vtq
 
 CODE_DIR = Path(__file__).resolve().parent
 REPO = CODE_DIR.parent
-SESSIONS_CSV = REPO / "metadata" / "me_sessions_fip_curated.csv"
-ME_ASSETS_CSV = REPO / "metadata" / "me_assets_fip.csv"
+SESSIONS_CSV = REPO / "inputs" / "me_sessions_fip_curated.csv"
+ME_ASSETS_CSV = REPO / "inputs" / "me_assets_fip.csv"
 DEFAULT_OUT = REPO / "results" / "fip_motion_energy_aligned"
 DEFAULT_REPORT = REPO / "results" / "build_me_table_dry_run.csv"
 

@@ -4,8 +4,8 @@
 # ///
 """Map each FIP session to its motion-energy result asset.
 
-Writes ``metadata/me_assets_fip.csv``: one row per ``used_in_fip05_07`` session
-in ``metadata/me_sessions_fip_curated.csv``, with ``raw_session``,
+Writes ``inputs/me_assets_fip.csv``: one row per ``used_in_fip05_07`` session
+in ``inputs/me_sessions_fip_curated.csv``, with ``raw_session``,
 ``me_asset_id``, ``me_asset_name``, ``me_run_id`` and ``raw_asset_id`` (the
 behavior asset the ME run read).
 
@@ -39,8 +39,8 @@ from pathlib import Path
 import pandas as pd
 
 REPO = Path(__file__).resolve().parent.parent
-SESSIONS_CSV = REPO / "metadata" / "me_sessions_fip_curated.csv"
-OUT_CSV = REPO / "metadata" / "me_assets_fip.csv"
+SESSIONS_CSV = REPO / "inputs" / "me_sessions_fip_curated.csv"
+OUT_CSV = REPO / "inputs" / "me_assets_fip.csv"
 BATCH_CAPSULE = REPO.parent / "aind-motion-energy-batch-capsule"
 DEFAULT_MANIFESTS = BATCH_CAPSULE / "results"
 
