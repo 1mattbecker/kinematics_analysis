@@ -46,7 +46,7 @@ change; each item is checked for working as intended, not for matching earlier n
 - [x] C9. `load_example_session_and_unit` (`eph_00`, `eph_07`); `eph_07.count_spikes` vs `ephys_utils.count_spikes_in_window`
 - [x] C10. `_canon_unit` (`encoding_methods`, `per_unit_stats_registry`)
 - [x] C11. `men_00.event_context` vs `fu.label_context`; `per_animal_timecourse` vs `kin_04._interp_to_grid`
-- [ ] C12. `val_03.wilson_ci` → shared; `lickometer_qc.refractory_mask` vs library `filter_timestamps_refractory`
+- [x] C12. `val_03.wilson_ci` → shared; `lickometer_qc.refractory_mask` vs library `filter_timestamps_refractory`
 - [ ] C13. Scripts: `list_keys` / `read_json` (`build_me_table`, `build_me_asset_map`), `check_leading_lost_frames.fetch` vs `build_me_table.download`
 - [x] C14. Same-notebook redefinitions: `test_session_quality` (`plot_combined_summary_compare` ×3, `show_session_video_reel` ×2), `attach_data._parse_vp_dt` ×2
 
@@ -94,6 +94,10 @@ change; each item is checked for working as intended, not for matching earlier n
   it); tested equal to both old versions. Found and fixed on the way: `eph_00` cell 16 read an
   undefined `bundle_cache`; it now calls `make_session_bundle`. `eph_*` lint only (no OpenCV in
   `.venv-fip`, so the library's video modules do not import locally).
+- **C12.** `lickometer_qc` and `val_03` take `wilson_ci` from `stats_utils` (statsmodels;
+  z = 1.95996 instead of 1.96). `val_04` runs locally with identical output. `refractory_mask`
+  stays: it returns a positional mask that handles repeated timestamps, where the library's
+  `filter_timestamps_refractory` returns values and prints on every call.
 - **Follow-up, not in this list:** the bout helpers in `behavior_utils` are library candidates
   (a PR to the video-analysis library, then a capsule rebuild). `attach_data`'s asset search could
   use `aind_dynamic_foraging_data_utils.code_ocean_utils` (`get_assets`, `attach_data`); not changed,

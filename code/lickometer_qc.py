@@ -41,6 +41,8 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
+from stats_utils import wilson_ci
+
 
 # ── Event detection ───────────────────────────────────────────────────────────
 
@@ -575,15 +577,6 @@ def dropout_minutes(events: pd.DataFrame, licko_kept: Dict[str, np.ndarray],
     return pd.Series(out, name="dropout_minutes")
 
 
-def wilson_ci(k: float, n: float, z: float = 1.96) -> Tuple[float, float]:
-    """Wilson score interval for ``k`` successes in ``n`` trials. NaN pair when ``n`` is 0."""
-    if n == 0:
-        return (np.nan, np.nan)
-    p = k / n
-    den = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / den
-    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
-    return centre - half, centre + half
 
 
 def summarize_sessions(events: pd.DataFrame, licko: pd.DataFrame, ref: pd.DataFrame,
