@@ -30,13 +30,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 import pandas as pd
+
+from s3_utils import list_keys, read_json
 
 REPO = Path(__file__).resolve().parent.parent
 SESSIONS_CSV = REPO / "inputs" / "me_sessions_fip_curated.csv"
@@ -53,28 +52,6 @@ RUNS = [
 
 SCRATCH_URL = "https://aind-scratch-data.s3.amazonaws.com"
 ME_PREFIX = "matt.becker/motion_energy"
-
-
-def list_keys(prefix):
-    """Return the object keys under ``prefix`` in the scratch bucket."""
-    keys, token = [], None
-    while True:
-        url = f"{SCRATCH_URL}/?list-type=2&prefix={prefix}"
-        if token:
-            url += f"&continuation-token={urllib.parse.quote(token)}"
-        text = urllib.request.urlopen(url).read().decode()
-        keys += re.findall(r"<Key>(.*?)</Key>", text)
-        token_match = re.search(
-            r"<NextContinuationToken>(.*?)</NextContinuationToken>", text
-        )
-        if not token_match:
-            return keys
-        token = token_match.group(1)
-
-
-def read_json(key):
-    """Read one JSON object from the scratch bucket."""
-    return json.load(urllib.request.urlopen(f"{SCRATCH_URL}/{key}"))
 
 
 def main():
@@ -121,12 +98,12 @@ def main():
         asset = client.data_assets.get_data_asset(record["result_asset_id"])
         if not asset.name.startswith(f"{session}_motionenergy_"):
             problems.append(f"{session}: asset name {asset.name}")
-        keys = list_keys(f"{ME_PREFIX}/{asset.name}/")
+        keys = list_keys(SCRATCH_URL, f"{ME_PREFIX}/{asset.name}/")
         metadata_keys = [k for k in keys if k.endswith("_me_metadata.json")]
         if len(metadata_keys) != 2:
             problems.append(f"{session}: {len(metadata_keys)} me_metadata.json files")
         for key in metadata_keys:
-            meta = read_json(key)
+            meta = read_json(f"{SCRATCH_URL}/{key}")
             camera = key.rsplit("/", 1)[1].removesuffix("_me_metadata.json")
             if not meta["video_path"].endswith(".mp4"):
                 problems.append(f"{session} {camera}: video {meta['video_path']}")

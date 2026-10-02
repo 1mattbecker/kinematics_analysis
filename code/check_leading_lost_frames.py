@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import argparse
 import tempfile
-import urllib.request
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -38,6 +37,7 @@ import pandas as pd
 from aind_dynamic_foraging_behavior_video_analysis import video_timing_qc as vtq
 
 import plotstyle as ps
+from s3_utils import fetch_cached as fetch
 
 REPO = Path(__file__).resolve().parent.parent
 FIG_DIR = REPO / "docs" / "video_timing_qc"
@@ -55,14 +55,6 @@ EDGE_S = 10.0  # licks this close to the first/last frame are left out
 COLOR_FIRST = ps.OKABE_ITO["vermillion"]  # frames on the first n triggers (CSV pairing)
 COLOR_LAST = ps.OKABE_ITO["blue"]  # frames on the last n triggers
 COLOR_CONTROL = ps.OKABE_ITO["black"]
-
-
-def fetch(url, cache):
-    """Download ``url`` once into ``cache``; return the local path."""
-    path = cache / url.split("amazonaws.com/", 1)[1].replace("/", "__")
-    if not path.exists():
-        urllib.request.urlretrieve(url, path)
-    return path
 
 
 def read_register(url, cache):

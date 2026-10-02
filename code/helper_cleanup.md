@@ -47,7 +47,7 @@ change; each item is checked for working as intended, not for matching earlier n
 - [x] C10. `_canon_unit` (`encoding_methods`, `per_unit_stats_registry`)
 - [x] C11. `men_00.event_context` vs `fu.label_context`; `per_animal_timecourse` vs `kin_04._interp_to_grid`
 - [x] C12. `val_03.wilson_ci` → shared; `lickometer_qc.refractory_mask` vs library `filter_timestamps_refractory`
-- [ ] C13. Scripts: `list_keys` / `read_json` (`build_me_table`, `build_me_asset_map`), `check_leading_lost_frames.fetch` vs `build_me_table.download`
+- [x] C13. Scripts: `list_keys` / `read_json` (`build_me_table`, `build_me_asset_map`), `check_leading_lost_frames.fetch` vs `build_me_table.download`
 - [x] C14. Same-notebook redefinitions: `test_session_quality` (`plot_combined_summary_compare` ×3, `show_session_video_reel` ×2), `attach_data._parse_vp_dt` ×2
 
 ### D. Finish
@@ -98,6 +98,10 @@ change; each item is checked for working as intended, not for matching earlier n
   z = 1.95996 instead of 1.96). `val_04` runs locally with identical output. `refractory_mask`
   stays: it returns a positional mask that handles repeated timestamps, where the library's
   `filter_timestamps_refractory` returns values and prints on every call.
+- **C13.** `s3_utils.py` (standard library only): `urlopen` with retries, `download`,
+  `fetch_cached`, `read_json`, `list_keys` (follows continuation pages; `build_me_table`'s read one
+  page). Used by `build_me_table`, `build_me_asset_map`, `check_leading_lost_frames`. Checked
+  against the scratch bucket (2,266 keys over two pages; JSON read; missing object → None).
 - **Follow-up, not in this list:** the bout helpers in `behavior_utils` are library candidates
   (a PR to the video-analysis library, then a capsule rebuild). `attach_data`'s asset search could
   use `aind_dynamic_foraging_data_utils.code_ocean_utils` (`get_assets`, `attach_data`); not changed,

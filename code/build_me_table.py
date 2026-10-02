@@ -40,15 +40,9 @@ import importlib.metadata
 import json
 import os
 import platform
-import re
-import shutil
 import subprocess
 import tempfile
-import time
 import traceback
-import urllib.error
-import urllib.parse
-import urllib.request
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -57,6 +51,8 @@ import pandas as pd
 
 import aind_dynamic_foraging_behavior_video_analysis as video_analysis
 from aind_dynamic_foraging_behavior_video_analysis import video_timing_qc as vtq
+
+from s3_utils import download, list_keys, read_json
 
 CODE_DIR = Path(__file__).resolve().parent
 REPO = CODE_DIR.parent
@@ -97,52 +93,6 @@ REPORT_COLUMNS = INDEX_COLUMNS + ["n_trigger_events", "n_exposures", "me_asset_n
 
 
 # --- Reading from S3 over HTTPS -------------------------------------------
-
-
-def _urlopen(url, tries=4):
-    """Open ``url``, retrying transient errors; None on 404."""
-    for attempt in range(tries):
-        try:
-            return urllib.request.urlopen(url, timeout=120)
-        except urllib.error.HTTPError as e:
-            if e.code in (403, 404):
-                return None
-            if attempt == tries - 1:
-                raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
-            if attempt == tries - 1:
-                raise
-        time.sleep(2 ** attempt)
-
-
-def download(url, dest):
-    """Save ``url`` to ``dest``; return ``dest``, or None if it does not exist."""
-    response = _urlopen(url)
-    if response is None:
-        return None
-    with response, open(dest, "wb") as fh:
-        shutil.copyfileobj(response, fh, length=1 << 20)
-    return dest
-
-
-def read_json(url):
-    """Read a JSON object from ``url``; None if it does not exist."""
-    response = _urlopen(url)
-    if response is None:
-        return None
-    with response:
-        return json.load(response)
-
-
-def list_keys(bucket_url, prefix):
-    """Object keys under ``prefix`` (one listing page is enough here)."""
-    query = urllib.parse.urlencode({"list-type": 2, "prefix": prefix})
-    response = _urlopen(f"{bucket_url}/?{query}")
-    if response is None:
-        raise FileNotFoundError(f"Cannot list {bucket_url}/{prefix}")
-    with response:
-        text = response.read().decode()
-    return re.findall(r"<Key>(.*?)</Key>", text)
 
 
 def detect_layout(raw_session):
