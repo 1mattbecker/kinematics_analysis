@@ -7,7 +7,8 @@ per-animal or per-session values. Statistics come from ``stats_utils``.
 
 Contents
 --------
-:func:`plot_mean_sem`, :func:`animal_styles`, :func:`strip_by_measure`, :func:`strip_by_animal`
+:func:`plot_mean_sem`, :func:`plot_etr`, :func:`animal_styles`, :func:`strip_by_measure`,
+:func:`strip_by_animal`
 """
 
 from __future__ import annotations
@@ -60,6 +61,20 @@ def plot_mean_sem(ax, x, arr, color, label: Optional[str] = None, show_rows: boo
     ax.plot(x, m, color=color, lw=lw, ls=ls, label=label)
     if a.shape[0] > 1:
         ax.fill_between(x, m - sem, m + sem, color=color, alpha=alpha, lw=0)
+
+
+def plot_etr(ax, etr: pd.DataFrame, color, label: Optional[str] = None, value_col: str = "data",
+             **kw):
+    """Mean ± SEM over events of a tidy event-triggered response.
+
+    ``etr`` is the tidy output of ``aind_dynamic_foraging_data_utils.alignment
+    .event_triggered_response`` (or ``fip_utils.peri_event``): columns ``time``, ``event_number``
+    and ``value_col``. Keyword arguments go to :func:`plot_mean_sem`.
+    """
+    if etr is None or etr.empty:
+        return
+    m = etr.pivot_table(index="event_number", columns="time", values=value_col, dropna=False)
+    plot_mean_sem(ax, m.columns.to_numpy(float), m.to_numpy(float), color, label, **kw)
 
 
 def animal_styles(subjects: Sequence[str]) -> Dict[str, Tuple[str, str]]:

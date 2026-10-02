@@ -7,6 +7,17 @@ Deferred work scoped to the `fip_*` notebook series (`fip_00_explore.ipynb`,
 
 ---
 
+## 2026-10-02
+
+- **Helper clean-up** (see `helper_cleanup.md`): `fip_coupling.py` is merged into `fip_utils.py`;
+  generic code is in `signal_utils`, `stats_utils`, `plot_utils`, `behavior_utils`. `fip_00`–`fip_04`
+  are lint-checked only; run them on Code Ocean before trusting their figures.
+- **"Pass 2" (2026-09-15) is closed without moving to `plot_fip`.** Its
+  `fip_psth_multiple_inner_compute` pools over sessions, while these notebooks use the animal as the
+  unit, and it would need motion energy injected into every `df_fip` as a channel. `fip_00`'s
+  pooling uses `stats_utils` / `plot_utils` instead. Per-timepoint hierarchical bootstrap remains
+  available through `aind_hierarchical_bootstrap` (`st.hier_bootstrap`) if a final figure needs it.
+
 ## 2026-09-28
 
 - **Take the RPE-split finding to Rachel** (`fip_06`). Her RPE ≥ 0 group contains the 1% of

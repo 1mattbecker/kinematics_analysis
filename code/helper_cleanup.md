@@ -32,7 +32,7 @@ change; each item is checked for working as intended, not for matching earlier n
 - [x] B4. `kin_00.resolve_labeled_video` → library `find_labeled_video`
 - [x] B5. `fu._enrich_trials_fallback` → Rachel's `enrich_df_trials` only
 - [x] B6. `_fdr_bh` (×2, `encoding_methods`, `per_unit_stats_registry`) → statsmodels `multipletests`
-- [ ] B7. `fip_00` multi-session ETR helpers → `plot_fip` PSTH machinery, or record why not
+- [x] B7. `fip_00` multi-session ETR helpers → `plot_fip` PSTH machinery, or record why not
 
 ### C. One copy of each helper
 - [x] C1. Peri-event / window mean (`fip_coupling`, `men_utils`); NaN-safe window mean
@@ -102,6 +102,11 @@ change; each item is checked for working as intended, not for matching earlier n
   `fetch_cached`, `read_json`, `list_keys` (follows continuation pages; `build_me_table`'s read one
   page). Used by `build_me_table`, `build_me_asset_map`, `check_leading_lost_frames`. Checked
   against the scratch bucket (2,266 keys over two pages; JSON read; missing object → None).
+- **B7.** Not moved onto `plot_fip`: `fip_psth_multiple_inner_compute` pools over sessions (the
+  `fip_*` unit is the animal) and needs motion energy injected into every `df_fip` as a 500 Hz
+  channel. `fip_00`'s pooling now uses `st.group_means` / `st.mean_sem` / `pu.plot_mean_sem`. The
+  "tidy ETR → mean ± SEM over events" plot that `fip_00` (×3), `fip_02` (×2) and `fip_06` each drew
+  by hand is `pu.plot_etr`; `fip_06` runs locally with identical output.
 - **Follow-up, not in this list:** the bout helpers in `behavior_utils` are library candidates
   (a PR to the video-analysis library, then a capsule rebuild). `attach_data`'s asset search could
   use `aind_dynamic_foraging_data_utils.code_ocean_utils` (`get_assets`, `attach_data`); not changed,
