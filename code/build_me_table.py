@@ -83,7 +83,7 @@ INDEX_COLUMNS = [
     "session", "subject", "camera", "source_camera", "layout",
     "raw_asset_id", "me_asset_id", "source_video",
     "n_frames", "frame_interval_s", "harp_start", "harp_end",
-    "timing_source", "action", "status", "error", "failed_checks",
+    "timing_source", "verdict", "action", "status", "error", "failed_checks",
     "frames_lost", "glitch_rows", "clock_rate_ppm", "video_frame_count_diff",
     *[f"n_{source}" for source in HARP_SOURCES],
     "padded",
@@ -116,6 +116,17 @@ def csv_key(layout, source_camera):
 
 
 # --- Per camera -----------------------------------------------------------
+
+
+def correction(by_check):
+    """How a usable camera's time is corrected: ``use harp as written``,
+    ``fix glitches`` or ``re-index`` (the ``action`` column; ``fip_utils.me_sessions``
+    filters on it). ``by_check`` is the checks table indexed by ``check``."""
+    if not by_check.loc["no_frames_lost", "passed"]:
+        return "re-index"
+    if not by_check.loc["harp_has_no_glitches", "passed"]:
+        return "fix glitches"
+    return "use harp as written"
 
 
 def build_camera(camera, info, work_dir, trigger_times, log_error, out_dir, dry_run):
@@ -151,19 +162,21 @@ def build_camera(camera, info, work_dir, trigger_times, log_error, out_dir, dry_
     n_decoded = int(me_meta["n_frames_decoded"])
     n_me = int(me_meta["n_me_frames"])
 
-    checks = vtq.check_video_timing(timing, video_frame_count=n_decoded)
+    checks = vtq.check_video_timing(timing, trigger_times, video_frame_count=n_decoded)
     by_check = checks.set_index("check")
-    info["action"] = vtq.timing_action(checks)
+    info["verdict"] = vtq.timing_verdict(checks)
+    info["action"] = correction(by_check) if info["verdict"] == "use" else None
     info["failed_checks"] = ";".join(checks.loc[checks["passed"].eq(False), "check"])
     info["frames_lost"] = int(by_check.loc["no_frames_lost", "count"])
     info["glitch_rows"] = " ".join(map(str, by_check.loc["harp_has_no_glitches", "rows"]))
     info["clock_rate_ppm"] = int(by_check.loc["clock_rates_agree", "count"])
     info["video_frame_count_diff"] = int(by_check.loc["video_frame_count", "count"])
 
-    # timing_action does not look at the video frame count: a mismatch shifts every
-    # later frame, and where the frames went is not recorded, so refuse it here
-    if not by_check.loc["video_frame_count", "passed"]:
-        raise ValueError(f"video_frame_count failed: {by_check.loc['video_frame_count', 'message']}")
+    # The verdict covers the trigger log and the video frame count (a mismatch shifts
+    # every later frame, and where the frames went is not recorded)
+    if info["verdict"] != "use":
+        check = info["verdict"].split(": ")[1]
+        raise ValueError(f"{check} failed: {by_check.loc[check, 'message']}")
     # A log that is present but unreadable is a rejected log, not a missing one
     if log_error is not None:
         raise ValueError(f"Trigger log unreadable: {log_error}")
@@ -348,10 +361,10 @@ def repo_commit():
 
 
 def summarize(rows):
-    """Print counts per action and status, and every refusal."""
+    """Print counts per verdict, action and status, and every refusal."""
     table = pd.DataFrame(rows)
     print(f"\n{len(table)} cameras, {table['session'].nunique()} sessions")
-    print(table.groupby(["action", "status"], dropna=False).size().to_string())
+    print(table.groupby(["verdict", "action", "status"], dropna=False).size().to_string())
     print(table["timing_source"].value_counts().to_string())
     refused = table[table["status"] == "refused"]
     print(f"\nRefused: {len(refused)} cameras")

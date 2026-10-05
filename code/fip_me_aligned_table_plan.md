@@ -117,10 +117,12 @@ AWS role. About 170 MB per session.
    1. `timing = load_video_timing(csv)` (both layouts).
    2. Load `me_clean.npy` and `me_metadata.json`. Require `video_path` ends in `.mp4` and
       `end_frame` is null.
-   3. `checks = check_video_timing(timing, video_frame_count=n_frames_decoded)`;
-      `action = timing_action(checks)`.
-   4. Refuse if `video_frame_count` fails: `timing_action` does not look at it, so the build
-      must.
+   3. `checks = check_video_timing(timing, trigger_times, video_frame_count=n_frames_decoded)`;
+      `verdict = timing_verdict(checks)`; for a usable camera, `action` is how it is corrected
+      (from the checks: `re-index` if frames were lost, else `fix glitches` if Harp has
+      glitches, else `use harp as written`).
+   4. Refuse unless the verdict is `use` (it covers the trigger log and the video frame count),
+      and refuse a log that is present but unreadable.
    5. `fixed = correct_video_timing(timing, trigger_times=trigger_times)`. A `ValueError` →
       camera refused, error text recorded.
    6. Pad a leading NaN when `n_me_frames == n_frames_decoded - 1`; require ME length == rows
@@ -159,7 +161,9 @@ was moved when `frame_number[i] − frame_number[0] ≠ i`). Refused cameras get
   `source_camera` (name in the raw asset), `layout`, `raw_asset_id`, `me_asset_id`, `source_video`
 - size: `n_frames`, `frame_interval_s` (`video_timing_qc.frame_interval` of the raw Harp
   column), `harp_start`, `harp_end`
-- timing: `timing_source` (`trigger_log` / `csv`), `action` (from `timing_action`),
+- timing: `timing_source` (`trigger_log` / `csv`), `verdict` (`use` / `exclude: <check>`, from
+  `timing_verdict`), `action` (`use harp as written` / `fix glitches` / `re-index`; empty when
+  refused),
   `status` (`ok` / `refused`), `error`, `failed_checks`, `frames_lost`, `glitch_rows`,
   `clock_rate_ppm` (the `clock_rates_agree` count), `video_frame_count_diff`
 - per-row source counts: `n_<harp_source>` for each value present
