@@ -1,38 +1,46 @@
 # fip_* / men_* to-do
 
 Open work for the FIP and motion-energy notebooks (`fip_00`–`fip_07`, `men_00`). `TODO.md` tracks
-the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-02.
+the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-05.
 
 ---
 
-## Plan: motion energy × FIP
+## Plan: motion energy × DA/NE (talk for the brain-wide NM meeting)
 
-All analyses run on one dataset: the CSV-curated assets (`fu.load_pairs`, 9 animals, 97 sessions)
-with the aligned motion-energy table (`fu.motion_energy_to_session`). The animal is the unit.
-Steps 2–5 share one new notebook (`fip_08`).
+Questions: how do DA and NE relate to movement; does RPE coding relate to movement; what movement
+goes with DA/NE events; how are instructed and uninstructed movements represented. Outline A of the
+2026-10-05 discussion, with the DA–NE correlation results added.
 
-1. **Check the motion-energy data.** Attach the 4-channel rebuild as `DANE_4channels_curated`,
-   then run `men_00` on Code Ocean. Use its lick-triggered check to confirm the clock in every
-   session and camera, and pick the camera. Decide on 808054_2025-09-05 (odd ME spectrum, few
-   onsets) and animal 816212 (outlier in every coupling measure; refused cameras).
-2. **FIP variance explained by movement beyond the task.** Add lagged motion energy to the task
-   model in `fu.task_residuals` (go cue, outcome, lick kernels) and measure the variance it adds,
-   for DA and for NE, per animal. Compare with and without slow drift removed, so engagement does
-   not inflate it. This replaces porting `fip_03`.
-3. **Movement as a confound of the RPE results.** Add motion energy in the outcome window to
-   `fu.fit_rpe_terms` and check whether NE's RPE slope and DA's reward term change.
-4. **NE solo transients.** Align motion energy to solo and partnered NE and DA transients
-   (`fip_05` section 5), across animals and by task context.
-5. **Movement with and without licking.** Align DA and NE to motion-energy events without
-   licking, and to instructed vs uninstructed lick bouts (`men_00` definitions).
-6. **Timing around movement onset.** DA and NE relative to motion-energy onsets, including onsets
-   in the go cue → choice window ("anticipatory movement"). Lags describe the measured signals;
-   GCaMP and dLight kinetics differ.
-7. **Slow coupling.** Running-mean motion energy as the engagement covariate for tonic DA/NE and
-   for `fip_05`'s negative 2–10 min residual correlation.
+**Same choices everywhere.**
+- Data: the CSV-curated assets (`fu.load_pairs`, 9 animals, 97 sessions) and the aligned ME table,
+  **bottom camera only**, cameras that fail the video timing or quality screen left out
+  (`inputs/video_screen_fip.csv`).
+- DA, NE and ME on one 20 Hz grid (ME bin-averaged with `su.bin_to_grid`), each z-scored per
+  session over the task.
+- One ME onset rule (`fu.ME_ONSET_KW`), one transient rule (`fip_07`'s prominence), one outcome
+  window (0–2 s after the choice).
+- Sessions averaged within animal; Wilcoxon signed-rank on animal means; circular-shift nulls
+  (≥ 60 s) where chance is needed.
+- Exclusions come from QC only. 816212 stays unless its clock check fails.
 
-Not planned: porting `fip_03` as it is (step 2 supersedes it), more single-session work in
-`fip_00`–`fip_02`, directional or causal claims.
+| # | Slide | Analysis | Where |
+|---|---|---|---|
+| 1 | Task and signals | none | |
+| 2 | The ME data | QC counts, lick-triggered ME (clock check), ME around go cue and choice | `men_00` §0–1 |
+| 3 | DA and NE co-vary | cross-correlation and coherence; large transients with and without a partner | `fip_07` Figs 1–2 |
+| 4 | Q1 movement | (a) DA, NE at ME onsets; (b) ME × DA and ME × NE cross-correlation; (c) variance explained by the task model and by task + lagged ME | `fip_08` §1 |
+| 5 | Movement and DA–NE coupling | DA–NE correlation raw, after the task model, after task + ME | `fip_08` §2 |
+| 6 | Q2 RPE vs movement | (a) ME through the same RPE regression as DA and NE; (b) DA, NE RPE terms with and without post-outcome ME | `fip_08` §3 |
+| 7 | Q3 movement at DA/NE events | ME around large DA and NE transients, solo vs partnered | `fip_08` §4 |
+| 8 | Q4 instructed vs uninstructed | DA, NE, ME at instructed lick bouts, uninstructed lick bouts, ME events without licking | `fip_08` §5 |
+| 9 | Summary | one line per question | |
+
+Order: (1) local setup: data root from `ME_DATA_ROOT`, quality screen in `fu.me_sessions`,
+`.venv-fip` kernel; (2) run `men_00`; (3) `fip_07` figures; (4) `fip_08`.
+
+Left out to keep it simple: `fip_03`'s variance partition (4c replaces it), slow engagement
+coupling, sorting ME events by clustering or camera, timing claims from lags (GCaMP and dLight
+kinetics differ).
 
 ---
 
