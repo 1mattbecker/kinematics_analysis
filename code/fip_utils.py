@@ -1188,8 +1188,11 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
     Returns
     -------
     dict
-        ``{sig: z, sig + '_fit': fitted, sig + '_res': residual, sig + '_r2': fraction explained}``
-        for ``sig`` in ``da``, ``ne``.
+        ``{sig: z, sig + '_fit': fitted, sig + '_res': residual, sig + '_r2': fraction explained,
+        sig + '_beta': coefficients}`` for ``sig`` in ``da``, ``ne``. With ``task``, ``beta`` holds
+        the event kernels (event ``e``, lag ``j`` at ``e * n_lags + j``; events in
+        :func:`event_design` order), then the intercept, then one weight per ``extra`` column;
+        without, the intercept and then ``extra``.
     """
     n = len(pair["da"])
     blocks = [event_design(pair, kernel_s)] if task else [csr_matrix(np.ones((n, 1)))]
@@ -1207,6 +1210,7 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
         out[sig + "_fit"] = fit
         out[sig + "_res"] = y - fit
         out[sig + "_r2"] = 1.0 - np.var(y - fit) / np.var(y)
+        out[sig + "_beta"] = beta
     return out
 
 

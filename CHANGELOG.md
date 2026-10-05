@@ -43,7 +43,8 @@ frame count; every camera is used or refused as before.
   (ME after the outcome is mostly consumption, so it shares variance with reward). Partnered large transients
   sit on more movement than solo ones (ME 0.7 vs 0.3 z). NE responds to uninstructed lick bouts and to
   movement without licking (~0.55 z); DA does not.
-- **`fip_utils`:** `lagged_columns`; `task_residuals(extra=, task=)`; `large_transients` (fip_07's rule);
+- **`fip_08` model figures:** the regression drawn for one session (inputs, observed vs predicted, contribution of each regressor group, design matrix) and a supplementary figure of the fitted kernels. With ME in the model, NE's lick kernel turns negative and its go-cue kernel halves (licks and ME are collinear); DA's ME filter is small, with a dip ~0.3 s after movement.
+- **`fip_utils`:** `lagged_columns`; `task_residuals(extra=, task=)` (now also returns coefficients); `large_transients` (fip_07's rule);
   `fit_rpe_terms` also returns covariate coefficients.
 
 ## 2026-10-02
