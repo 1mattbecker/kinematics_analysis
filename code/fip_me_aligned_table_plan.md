@@ -13,7 +13,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 |---|---|
 | ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29 (runs `ce719ee8`, `2b3a9315`). The 10 808054 sessions from 2025-09-02 to 2025-09-15 (ME first computed June 2026, from `.avi`) rerun from `.mp4` (run `342a45f7`); manifest not yet pulled |
 | Video timing QC and correction | In the library: `video_timing_qc`, released in `v0.1.0` (`41e5b59`, merged to `main`). The build calls it; nothing is reimplemented here |
-| Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which now pins `v0.1.0` (`41e5b59`). Environment not yet rebuilt |
+| Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which pinned `v0.1.0` (`41e5b59`). 2026-10-05: branch `timing-verdict` pins `v0.2.0` (`0e1c8df`) and the build uses `timing_verdict`; environment not yet rebuilt |
 | Scratch QC (`video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; deleted 2026-10-02 (in git history at `59c31b2`) |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | Session → ME asset mapping | Done 2026-09-30: `inputs/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
@@ -52,7 +52,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
   number of exposures between consecutive saved frames, `diff(frame_number)`.
 - **Even sampling before any alignment.** The loader returns ME on an even time grid;
   nothing downstream gets the uneven per-frame samples (see "Uneven sampling").
-- **Library pinned by commit:** `v0.1.0` (`41e5b59`); the SHA is recorded in the output.
+- **Library pinned by commit:** `v0.2.0` (`0e1c8df`; was `v0.1.0`, `41e5b59`); the SHA is recorded in the output.
 
 ## Dry pass (2026-09-30)
 
@@ -297,14 +297,14 @@ The original plan for this section:
 ## Where it runs
 
 `code/build_me_table.py` as a script in a cloud workstation of this capsule, on
-`fip-motion-energy`, after the environment is rebuilt for the `v0.1.0` pin. It writes to the
+`fip-motion-energy`, after the environment is rebuilt for the `v0.2.0` pin. It writes to the
 workstation's `/scratch`, and the folder is saved as one data asset from there by hand.
 Re-runnable: skips sessions whose files exist unless `--force`. Estimated ~10 min with 4 workers
 (local test: 4 sessions in 16 s; dry pass of all 97 in 5.5 min), ~5 GB (28 MB per camera × 178).
 
 In the workstation, from `/root/capsule`:
 
-1. `git switch fip-motion-energy && git pull`; confirm the library is `v0.1.0`
+1. `git switch fip-motion-energy && git pull`; confirm the library is `0.2.0`
    (`python -c "import aind_dynamic_foraging_behavior_video_analysis as m; print(m.__version__)"`).
 2. `cd code && python build_me_table.py --dry-run --workers $(nproc) --report /scratch/me_dry_run.csv`:
    expect 178 ok, 16 refused (the local dry-run report, deleted 2026-10-02, is in git history at

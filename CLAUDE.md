@@ -82,7 +82,8 @@ says "the library", it means this one.
 - **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
   branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
-  to a commit: tag `v0.1.0` (`41e5b59`, 2026-09-30), which adds the video timing QC. Library
+  to a commit: tag `v0.2.0` (`0e1c8df`, 2026-10-05): the video timing QC (added in `v0.1.0`,
+  `41e5b59`) with `timing_verdict`, and video screening. Library
   changes reach the capsule only when that pin is moved deliberately, then the image rebuilt.
   To go back to the version before the QC, pin tag `pre-video-timing-qc` (`5738b32`). The QC
   corrects `time_raw` for drop/glitch sessions and refuses Harp clock-step sessions; see the

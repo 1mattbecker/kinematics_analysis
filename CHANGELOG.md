@@ -2,6 +2,25 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-05
+
+### Video-analysis library v0.2.0; `build_me_table` uses `timing_verdict` (`timing-verdict`)
+
+`environment/Dockerfile` pins `aind-dynamic-foraging-behavior-video-analysis` at tag `v0.2.0`
+(`0e1c8df`, was `v0.1.0`). The library deprecates `timing_action` (removed in a later release) for
+`timing_verdict` (`use` / `exclude: <check>`), whose checks include the trigger log and the video
+frame count; every camera is used or refused as before.
+
+- `build_me_table.py` passes the trigger log to `check_video_timing`, refuses unless the verdict is
+  `use`, and drops its own frame-count refusal. `index.csv` gains `verdict`; `action` keeps its
+  strings (`use harp as written` / `fix glitches` / `re-index`) for usable cameras, so
+  `me_sessions(exclude_actions=...)` and the built asset are unaffected, and is empty for refused
+  cameras (was `refuse: <check>`).
+- `verify_video_timing_qc.ipynb` builds its action strings from `timing_verdict`.
+- Checked offline on simulated cameras (clean, glitch, drops with and without a log, frame-count
+  mismatch, wrong or short log): same outcome, error text and `action` as `v0.1.0`. Not yet run on
+  Code Ocean: rebuild, then `build_me_table.py --dry-run` should give 178 ok, 16 refused.
+
 ## 2026-10-02
 
 ### Helper clean-up: one implementation per operation (`fip-motion-energy`)
