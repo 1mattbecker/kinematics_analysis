@@ -1060,7 +1060,8 @@ def fit_rpe_terms(df: pd.DataFrame, y: str, rpe_col: str = "RPE_earned",
     Returns
     -------
     pandas.Series
-        ``intercept, reward, rpe_rew, rpe_unrew`` (units of ``y`` per unit RPE), and ``n``.
+        ``intercept, reward, rpe_rew, rpe_unrew`` (units of ``y`` per unit RPE), one coefficient
+        per covariate under its column name, and ``n``.
     """
     d = df[["rewarded", rpe_col, y, *covariates]].dropna()
     r = d["rewarded"].to_numpy(float)
@@ -1068,7 +1069,7 @@ def fit_rpe_terms(df: pd.DataFrame, y: str, rpe_col: str = "RPE_earned",
     X = np.c_[np.ones(len(d)), r, rpe * r, rpe * (1 - r), d[list(covariates)].to_numpy(float)]
     beta, *_ = np.linalg.lstsq(X, d[y].to_numpy(float), rcond=None)
     return pd.Series(dict(intercept=beta[0], reward=beta[1], rpe_rew=beta[2], rpe_unrew=beta[3],
-                          n=len(d)))
+                          **dict(zip(covariates, beta[4:])), n=len(d)))
 
 
 def residualize(df: pd.DataFrame, y: str, covariates: Sequence[str],

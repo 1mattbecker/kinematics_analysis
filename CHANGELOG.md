@@ -24,6 +24,28 @@ frame count; every camera is used or refused as before.
   refusals word their error differently (`trigger_log_count failed: trigger log has N events,
   frame numbers span M exposures`), since the check, not `correct_video_timing`, now refuses.
 
+## 2026-10-05
+
+### Motion energy × DA/NE: `fip_08`, quality screen, local runs (`fip-motion-energy`)
+
+- **Plan** for the brain-wide NM meeting talk rewritten in `code/fip_todo.md` (one dataset, one grid,
+  animal-level Wilcoxon throughout).
+- **Video quality screen applied to the ME table.** `inputs/video_screen_fip.csv` is the library's
+  301-session screen (0.2.0); `fu.load_me_index` marks cameras the build kept but the screen excludes as
+  `excluded` (26 side cameras: 818586, 809487, clipping). Bottom camera unaffected (88 usable).
+- **Local runs.** ME functions default to `$ME_DATA_ROOT`; kernel `kinematics_fip` (`.venv-fip`) sets it.
+  `men_00` run on all 97 sessions: lick-triggered ME peaks within 0.07 s of the lick on every bottom
+  camera, so no session or animal (816212 included) is excluded.
+- **`fip_08_movement_da_ne`** (new), 88 sessions / 9 animals, bottom camera. First results: NE tracks ME
+  (peak r 0.63, NE 0.17 s later) far more than DA (0.33); lagged ME adds ΔR² 0.28 to NE beyond the task model
+  and 0.02 to DA. DA–NE r 0.26 raw, 0.02 after the task model, 0.06 after task + ME. With ME as a covariate,
+  DA's RPE terms do not change; NE's RPE|rewarded term survives (0.33 → 0.22), its reward term turns negative
+  (ME after the outcome is mostly consumption, so it shares variance with reward). Partnered large transients
+  sit on more movement than solo ones (ME 0.7 vs 0.3 z). NE responds to uninstructed lick bouts and to
+  movement without licking (~0.55 z); DA does not.
+- **`fip_utils`:** `lagged_columns`; `task_residuals(extra=, task=)`; `large_transients` (fip_07's rule);
+  `fit_rpe_terms` also returns covariate coefficients.
+
 ## 2026-10-02
 
 ### Helper clean-up: one implementation per operation (`fip-motion-energy`)
