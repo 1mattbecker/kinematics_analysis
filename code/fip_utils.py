@@ -524,19 +524,40 @@ def streak_go_cues(df_trials: pd.DataFrame, bin_fn) -> Optional[np.ndarray]:
 #: ``me_clean`` of every video frame, plus ``index.csv`` with each camera's timing status.
 ME_TABLE_NAME = "fip_motion_energy_aligned"
 
-_ME_INDEX: Dict[str, pd.DataFrame] = {}
+#: Folder holding the ME table: Code Ocean's data mount, or ``$ME_DATA_ROOT`` when set (a local
+#: copy, e.g. ``../../data`` from ``code/``).
+ME_DATA_ROOT = os.environ.get("ME_DATA_ROOT", DEFAULT_DATA_ROOT)
+
+#: Per-camera video screen (timing + image quality) from the video-analysis library's
+#: ``screen_sessions`` over the 301 curated FIP sessions (library 0.2.0). ``use`` is False for a
+#: camera that failed either check; the ME table's own build applied the timing check only.
+VIDEO_SCREEN_CSV = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "inputs", "video_screen_fip.csv")
+
+_ME_INDEX: Dict[Tuple[str, bool], pd.DataFrame] = {}
 
 
 class MotionEnergyRefused(ValueError):
-    """The ME table build refused this camera (``index.csv`` ``status`` is not ``ok``)."""
+    """The camera has no usable ME (``index.csv`` ``status`` is not ``ok``): the ME table build
+    refused it, or the video screen excluded it."""
 
 
-def load_me_index(data_root: str = DEFAULT_DATA_ROOT) -> pd.DataFrame:
+def load_me_index(data_root: str = ME_DATA_ROOT, screen: bool = True) -> pd.DataFrame:
     """``index.csv`` of the aligned ME table: one row per session x camera.
 
     Adds ``ses_idx`` (``<subject>_<date>``, the form of ``nwb.session_id``) to the table's
     ``session`` (the raw asset name, ``behavior_<subject>_<date>_<time>``). Read once per
     ``data_root`` and cached.
+
+    Parameters
+    ----------
+    data_root : str
+        Folder holding the ME table (see :data:`ME_DATA_ROOT`).
+    screen : bool
+        Apply :data:`VIDEO_SCREEN_CSV`: a camera the build kept but the screen excludes (image
+        quality, e.g. side cameras clipped by overexposure) gets ``status = "excluded"`` and the
+        screen's ``reason`` as ``error``, so :func:`me_sessions` leaves it out and :func:`load_me`
+        raises :class:`MotionEnergyRefused`. A camera missing from the screen is kept as built.
 
     Raises
     ------
@@ -544,19 +565,27 @@ def load_me_index(data_root: str = DEFAULT_DATA_ROOT) -> pd.DataFrame:
         If the ME table asset is not attached under ``data_root``.
     """
     path = os.path.join(data_root, ME_TABLE_NAME, "index.csv")
-    if path not in _ME_INDEX:
+    if (path, screen) not in _ME_INDEX:
         if not os.path.exists(path):
             raise FileNotFoundError("ME table not attached: %s" % path)
         index = pd.read_csv(path)
         index["ses_idx"] = index["session"].str.split("_").str[1:3].str.join("_")
-        _ME_INDEX[path] = index
-    return _ME_INDEX[path]
+        if screen:
+            verdict = pd.read_csv(VIDEO_SCREEN_CSV).set_index(["session", "camera"])
+            key = pd.MultiIndex.from_frame(index[["session", "camera"]])
+            use = verdict["use"].reindex(key).to_numpy()
+            reason = verdict["reason"].reindex(key).to_numpy()
+            excluded = (index["status"] == "ok").to_numpy() & (use == False)  # noqa: E712 (NaN = not screened)
+            index.loc[excluded, "status"] = "excluded"
+            index.loc[excluded, "error"] = reason[excluded]
+        _ME_INDEX[(path, screen)] = index
+    return _ME_INDEX[(path, screen)]
 
 
 def me_sessions(
     camera: str = "BottomCamera",
     exclude_actions: Sequence[str] = (),
-    data_root: str = DEFAULT_DATA_ROOT,
+    data_root: str = ME_DATA_ROOT,
 ) -> List[str]:
     """Session ids (``<subject>_<date>``) with usable motion energy for ``camera``.
 
@@ -566,9 +595,9 @@ def me_sessions(
         ``BottomCamera`` or ``SideCameraRight``.
     exclude_actions : sequence of str
         Timing actions to leave out, e.g. ``("re-index",)`` for the frame-drop sessions or
-        ``("fix glitches",)`` for the Harp-glitch ones. Refused cameras are always left out.
+        ``("fix glitches",)`` for the Harp-glitch ones. Refused and screen-excluded cameras are always left out.
     data_root : str
-        Where Code Ocean mounts attached assets.
+        Folder holding the ME table (:data:`ME_DATA_ROOT`).
 
     Returns
     -------
@@ -585,7 +614,7 @@ def me_sessions(
 
 
 def load_me(
-    session_id: str, camera: str = "BottomCamera", data_root: str = DEFAULT_DATA_ROOT
+    session_id: str, camera: str = "BottomCamera", data_root: str = ME_DATA_ROOT
 ) -> Tuple[np.ndarray, np.ndarray, dict]:
     """Motion energy for one camera, normalised per exposure, on an even Harp-time grid.
 
@@ -612,7 +641,7 @@ def load_me(
     camera : str
         ``BottomCamera`` or ``SideCameraRight``.
     data_root : str
-        Where Code Ocean mounts attached assets.
+        Folder holding the ME table (:data:`ME_DATA_ROOT`).
 
     Returns
     -------
@@ -625,7 +654,7 @@ def load_me(
     FileNotFoundError
         If the table has no row for this session and camera, so a multi-session loop can skip.
     MotionEnergyRefused
-        If the build refused the camera (``info['error']`` says why).
+        If the build refused the camera or the video screen excluded it (``info['error']`` says why).
     ValueError
         If the file does not match its index row (a length mismatch is never truncated).
     """
@@ -638,7 +667,7 @@ def load_me(
     info = rows.iloc[0].to_dict()
     if info["status"] != "ok":
         raise MotionEnergyRefused(
-            "%s %s refused by the ME table build: %s" % (session_id, camera, info["error"])
+            "%s %s has no usable ME (%s): %s" % (session_id, camera, info["status"], info["error"])
         )
 
     frames = pd.read_parquet(
@@ -683,7 +712,7 @@ def motion_energy_to_session(
     df_trials: pd.DataFrame,
     go_cue_col: str = "goCue_start_time_raw",
     camera: str = "BottomCamera",
-    data_root: str = DEFAULT_DATA_ROOT,
+    data_root: str = ME_DATA_ROOT,
     pad_s: Optional[float] = ME_TASK_PAD_S,
 ) -> Tuple[np.ndarray, np.ndarray, float]:
     """Motion energy on the session clock (t=0 at the first go cue), evenly sampled.
@@ -711,7 +740,7 @@ def motion_energy_to_session(
     camera : str
         ``BottomCamera`` or ``SideCameraRight``.
     data_root : str
-        Where Code Ocean mounts attached assets.
+        Folder holding the ME table (:data:`ME_DATA_ROOT`).
     pad_s : float or None
         Margin kept around the go cues, in s. ``None`` returns the whole video.
 
