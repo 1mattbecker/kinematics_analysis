@@ -13,7 +13,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 |---|---|
 | ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29 (runs `ce719ee8`, `2b3a9315`). The 10 808054 sessions from 2025-09-02 to 2025-09-15 (ME first computed June 2026, from `.avi`) rerun from `.mp4` (run `342a45f7`); manifest not yet pulled |
 | Video timing QC and correction | In the library: `video_timing_qc`, released in `v0.1.0` (`41e5b59`, merged to `main`). The build calls it; nothing is reimplemented here |
-| Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which pinned `v0.1.0` (`41e5b59`). 2026-10-05: branch `timing-verdict` pins `v0.2.0` (`0e1c8df`) and the build uses `timing_verdict`; environment not yet rebuilt |
+| Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which pinned `v0.1.0` (`41e5b59`). 2026-10-05: branch `timing-verdict` pins `v0.2.0` (`0e1c8df`) and the build uses `timing_verdict`; rebuilt, dry run identical to `v0.1.0` (178 ok, 16 refused) |
 | Scratch QC (`video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; deleted 2026-10-02 (in git history at `59c31b2`) |
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | Session → ME asset mapping | Done 2026-09-30: `inputs/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |

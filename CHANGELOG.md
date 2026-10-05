@@ -17,9 +17,12 @@ frame count; every camera is used or refused as before.
   `me_sessions(exclude_actions=...)` and the built asset are unaffected, and is empty for refused
   cameras (was `refuse: <check>`).
 - `verify_video_timing_qc.ipynb` builds its action strings from `timing_verdict`.
-- Checked offline on simulated cameras (clean, glitch, drops with and without a log, frame-count
-  mismatch, wrong or short log): same outcome, error text and `action` as `v0.1.0`. Not yet run on
-  Code Ocean: rebuild, then `build_me_table.py --dry-run` should give 178 ok, 16 refused.
+- Verified on Code Ocean (dry run, all 97 sessions, compared with the `v0.1.0` dry run at
+  `c1b7ddc:metadata/me_dry_run_fip.csv`): every camera has the same status, and every usable
+  camera the same `action`. 178 ok (126 `use harp as written`, 32 `re-index`, 20 `fix glitches`),
+  16 refused (12 `exclude: harp_evenly_spaced`, 4 `exclude: trigger_log_count`). The 4 trigger-log
+  refusals word their error differently (`trigger_log_count failed: trigger log has N events,
+  frame numbers span M exposures`), since the check, not `correct_video_timing`, now refuses.
 
 ## 2026-10-02
 
