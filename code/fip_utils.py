@@ -59,7 +59,7 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, hstack
 
 import signal_utils as su
 
@@ -1141,8 +1141,34 @@ def event_design(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0)):
     return csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n_col + 1))
 
 
+def lagged_columns(x: np.ndarray, fs: float, lags_s: Tuple[float, float]) -> np.ndarray:
+    """Lagged copies of a grid signal as regressor columns.
+
+    Column ``j`` holds ``x`` delayed by ``lag_j`` (row ``t`` is ``x[t - lag_j]``), for every
+    sample lag from ``lags_s[0]`` to ``lags_s[1]`` s inclusive. A positive lag lets the response
+    follow ``x``; a negative one lets it come first. Samples off the grid and NaN samples are 0,
+    so ``x`` should be centred (z-scored) first.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(len(x), n_lags)``.
+    """
+    x = np.nan_to_num(np.asarray(x, float))
+    n = len(x)
+    lags = np.arange(int(round(lags_s[0] * fs)), int(round(lags_s[1] * fs)) + 1)
+    out = np.zeros((n, len(lags)))
+    for j, k in enumerate(lags):
+        if k >= 0:
+            out[k:, j] = x[:n - k]
+        else:
+            out[:n + k, j] = x[-k:]
+    return out
+
+
 def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
-                   ridge: float = 1e-3) -> dict:
+                   ridge: float = 1e-3, extra: Optional[np.ndarray] = None,
+                   task: bool = True) -> dict:
     """Split each z-scored signal into a task-evoked fit and a residual.
 
     Parameters
@@ -1152,6 +1178,11 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
         Kernel span relative to each event, s.
     ridge : float
         Small ridge on the normal equations, for overlapping-lick collinearity.
+    extra : numpy.ndarray, optional
+        ``(n_samples, k)`` further regressors fit with the task events, e.g. lagged motion
+        energy from :func:`lagged_columns`.
+    task : bool
+        Include the task events. ``task=False`` with ``extra`` fits ``extra`` and an intercept only.
 
     Returns
     -------
@@ -1159,7 +1190,11 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
         ``{sig: z, sig + '_fit': fitted, sig + '_res': residual, sig + '_r2': fraction explained}``
         for ``sig`` in ``da``, ``ne``.
     """
-    X = event_design(pair, kernel_s)
+    n = len(pair["da"])
+    blocks = [event_design(pair, kernel_s)] if task else [csr_matrix(np.ones((n, 1)))]
+    if extra is not None:
+        blocks.append(csr_matrix(np.asarray(extra, float)))
+    X = hstack(blocks, format="csr")
     XtX = (X.T @ X).toarray()
     XtX[np.diag_indices_from(XtX)] += ridge
     out = {}
@@ -1172,6 +1207,31 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
         out[sig + "_res"] = y - fit
         out[sig + "_r2"] = 1.0 - np.var(y - fit) / np.var(y)
     return out
+
+
+def large_transients(z_a: np.ndarray, z_b: np.ndarray, t0: float, fs: float,
+                     large_prom: float = 2.0, partner_prom: float = 1.0,
+                     match_win_s: float = 0.5, min_sep_s: float = 0.5) -> pd.DataFrame:
+    """Large transients of one signal and whether the other has a partner (``fip_07`` Fig 2 rule).
+
+    Transients are :func:`signal_utils.detect_transients` peaks. A transient of ``z_a`` is
+    *large* at prominence ≥ ``large_prom``; it has a *partner* when ``z_b`` has a peak of
+    prominence ≥ ``partner_prom`` within ±``match_win_s`` s, and is *solo* otherwise.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per large transient of ``z_a``: ``i`` (sample), ``t`` (s), ``prominence``,
+        ``lag`` (s to the nearest ``z_b`` peak, + = later), ``partner`` (bool).
+    """
+    det_a = su.detect_transients(z_a, fs, prominence=partner_prom, min_sep_s=min_sep_s)
+    det_b = su.detect_transients(z_b, fs, prominence=partner_prom, min_sep_s=min_sep_s)
+    big = det_a[det_a["prominence"] >= large_prom].reset_index(drop=True)
+    big["t"] = t0 + big["i"] / fs
+    _, lag = su.nearest_partner(big["t"].to_numpy(), t0 + det_b["i"].to_numpy() / fs)
+    big["lag"] = lag
+    big["partner"] = np.abs(lag) <= match_win_s
+    return big[["i", "t", "prominence", "lag", "partner"]]
 
 
 # ── Signal helpers ────────────────────────────────────────────────────────────
