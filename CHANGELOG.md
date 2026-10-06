@@ -2,6 +2,22 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-06
+
+### Motion-energy QC notebook and summary figure (`fip-motion-energy`)
+
+- **`men_01_motion_energy_qc`** (new): example session; timing QC (63 cameras per camera type as written,
+  10 glitches fixed, 15–17 re-indexed, 16 refused); without the re-indexing a row-count clock would be
+  280–670 s off by session end; after correction the lick-triggered ME peak sits within ±0.14 s in every
+  usable camera, whatever the correction. Image quality: 26 side cameras excluded for overexposure (809487 all
+  8, 818586 18 of 23); the clipped pixels sit on the jaw and tongue. Bottom camera: 88 usable sessions, 9 mice;
+  side: 64, 8 mice. ME scale differs between sessions (per-session z-score needed); onset rate 0.1–12/min;
+  bottom vs side r = 0.91 (median).
+- **`men_00` section 9:** one summary figure (bottom camera): go-cue and choice-aligned ME by outcome, the first
+  150 ms after the go cue at 500 Hz (onset 12 ms median, 8–18 ms), per-mouse ME after the choice.
+- `men_utils.lick_clock_check` (shared by `men_00` and `men_01`); `inputs/video_screen_fip.csv` now carries the
+  timing method, frames lost and quality medians.
+
 ## 2026-10-05
 
 ### Video-analysis library v0.2.0; `build_me_table` uses `timing_verdict` (`timing-verdict`)

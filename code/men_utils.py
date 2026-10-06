@@ -12,7 +12,8 @@ tests in ``stats_utils``, mean ± SEM plots in ``plot_utils``, lick bouts and ta
 
 Contents
 --------
-:func:`inventory_sessions`, :func:`load_session`, :func:`load_sessions`, :func:`normalise`
+:func:`inventory_sessions`, :func:`load_session`, :func:`load_sessions`, :func:`normalise`,
+:func:`lick_clock_check`
 
 Clock: every time is session time (s from the first go cue). Each session's ME is bin-averaged
 onto a uniform ``fs``-Hz grid; sample ``i`` is the mean over ``[t0 + (i - 0.5) / fs,
@@ -24,7 +25,7 @@ from __future__ import annotations
 import glob
 import os
 import pickle
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -174,3 +175,43 @@ def normalise(x: np.ndarray, how: str = "z") -> np.ndarray:
     if how == "none":
         return x
     raise ValueError("how must be 'z', 'median' or 'none'")
+
+
+def lick_clock_check(sessions: List[dict], cameras: Sequence[str], fs: float, lags_s: np.ndarray,
+                     key: str = "me_n") -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Lick-triggered ME per session and camera, and the lag of its peak (the clock check).
+
+    Each lick is a tongue protrusion both cameras see, so ME averaged around lick times peaks
+    close to the lick; a session whose peak sits far from zero has a misplaced ME clock.
+
+    Parameters
+    ----------
+    sessions : list of dict
+        From :func:`load_sessions`, each with ``s[key]`` = ``{camera: grid trace or None}``.
+    cameras : sequence of str
+    fs : float
+        Grid rate, Hz.
+    lags_s : numpy.ndarray
+        Offsets from each lick, s.
+    key : str
+        Which per-camera traces to use (``"me_n"``: normalised, ``"me"``: raw).
+
+    Returns
+    -------
+    clock : pandas.DataFrame
+        One row per session x camera: ``subject, session, camera, n_licks, peak_lag_s, peak``.
+    records : pandas.DataFrame
+        ``subject, session, camera, trace`` (the lick-triggered mean).
+    """
+    rows, records = [], []
+    for s in sessions:
+        for cam in cameras:
+            x = s[key][cam]
+            if x is None:
+                continue
+            tr = np.nanmean(su.peri_event_grid(x, s["t0"], fs, s["licks"], lags_s), axis=0)
+            rows.append(dict(subject=s["subject"], session=s["session"], camera=cam,
+                             n_licks=len(s["licks"]), peak_lag_s=lags_s[np.nanargmax(tr)],
+                             peak=np.nanmax(tr)))
+            records.append(dict(subject=s["subject"], session=s["session"], camera=cam, trace=tr))
+    return pd.DataFrame(rows), pd.DataFrame(records)
