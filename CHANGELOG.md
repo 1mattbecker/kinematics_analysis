@@ -2,6 +2,16 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-07
+
+### fip_08: cross-correlation and coherence of each pair (`fip-motion-energy`)
+
+- **`fip_08` section 0b** (new): `fip_07` Figure 1 run for DA–NE, DA–ME and NE–ME on the 88 ME sessions,
+  shown as one overlaid figure per level (one example session; animal means) in place of three copies.
+  Peak r: DA–NE 0.27, DA–ME 0.33, NE–ME 0.63; coherence 0.02–2 Hz above the shift null 0.06, 0.12, 0.33.
+  NE–ME exceeds both other pairs in 9/9 mice; DA–ME exceeds DA–NE in 8/9. Figures
+  `fip_08_0b_pairs_example`, `fip_08_0b_pairs_summary`; rows added to the section 6 numbers table.
+
 ## 2026-10-06
 
 ### Motion-energy QC notebook and summary figure (`fip-motion-energy`)
