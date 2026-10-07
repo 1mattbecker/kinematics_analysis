@@ -15,6 +15,7 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   bottom vs side r = 0.91 (median).
 - **`men_00` section 9:** one summary figure (bottom camera): go-cue and choice-aligned ME by outcome, the first
   150 ms after the go cue at 500 Hz (onset 12 ms median, 8–18 ms), per-mouse ME after the choice.
+- **`make_me_example_clip.py`:** frame-exact clip of `men_01`'s 60-s example (809491_2025-10-23), both cameras, event labels and an ME strip, in `data/figures/men/`. Session time → frame index through the corrected `harp_time` (`video_alignment.behavior_time_to_frame_index`), frame → MP4 presentation time from the file's sample tables (`aind_video_utils`; the MP4 timeline is not a uniform grid). Checked: ME recomputed from the decoded frames matches `me_clean` best at 0 frames offset (r = 0.93 bottom, 0.95 side).
 - `men_utils.lick_clock_check` (shared by `men_00` and `men_01`); `inputs/video_screen_fip.csv` now carries the
   timing method, frames lost and quality medians.
 
