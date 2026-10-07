@@ -11,6 +11,11 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   Peak r: DA–NE 0.27, DA–ME 0.33, NE–ME 0.63; coherence 0.02–2 Hz above the shift null 0.06, 0.12, 0.33.
   NE–ME exceeds both other pairs in 9/9 mice; DA–ME exceeds DA–NE in 8/9. Figures
   `fip_08_0b_pairs_example`, `fip_08_0b_pairs_summary`; rows added to the section 6 numbers table.
+- **`fip_08` section 0b, by band** (new figure `fip_08_0b_pairs_bands`; earlier figures unchanged):
+  coherence above the shift null in 0.02–0.1, 0.1–0.5 and 0.5–2 Hz. The single 0.02–2 Hz mean is
+  mostly its 0.5–2 Hz bins (Welch bins are evenly spaced in Hz) and understates NE–ME (0.68, 0.64, 0.23
+  by band). DA–ME and DA–NE do not differ at 0.1–0.5 Hz (the trial rate); DA–ME is higher at
+  0.02–0.1 Hz (9/9 mice) and 0.5–2 Hz (8/9).
 
 ## 2026-10-06
 
