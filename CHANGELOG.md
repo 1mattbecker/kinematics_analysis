@@ -29,6 +29,10 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   mostly its 0.5–2 Hz bins (Welch bins are evenly spaced in Hz) and understates NE–ME (0.68, 0.64, 0.23
   by band). DA–ME and DA–NE do not differ at 0.1–0.5 Hz (the trial rate); DA–ME is higher at
   0.02–0.1 Hz (9/9 mice) and 0.5–2 Hz (8/9).
+- **`fip_08` section 4**: panel c retitled — it is the mean ME over −0.5 to +0.5 s, not the ME peak.
+  New figure `fip_08_4_transients_peak`: per animal, the peak of the average ME trace within ±0.5 s
+  and its time. Solo NE 0.81 z vs solo DA 0.52 z (7/9 mice, p = 0.07), though their window means match
+  (0.31, 0.30): NE solo transients sit on a narrow ME peak 0.1 s earlier, DA solo on broad low ME.
 
 ## 2026-10-06
 
