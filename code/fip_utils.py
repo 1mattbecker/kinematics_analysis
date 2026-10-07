@@ -1104,42 +1104,107 @@ def residualize(df: pd.DataFrame, y: str, covariates: Sequence[str],
 
 # ── CSV-curated assets: task model ────────────────────────────────────────────
 
-def event_design(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0)):
+#: Event regressors :func:`task_events` can build. The first four are :func:`event_design`'s
+#: default task model. The ``×`` ones are parametric: the event's times, each weighted by a trial
+#: value centred within the session over the trials it applies to, so their kernel is the response
+#: per unit of the value on top of the plain event's kernel.
+TASK_EVENTS = ("go cue", "rewarded outcome", "unrewarded outcome", "lick",
+               "go cue × Q_sum", "rewarded outcome × RPE", "unrewarded outcome × RPE")
+
+
+def task_events(pair: dict, names: Sequence[str] = TASK_EVENTS[:4],
+                rng: Optional[np.random.Generator] = None) -> List[Tuple[np.ndarray, Optional[np.ndarray]]]:
+    """Event times (and weights) for :func:`event_design`, by name.
+
+    Parameters
+    ----------
+    pair : dict
+        One element of :func:`load_pairs`.
+    names : sequence of str
+        From :data:`TASK_EVENTS`. ``go cue × Q_sum`` weights each go cue by that trial's
+        ``Q_sum`` (no-response trials, where the model leaves it NaN, get the session mean, i.e.
+        weight 0). ``rewarded/unrewarded outcome × RPE`` weight each outcome by ``RPE_earned``,
+        centred within that outcome class (where RPE is ``1 − Q_chosen`` or ``−Q_chosen``).
+    rng : numpy.random.Generator, optional
+        If given, the trial values of the ``×`` events are permuted among their trials (a null
+        that keeps event times and the value distribution and breaks the pairing).
+
+    Returns
+    -------
+    list of (times, weights)
+        ``weights`` is None for plain events.
+    """
+    tr = pair["trials"]
+    responded = (tr["animal_response"] < 2).to_numpy()
+    rewarded = tr["earned_reward"].astype(bool).to_numpy() & responded
+    cue = tr["goCue_start_time_in_session"].to_numpy()
+    out = tr["reward_outcome_time_in_session"].to_numpy()
+
+    def centred(v, keep):
+        v = np.asarray(v, float)[keep]
+        v = np.nan_to_num(v - np.nanmean(v)) if np.isfinite(v).any() else np.zeros(len(v))
+        return rng.permutation(v) if rng is not None else v
+
+    every = np.ones(len(tr), bool)
+    built = {
+        "go cue": (cue, None),
+        "rewarded outcome": (out[rewarded], None),
+        "unrewarded outcome": (out[responded & ~rewarded], None),
+        "lick": (pair["licks"], None),
+        "go cue × Q_sum": (cue, centred(tr["Q_sum"], every)),
+        "rewarded outcome × RPE": (out[rewarded], centred(tr["RPE_earned"], rewarded)),
+        "unrewarded outcome × RPE": (out[responded & ~rewarded],
+                                     centred(tr["RPE_earned"], responded & ~rewarded)),
+    }
+    return [built[nm] for nm in names]
+
+
+def event_design(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
+                 events: Optional[Sequence[Tuple[np.ndarray, Optional[np.ndarray]]]] = None):
     """Sparse FIR design matrix of task events for one session.
 
     One boxcar regressor per lag in ``kernel_s`` for each of: go cue, outcome on rewarded trials,
     outcome on unrewarded trials, and every lick. Plus an intercept. Kernels are shared across
     trials, so trial-to-trial amplitude variation (RPE, noise) stays in the residual.
 
+    Parameters
+    ----------
+    pair : dict
+    kernel_s : tuple
+        Kernel span relative to each event, s (end exclusive).
+    events : sequence of (times, weights), optional
+        Other event regressors, e.g. from :func:`task_events`; ``weights`` (one per time, or
+        None for 1) set the regressor's value at each event. Default: the four above.
+
     Returns
     -------
     scipy.sparse.csr_matrix
-        ``(n_samples, 4 * n_lags + 1)``.
+        ``(n_samples, n_events * n_lags + 1)``; the intercept is the last column.
     """
     n = len(pair["da"])
     fs, t0 = pair["fs"], pair["t0"]
-    tr = pair["trials"]
-    responded = (tr["animal_response"] < 2).to_numpy()
-    rewarded = tr["earned_reward"].astype(bool).to_numpy() & responded
-    out = tr["reward_outcome_time_in_session"].to_numpy()
-    events = [tr["goCue_start_time_in_session"].to_numpy(), out[rewarded],
-              out[responded & ~rewarded], pair["licks"]]
+    if events is None:
+        events = task_events(pair)
     lag_i = np.arange(int(round(kernel_s[0] * fs)), int(round(kernel_s[1] * fs)))
-    rows, cols = [], []
-    for e, times in enumerate(events):
-        times = times[np.isfinite(times)]
-        idx = su.grid_index(times, t0, fs)
+    rows, cols, vals = [], [], []
+    for e, (times, weights) in enumerate(events):
+        times = np.asarray(times, float)
+        weights = np.ones(len(times)) if weights is None else np.asarray(weights, float)
+        ok = np.isfinite(times)
+        idx, w = su.grid_index(times[ok], t0, fs), weights[ok]
         for j, k in enumerate(lag_i):
             ii = idx + k
-            ii = ii[(ii >= 0) & (ii < n)]
-            rows.append(ii)
-            cols.append(np.full(len(ii), e * len(lag_i) + j))
+            on = (ii >= 0) & (ii < n)
+            rows.append(ii[on])
+            cols.append(np.full(on.sum(), e * len(lag_i) + j))
+            vals.append(w[on])
     n_col = len(events) * len(lag_i)
     rows.append(np.arange(n))
     cols.append(np.full(n, n_col))
+    vals.append(np.ones(n))
     rows = np.concatenate(rows)
     cols = np.concatenate(cols)
-    return csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n_col + 1))
+    return csr_matrix((np.concatenate(vals), (rows, cols)), shape=(n, n_col + 1))
 
 
 def lagged_columns(x: np.ndarray, fs: float, lags_s: Tuple[float, float]) -> np.ndarray:
@@ -1169,7 +1234,7 @@ def lagged_columns(x: np.ndarray, fs: float, lags_s: Tuple[float, float]) -> np.
 
 def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
                    ridge: float = 1e-3, extra: Optional[np.ndarray] = None,
-                   task: bool = True) -> dict:
+                   task: bool = True, events=None) -> dict:
     """Split each z-scored signal into a task-evoked fit and a residual.
 
     Parameters
@@ -1184,6 +1249,8 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
         energy from :func:`lagged_columns`.
     task : bool
         Include the task events. ``task=False`` with ``extra`` fits ``extra`` and an intercept only.
+    events : sequence of (times, weights), optional
+        Passed to :func:`event_design` (default: its four task events).
 
     Returns
     -------
@@ -1195,7 +1262,7 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
         without, the intercept and then ``extra``.
     """
     n = len(pair["da"])
-    blocks = [event_design(pair, kernel_s)] if task else [csr_matrix(np.ones((n, 1)))]
+    blocks = [event_design(pair, kernel_s, events)] if task else [csr_matrix(np.ones((n, 1)))]
     if extra is not None:
         blocks.append(csr_matrix(np.asarray(extra, float)))
     X = hstack(blocks, format="csr")

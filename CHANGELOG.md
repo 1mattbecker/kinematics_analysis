@@ -4,6 +4,19 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-07
 
+### fip_09: task × ME regression with three task models (`fip-motion-energy`)
+
+- **`fip_09_task_me_models`** (new): `fip_08` §1's regression refit with *events* (go cue, rewarded,
+  unrewarded outcome), *events + licks* (`fip_08`'s) and *events + Q/RPE* (go cue × Q_sum, outcome × RPE
+  kernels), each with and without ME, ME lags now −1…4 s. 88 sessions, 9 mice. ME adds far more to NE
+  (ΔR² above shifted null 0.28–0.30 across models) than DA (0.02–0.03); dropping licks raises DA's ME
+  increment 0.019 → 0.033 and barely changes NE's. −1…4 s vs −1…2 s ME lags change ΔR² by ≤ 0.006.
+  Q/RPE add ΔR² 0.017 (DA) and 0.005 (NE) above shuffled values; with ME, 0.015 and 0.003. The
+  individual Q_sum and RPE kernels are collinear (r ≈ −0.9) and not separately interpretable.
+- **`fip_utils`**: `event_design` / `task_residuals` take an optional `events=` list; new
+  `task_events` and `TASK_EVENTS` build plain and trial-weighted (Q_sum, RPE) event regressors.
+  Defaults unchanged (design matrix identical to before).
+
 ### fip_08: cross-correlation and coherence of each pair (`fip-motion-energy`)
 
 - **`fip_08` section 0b** (new): `fip_07` Figure 1 run for DA–NE, DA–ME and NE–ME on the 88 ME sessions,
