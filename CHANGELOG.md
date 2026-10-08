@@ -4,6 +4,18 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-08
 
+### Where the fast ME after the go cue comes from (`cue_me_maps.py`)
+
+- **`cue_me_maps.py`** (new): per-pixel |frame difference| at each 2 ms lag around N go cues. Frame
+  windows from the library's `video_alignment.event_frame_ranges` on the ME table's corrected
+  `harp_time`; frame-exact clips from the S3 MP4 with `video_clips.cut_clips` (library v0.3.0, not
+  yet the capsule pin); stops unless the clips' ME matches the table's `me_clean` at offset 0. Writes
+  the maps and an ME-by-region figure to `data/figures/men/`.
+- Result for `men_00` §9b's ~30 Hz ringing (809487_2025-10-10 vs 815334_2025-11-14, 150 cues each):
+  in 809487 a jolt across the whole face/body edge at ~12–16 ms, then the ringing, which is on the
+  whiskers (both sides of the snout, peaks ~30 and ~57 ms); the face/body edge does not ring. 815334
+  has no jolt; whiskers start at ~20–25 ms and ME ramps over 50–100 ms with little fast component.
+
 ### FIP notebooks regrouped by analysis type (`fip-refactor`)
 
 - **`fip_10`–`fip_17`** replace `fip_00`–`fip_09`, one notebook per kind of analysis:
