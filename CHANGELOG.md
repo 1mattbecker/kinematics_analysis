@@ -4,6 +4,28 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-08
 
+### FIP notebooks regrouped by analysis type (`fip-refactor`)
+
+- **`fip_10`–`fip_17`** replace `fip_00`–`fip_09`, one notebook per kind of analysis:
+  `fip_10_correlation` (DA × NE and DA/NE/ME pairs, xcorr, coherence, bands), `fip_11_transients`
+  (shared/solo transients, matched pairs, ME at transients), `fip_12_movement_events` (ME onsets,
+  instructed vs uninstructed), `fip_13_task_me_regression` (R², model, kernels, DA–NE r with task/ME
+  removed, by timescale), `fip_14_task_model_variants` (was `fip_09`), `fip_15_task_responses`
+  (`fip_07` Fig 3, Rachel's pipeline), `fip_16_rpe_coding` (`fip_05` §1/2/4 + `fip_08` §3),
+  `fip_17_rpe_split` (was `fip_06`). Cells were copied, not rewritten; every figure in the
+  2026-10-07 talk is reproduced.
+- **Archived** (`code/archive/`, with a where-it-went table in its README): `fip_00`–`fip_04` (old
+  JSON-curated asset, superseded), `fip_05`, `fip_07`, `fip_08` (split into the above). Dropped as
+  duplicates: `fip_05`'s example traces, its go-cue latency figure (`fip_15` §2 has it on Rachel's
+  pipeline) and its dissociation figure (= `fip_11` §1).
+- **`fu.add_motion_energy`** (new): the "keep sessions with a usable camera, put z-scored DA, NE, ME,
+  ME onsets and lick events on the pair grid" block that `fip_08`/`fip_09` repeated inline.
+- All eight rerun locally (97 sessions / 88 with ME, 9 mice). Numbers equal the earlier runs except
+  shift-null draws (matched-pair lag centre 0.084 → 0.088 s) and `fip_13` §5, the DA–NE correlation
+  by timescale, which now uses the 88 ME sessions instead of 97 (e.g. raw 2–8 s r 0.349 → 0.345).
+
+## 2026-10-08
+
 ### men_02: fixed-length lick window and session-permutation null (`fip-motion-energy`)
 
 - **`men_02_value_from_video`**: the go cue → first lick window (RT long, so partly a measure of RT) is

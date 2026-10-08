@@ -3,13 +3,14 @@ fip_utils.py — shared code for the ``fip_*`` notebook series (and ``men_*``'s 
 
 Two data paths, one per kind of FIP asset:
 
-* **NWB-list assets with JSON curation** (``DA_NE_4channels``; ``fip_00``–``fip_04``):
+* **NWB-list assets with JSON curation** (``DA_NE_4channels``; only the archived ``fip_00``–``fip_04``):
   :func:`load_curated_sessions` reads the saved parquet hierarchy with Rachel's
   ``load_nwb_list`` and applies the JSON curation; :func:`select_session`, :func:`build_meta`,
   :func:`pick_example` set up one session; :func:`process_session` adds motion energy.
 * **CSV-curated assets read directly** (``DANE_3channels_curated``, the 4-channel rebuild;
-  ``fip_05``, ``fip_07``, ``men_00``): :func:`find_asset_root`, :func:`inventory_pairs`,
-  :func:`choose_side`, :func:`load_pairs` put same-side DA/NE pairs on a uniform grid;
+  ``fip_10``–``fip_17``, ``men_00``): :func:`find_asset_root`, :func:`inventory_pairs`,
+  :func:`choose_side`, :func:`load_pairs` put same-side DA/NE pairs on a uniform grid,
+  :func:`add_motion_energy` adds bottom- or side-camera ME on that grid;
   :func:`trial_measures`, :func:`fit_rpe_terms`, :func:`residualize`, :func:`task_residuals`
   measure them. (This was ``fip_coupling.py``.)
 
@@ -978,6 +979,63 @@ def load_pairs(kept: pd.DataFrame, fs: float = 20.0, pre_s: float = 5.0, post_s:
     return pairs
 
 
+def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "BottomCamera",
+                      data_root: str = ME_DATA_ROOT, onset_fs: Optional[float] = 100.0,
+                      exclude_subjects: Sequence[str] = ()) -> List[dict]:
+    """Keep the pairs whose camera passes the ME screen and put DA, NE and ME on their grid.
+
+    ME on the session clock (:func:`motion_energy_to_session`) is averaged into the pair's
+    ``fs``-Hz bins (:func:`signal_utils.bin_to_grid`). Every trace is z-scored over the grid.
+
+    Parameters
+    ----------
+    pairs : sequence of dict
+        From :func:`load_pairs`.
+    kept : pandas.DataFrame
+        From :func:`choose_side`; gives each session's folder.
+    camera : str
+        ``BottomCamera`` or ``SideCameraRight``.
+    data_root : str
+        Folder holding the ME table.
+    onset_fs : float or None
+        Rate of the grid ME onsets are detected on (:data:`ME_ONSET_KW`, on the z-scored
+        trace). ``None`` skips onset detection.
+    exclude_subjects : sequence of str
+        Subjects left out.
+
+    Returns
+    -------
+    list of dict
+        Copies of the kept pairs with ``z`` (``{"da", "ne", "me"}``, z-scored; ME's empty bins
+        set to 0), ``lick_events`` (left/right lick rows of ``df_events``) and, with
+        ``onset_fs``, ``me_onsets`` (s).
+    """
+    path_of = dict(zip(kept["session"], kept["path"]))
+    usable = set(me_sessions(camera, data_root=data_root))
+    out = []
+    for p in pairs:
+        if p["session"] not in usable or p["subject"] in exclude_subjects:
+            continue
+        path = path_of[p["session"]]
+        trials_raw = pd.read_parquet(os.path.join(path, "df_trials.parquet"))
+        t_me, y, _ = motion_energy_to_session(p["session"], trials_raw, camera=camera,
+                                              data_root=data_root)
+        n = len(p["da"])
+        q = dict(p)
+        q["z"] = {"da": su.zscore(p["da"]), "ne": su.zscore(p["ne"]),
+                  "me": np.nan_to_num(su.zscore(su.bin_to_grid(t_me, y, p["t0"], p["fs"], n)))}
+        if onset_fs is not None:
+            n_on = int(n * onset_fs / p["fs"])
+            me_on = su.zscore(su.bin_to_grid(t_me, y, p["t0"], onset_fs, n_on))
+            q["me_onsets"] = su.threshold_onsets(p["t0"] + np.arange(n_on) / onset_fs, me_on,
+                                                 already_z=True, **ME_ONSET_KW)
+        events = pd.read_parquet(os.path.join(path, "df_events.parquet"),
+                                 columns=["timestamps", "event"])
+        q["lick_events"] = events[events["event"].isin(["left_lick_time", "right_lick_time"])]
+        out.append(q)
+    return out
+
+
 # ── CSV-curated assets: per-trial measures ────────────────────────────────────
 
 def trial_measures(pair: dict, windows: Dict[str, Tuple[float, float]],
@@ -1284,7 +1342,7 @@ def task_residuals(pair: dict, kernel_s: Tuple[float, float] = (-1.0, 4.0),
 def large_transients(z_a: np.ndarray, z_b: np.ndarray, t0: float, fs: float,
                      large_prom: float = 2.0, partner_prom: float = 1.0,
                      match_win_s: float = 0.5, min_sep_s: float = 0.5) -> pd.DataFrame:
-    """Large transients of one signal and whether the other has a partner (``fip_07`` Fig 2 rule).
+    """Large transients of one signal and whether the other has a partner (``fip_11`` §1 rule).
 
     Transients are :func:`signal_utils.detect_transients` peaks. A transient of ``z_a`` is
     *large* at prominence ≥ ``large_prom``; it has a *partner* when ``z_b`` has a peak of

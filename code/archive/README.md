@@ -30,6 +30,26 @@ Full account in `TODO.md`.
 
 ## What was archived and why
 
+### FIP notebooks, reorganized by analysis type (archived 2026-10-08)
+
+The `fip_*` series was regrouped into `fip_10`–`fip_17`, one notebook per kind of analysis, all on
+the CSV-curated assets. Cells were copied, not rewritten; the table says where each part went.
+Everything shown in the 2026-10-07 talk ("DA, NE and movement") is in the new notebooks.
+
+| Notebook | Where its content went |
+|---|---|
+| `fip_00_explore.ipynb` | Retired. Single-session exploration on the JSON-curated `DA_NE_4channels` asset; superseded by `fip_10`/`fip_12` and `men_00` |
+| `fip_01_movement_value_coding.ipynb` | Retired. ME by RPE bin / reward streak on the old asset; superseded by `fip_16` §6 |
+| `fip_02_ne_only_events.ipynb` | Retired. NE-only onsets in one session; superseded by `fip_11` |
+| `fip_03_da_ne_commonality.ipynb` | Retired. ME from DA/NE variance partition, one animal; superseded by `fip_13` §1 |
+| `fip_04_da_ne_xcorr.ipynb` | Retired. DA × NE xcorr on the old asset; superseded by `fip_10` §1 (CSV-curated rebuild) |
+| `fip_05_da_ne_rpe_coupling.ipynb` | §1, §2, §4a–c → `fip_16`; §3d–e and §5's threshold sweep → `fip_11` §2–3; §3f and §4d–e → `fip_13` §5. Dropped: the example-trace figure, §3a–c (go-cue latency; `fip_15` §2 has it on Rachel's pipeline) and the rest of §5 (same as `fip_11` §1) |
+| `fip_07_da_ne_summary.ipynb` | Fig 1 → `fip_10` §1; Fig 2 → `fip_11` §1; Fig 3 → `fip_15` |
+| `fip_08_movement_da_ne.ipynb` | §0b → `fip_10` §2; §1 a–b and §5 → `fip_12`; §1 c–d → `fip_10` §2; §1 e–f, model, §2, kernels → `fip_13`; §3 → `fip_16` §6; §4 → `fip_11` §4 |
+
+`fip_06_rpe_split` and `fip_09_task_me_models` were renamed (not archived) to `fip_17_rpe_split`
+and `fip_14_task_model_variants`.
+
 ### Ported into the `kin_*`/`eph_*` series (the former HOLD set, archived 2026-09-16)
 
 | Notebook | Ported into |
