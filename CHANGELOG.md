@@ -11,8 +11,13 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   blocks minus the median with the target circularly shifted (100 shifts). 88 bottom / 64 side sessions.
   Q_chosen, bottom camera: previous outcome 0.42 (9/9 mice), log RT 0.08 (8/9), ME window means 0.02 (n.s.),
   ME binned pre-cue 0.02 (n.s.), ME binned incl. the 0.3 s before the first lick 0.08 (p = 0.055; these
-  bins carry RT), ME + RT 0.10–0.11 (8/9). Side camera alike. High-Q trials have higher pre-cue ME
-  (+0.12 z) and shorter RT, but pre-cue ME predicts little trial by trial.
+  bins carry RT), ME + RT 0.10–0.11 (8/9). Side camera alike.
+- **`men_02` §2** (added the same day): the plain per-session correlation of Q_chosen with each ME
+  window alone, tested by sign across animals (no shuffle, nothing removed). Pre-cue ME tracks Q_chosen:
+  −2…−1 s r = 0.15 (9/9 mice, 80/88 sessions), −1…0 s r = 0.11 (8/9); go cue → first lick r ≈ 0;
+  log RT r = −0.27 (0/9 positive). Side camera alike. The cross-validated decoders (now §3–§5) score
+  the same windows near zero: held-out blocks and the shifted-target baseline penalise a slowly
+  varying relation.
 - **`signal_utils.window_mean_grid`**: `a`/`b` may be one value per event (variable windows, e.g. go
   cue → first lick). Scalars behave as before.
 - **`men_utils.TRIAL_COLS`**: adds `Q_unchosen`, `Q_sum` (the shared men cache rebuilds once).
