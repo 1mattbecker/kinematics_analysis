@@ -4,20 +4,16 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-07
 
-### men_02: predicting value from motion energy before the outcome (`fip-motion-energy`)
+### men_02: predicting Q_chosen from motion energy before the outcome (`fip-motion-energy`)
 
-- **`men_02_value_from_video`** (new): per session and camera, ridge regression of Q_chosen (also RPE,
-  Q_sum, Q_chosen − Q_unchosen) on pre-outcome predictors, cross-validated R² over 5 contiguous trial
-  blocks minus the median with the target circularly shifted (100 shifts). 88 bottom / 64 side sessions.
-  Q_chosen, bottom camera: previous outcome 0.42 (9/9 mice), log RT 0.08 (8/9), ME window means 0.02 (n.s.),
-  ME binned pre-cue 0.02 (n.s.), ME binned incl. the 0.3 s before the first lick 0.08 (p = 0.055; these
-  bins carry RT), ME + RT 0.10–0.11 (8/9). Side camera alike.
-- **`men_02` §2** (added the same day): the plain per-session correlation of Q_chosen with each ME
-  window alone, tested by sign across animals (no shuffle, nothing removed). Pre-cue ME tracks Q_chosen:
-  −2…−1 s r = 0.15 (9/9 mice, 80/88 sessions), −1…0 s r = 0.11 (8/9); go cue → first lick r ≈ 0;
-  log RT r = −0.27 (0/9 positive). Side camera alike. The cross-validated decoders (now §3–§5) score
-  the same windows near zero: held-out blocks and the shifted-target baseline penalise a slowly
-  varying relation.
+- **`men_02_value_from_video`** (new): does ME before the outcome predict Q_chosen trial by trial?
+  Three ME windows (−2…−1 and −1…0 s before the go cue; go cue → first lick) and log RT, 88 bottom /
+  64 side sessions. Per-session r with Q_chosen (bottom; side alike): −2…−1 s 0.15 (9/9 mice, 80/88
+  sessions), −1…0 s 0.11 (8/9), response window ≈ 0, log RT −0.27 (9/9 negative). Cross-validated R²
+  over 5 contiguous blocks is negative for every ME window (−0.03 to −0.06): each held-out block is
+  mispredicted by its offset from the other blocks' mean Q_chosen. Log RT 0.02, ME windows + RT 0.04.
+  A first version with more targets, ridge/binned decoders, behavioral reference predictors and a
+  shifted-target null was cut back to this the same day.
 - **`signal_utils.window_mean_grid`**: `a`/`b` may be one value per event (variable windows, e.g. go
   cue → first lick). Scalars behave as before.
 - **`men_utils.TRIAL_COLS`**: adds `Q_unchosen`, `Q_sum` (the shared men cache rebuilds once).
