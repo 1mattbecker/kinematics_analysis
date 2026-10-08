@@ -73,8 +73,6 @@ frame count; every camera is used or refused as before.
   refusals word their error differently (`trigger_log_count failed: trigger log has N events,
   frame numbers span M exposures`), since the check, not `correct_video_timing`, now refuses.
 
-## 2026-10-05
-
 ### Motion energy × DA/NE: `fip_08`, quality screen, local runs (`fip-motion-energy`)
 
 - **Plan** for the brain-wide NM meeting talk rewritten in `code/fip_todo.md` (one dataset, one grid,
@@ -960,7 +958,6 @@ that `val_03_missed_licks` has landed.
 
 No analysis code touched.
 
-
 ### `val_03_missed_licks`: state the confidence conditioning in §4, plot densities
 
 Both §4 distributions were already measured from the same confidence-filtered arrays —
@@ -1458,7 +1455,6 @@ moved into the library.
   and n unchanged and only offsets the plotted x-axis (~0.19 mm vs the reference figure).
   Verified the mesh is entirely `+ML` (0.519-1.311 mm, 0 of 40208 vertices negative), so
   `eph_09`'s §7 contours are unaffected by the fold change.
-
 
 ### eph_08 / eph_09: use the reference run's spike-count windows and z_ccf filter
 - Traced the poster figure `rt_response_projection_abs.svg` (2026-05-04 00:34:41) to

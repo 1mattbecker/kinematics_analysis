@@ -38,7 +38,7 @@ goes with DA/NE events; how are instructed and uninstructed movements represente
 Order: (1) local setup: data root from `ME_DATA_ROOT`, quality screen in `fu.me_sessions`,
 `.venv-fip` kernel; (2) run `men_00`; (3) `fip_07` figures; (4) `fip_08`.
 
-Status 2026-10-05: setup done; `men_00` run locally (clock check passes everywhere, 816212 kept); `fip_07` figures in `data/figures/fip`; `fip_08` §1–5 run locally (figures `fip_08_*`). Next: slides; Code Ocean run after attaching the 4-channel rebuild as `DANE_4channels_curated`.
+Status 2026-10-08: everything in the table has run locally on 88 sessions / 9 mice (`men_00`, `men_01` QC, `fip_07`, `fip_08` §0b–5 plus model figures, `fip_09` task-model variants) and is in the talk deck. Not done: a Code Ocean run (attach the 4-channel rebuild as `DANE_4channels_curated` first); merging `fip-motion-energy` into `wild`.
 
 Left out to keep it simple: `fip_03`'s variance partition (4c replaces it), slow engagement
 coupling, sorting ME events by clustering or camera, timing claims from lags (GCaMP and dLight
