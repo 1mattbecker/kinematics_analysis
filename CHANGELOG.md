@@ -24,8 +24,6 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   shift-null draws (matched-pair lag centre 0.084 → 0.088 s) and `fip_13` §5, the DA–NE correlation
   by timescale, which now uses the 88 ME sessions instead of 97 (e.g. raw 2–8 s r 0.349 → 0.345).
 
-## 2026-10-08
-
 ### men_02: fixed-length lick window and session-permutation null (`fip-motion-energy`)
 
 - **`men_02_value_from_video`**: the go cue → first lick window (RT long, so partly a measure of RT) is
