@@ -38,7 +38,7 @@ goes with DA/NE events; how are instructed and uninstructed movements represente
 Order: (1) local setup: data root from `ME_DATA_ROOT`, quality screen in `fu.me_sessions`,
 `.venv-fip` kernel; (2) run `men_00`; (3) `fip_07` figures; (4) `fip_08`.
 
-Status 2026-10-08: everything in the table has run locally on 88 sessions / 9 mice (`men_00`, `men_01` QC, `fip_07`, `fip_08` §0b–5 plus model figures, `fip_09` task-model variants) and is in the talk deck. Not done: a Code Ocean run (attach the 4-channel rebuild as `DANE_4channels_curated` first); merging `fip-motion-energy` into `wild`.
+Status 2026-10-08: everything in the table has run locally on 88 sessions / 9 mice (`men_00`, `men_01` QC, `fip_07`, `fip_08` §0b–5 plus model figures, `fip_09` task-model variants) and is in the talk deck. Not done: merging `fip-motion-energy` into `wild`.
 
 Left out to keep it simple: `fip_03`'s variance partition (4c replaces it), slow engagement
 coupling, sorting ME events by clustering or camera, timing claims from lags (GCaMP and dLight
@@ -48,19 +48,12 @@ kinetics differ).
 
 ## Open items
 
-### Code Ocean runs
-- Run `fip_00`–`fip_04` with the 2026-10-02 helper modules; they have only been lint-checked.
-  `fip_03` rebuilds its cache (file renamed).
-- Copy figures headed for a paper from `scratch/figures` to `/results`.
-
-### Questions for Rachel
-- 808056 is missing from the 4-channel rebuild; it was the most strongly coupled animal in `fip_04`.
-- Is `latNAcc` the same placement as the older asset's `NAc`?
-- The RPE-split finding (`fip_06`): RPE = 0 omissions in her RPE ≥ 0 group, and 37/301 sessions
-  with `forget_rate_unchosen` fit at 1.0.
-- What window the `pearsonR` series uses, and what `bright` means in `dff-bright_mc-iso-IRLS`.
-
 ### Analyses
+- `fip_08` §4 (Q3) by task context: partnered large transients fall mostly at outcomes and licking, so
+  their higher ME may be context. Label each transient with `bu.label_context` (as `fip_07` Fig 2f) and
+  compare ME around solo and partnered transients within each context.
+- `fip_08` §2: why the DA–NE correlation rises from 0.02 (task removed) to 0.06 (task + ME removed).
+  Correlate the ME-predicted parts of DA and NE; split the residual correlation by frequency band.
 - Move `fip_05` onto Rachel's code (agreed): `dummy_nwb.load`, her `data_z` / `data_z_norm`,
   `event_triggered_response`, her RPE slope with the outcome split and pre-first-reward trials
   dropped; keep in `fip_utils` only what the libraries don't have.
@@ -78,13 +71,12 @@ kinetics differ).
   `pick_example` reworked. Only needed if this asset stays in use; the environment is pinned to
   `864550d`, which still has the JSON API.
 
-### Library
-- Move the bout helpers in `behavior_utils` into the video-analysis library (PR, then rebuild).
-
 ---
 
 ## Closed
 
+- Code Ocean runs and questions for Rachel: tracked outside this file (2026-10-08).
+- Bout helpers into the video-analysis library: not now; they stay in `behavior_utils` (2026-10-08).
 - `fip_utils` extraction; `fip_coupling` merged into `fip_utils`; shared helper modules
   (2026-10-02, `helper_cleanup.md`).
 - Dockerfile pinned to rachel-analysis-utils `864550d`.
