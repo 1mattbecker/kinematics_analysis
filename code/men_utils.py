@@ -41,7 +41,7 @@ CAMERAS = ("BottomCamera", "SideCameraRight")
 TRIAL_COLS = [
     "trial", "goCue_start_time_in_session", "goCue_start_time_raw", "choice_time_in_session",
     "reward_outcome_time_in_session", "animal_response", "earned_reward", "extra_reward",
-    "num_reward_past", "response_time", "RPE_earned", "Q_chosen",
+    "num_reward_past", "response_time", "RPE_earned", "Q_chosen", "Q_unchosen", "Q_sum",
 ]
 
 #: Bumped when the cached session dict changes shape, so an old cache is rebuilt.

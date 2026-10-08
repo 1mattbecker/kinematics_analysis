@@ -197,19 +197,21 @@ def peri_event_grid(x: np.ndarray, t0: float, fs: float, times, lags_s,
     return out
 
 
-def window_mean_grid(x: np.ndarray, t0: float, fs: float, times, a: float, b: float
-                     ) -> np.ndarray:
+def window_mean_grid(x: np.ndarray, t0: float, fs: float, times, a, b) -> np.ndarray:
     """Mean of a grid signal over ``[time + a, time + b)`` for each time.
 
-    NaN samples inside the window are skipped. The result is NaN when the time is NaN, the window
-    runs off the grid, or it holds no finite sample.
+    ``a`` and ``b`` are scalars, or one value per time (e.g. ``b`` = each trial's response time
+    for a go cue → first lick window). NaN samples inside the window are skipped. The result is
+    NaN when the time or a bound is NaN, the window runs off the grid, or it holds no finite sample.
     """
     x = np.asarray(x, float)
     times = np.asarray(times, dtype=float)
+    a = np.broadcast_to(np.asarray(a, float), times.shape)
+    b = np.broadcast_to(np.asarray(b, float), times.shape)
     out = np.full(len(times), np.nan)
-    ok = np.isfinite(times)
-    i0 = grid_index(times[ok] + a, t0, fs)
-    i1 = grid_index(times[ok] + b, t0, fs)
+    ok = np.isfinite(times) & np.isfinite(a) & np.isfinite(b)
+    i0 = grid_index(times[ok] + a[ok], t0, fs)
+    i1 = grid_index(times[ok] + b[ok], t0, fs)
     finite = np.isfinite(x)
     c = np.r_[0.0, np.cumsum(np.where(finite, x, 0.0))]
     cn = np.r_[0, np.cumsum(finite)]

@@ -4,15 +4,29 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-07
 
+### men_02: predicting value from motion energy before the outcome (`fip-motion-energy`)
+
+- **`men_02_value_from_video`** (new): per session and camera, ridge regression of Q_chosen (also RPE,
+  Q_sum, Q_chosen − Q_unchosen) on pre-outcome predictors, cross-validated R² over 5 contiguous trial
+  blocks minus the median with the target circularly shifted (100 shifts). 88 bottom / 64 side sessions.
+  Q_chosen, bottom camera: previous outcome 0.42 (9/9 mice), log RT 0.08 (8/9), ME window means 0.02 (n.s.),
+  ME binned pre-cue 0.02 (n.s.), ME binned incl. the 0.3 s before the first lick 0.08 (p = 0.055; these
+  bins carry RT), ME + RT 0.10–0.11 (8/9). Side camera alike. High-Q trials have higher pre-cue ME
+  (+0.12 z) and shorter RT, but pre-cue ME predicts little trial by trial.
+- **`signal_utils.window_mean_grid`**: `a`/`b` may be one value per event (variable windows, e.g. go
+  cue → first lick). Scalars behave as before.
+- **`men_utils.TRIAL_COLS`**: adds `Q_unchosen`, `Q_sum` (the shared men cache rebuilds once).
+
 ### fip_09: task × ME regression with three task models (`fip-motion-energy`)
 
 - **`fip_09_task_me_models`** (new): `fip_08` §1's regression refit with *events* (go cue, rewarded,
-  unrewarded outcome), *events + licks* (`fip_08`'s) and *events + Q/RPE* (go cue × Q_sum, outcome × RPE
-  kernels), each with and without ME, ME lags now −1…4 s. 88 sessions, 9 mice. ME adds far more to NE
+  unrewarded outcome), *events + licks* (`fip_08`'s) and *events + RPE* (rewarded/unrewarded outcome ×
+  RPE kernels), each with and without ME, ME lags now −1…4 s. 88 sessions, 9 mice. ME adds far more to NE
   (ΔR² above shifted null 0.28–0.30 across models) than DA (0.02–0.03); dropping licks raises DA's ME
-  increment 0.019 → 0.033 and barely changes NE's. −1…4 s vs −1…2 s ME lags change ΔR² by ≤ 0.006.
-  Q/RPE add ΔR² 0.017 (DA) and 0.005 (NE) above shuffled values; with ME, 0.015 and 0.003. The
-  individual Q_sum and RPE kernels are collinear (r ≈ −0.9) and not separately interpretable.
+  increment 0.019 → 0.032 and barely changes NE's. −1…4 s vs −1…2 s ME lags change ΔR² by ≤ 0.006.
+  RPE adds ΔR² 0.014 (DA) and 0.004 (NE) above shuffled values; with ME, 0.013 and 0.002. A go cue ×
+  Q_sum kernel was tried and dropped: collinear with RPE (r ≈ −0.9 on rewarded trials), the two
+  kernels traded off and flipped the DA RPE kernel's sign.
 - **`fip_utils`**: `event_design` / `task_residuals` take an optional `events=` list; new
   `task_events` and `TASK_EVENTS` build plain and trial-weighted (Q_sum, RPE) event regressors.
   Defaults unchanged (design matrix identical to before).
