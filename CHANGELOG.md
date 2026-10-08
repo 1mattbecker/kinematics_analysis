@@ -2,6 +2,20 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-08
+
+### men_02: fixed-length lick window and session-permutation null (`fip-motion-energy`)
+
+- **`men_02_value_from_video`**: the go cue → first lick window (RT long, so partly a measure of RT) is
+  replaced by −0.5…0 s before the first lick. Sections 2 and 3 add a session-permutation null (Harris
+  2020): Q_chosen of one session against the predictors of each other session of the same animal and
+  camera, truncated to the shorter session; each session's excess is its own statistic minus the
+  partner mean on the same trials. Results (bottom; side alike): r with Q_chosen −2…−1 s 0.15, −1…0 s
+  0.11, −0.5…0 s before the lick −0.10 (1/9 mice positive), log RT −0.27; the permuted r is ≈ 0
+  for all, so session drift does not produce the correlations. The permuted CV R² is ≈ −0.075 (the
+  block-offset effect); CV R² above it: single ME windows 0.02–0.03, all ME windows 0.08 (9/9 mice),
+  log RT 0.09, ME windows + RT 0.12. Q_chosen confirmed pre-update (RPE_earned = reward − Q_chosen).
+
 ## 2026-10-07
 
 ### men_02: predicting Q_chosen from motion energy before the outcome (`fip-motion-energy`)
