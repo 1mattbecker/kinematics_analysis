@@ -1,7 +1,7 @@
 # fip_* / men_* to-do
 
 Open work for the FIP and motion-energy notebooks (`fip_10`–`fip_17`, `men_00`–`men_02`). `TODO.md`
-tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-08 (notebooks
+tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-09 (isosbestic control added; 2026-10-08: notebooks
 regrouped by analysis type; old names → new in `archive/README.md`).
 
 ---
@@ -56,6 +56,22 @@ kinetics differ).
 - Move `fip_16` (was `fip_05`) onto Rachel's code (agreed): `dummy_nwb.load`, her `data_z` / `data_z_norm`,
   `event_triggered_response`, her RPE slope with the outcome split and pre-first-reward trials
   dropped; keep in `fip_utils` only what the libraries don't have.
+- Isosbestic control for the ME correlations (`fip_10` §2, `fip_12` §1, `fip_13`; asked for by
+  Kyle Severson): is any of DA's or NE's relation to ME motion artifact left after motion correction?
+  Do not use motion-corrected iso: the correction fits iso to itself, leaving ~0, so its ME
+  correlation is weak whatever the correction did. Residual artifact is the part of a channel's
+  artifact that iso does not contain. Instead:
+  1. Raw iso (bleach-corrected `dff-bright` only, no `mc`) × ME through the same xcorr and
+     ME-onset averages: how large the movement artifact is per fiber.
+  2. Corrected DA/NE and raw iso averaged at ME onsets: an iso-shaped deflection (same timing and
+     sign) left in corrected NE marks residual artifact.
+  3. If the NE fiber's red channel carries no sensor, red × ME is an artifact measure the correction
+     never used.
+  4. Activity-independent recordings (GFP or a mutant sensor) through the same pipeline, if any exist.
+
+  Data: the curated `df_fip.parquet` files carry only the corrected sensor channels (e.g. 816214
+  2025-12-03: `G_1` NE, `G_3` DA, `dff-bright_mc-iso-IRLS`), with no iso or raw traces. Iso_1/Iso_3 (and
+  red) have to come from upstream through Rachel's preprocessing without the `mc` step.
 - Contralateral control: DA from the opposite NAc × NE.
 - Behavior-model dependence: RPE and value come from one Q-learning fit; a refit or another model
   family would change `fip_16` sections 1–4.
