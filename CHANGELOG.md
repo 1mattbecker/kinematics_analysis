@@ -15,10 +15,10 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 - Bottom vs side camera ME correlation in the 62 sessions (8 mice) where both cameras pass QC:
   whole-session r, cross-correlation, r in 60-s windows across the session, r in task periods
-  (0–3 s after each go cue) vs inter-trial, r in lick bouts vs no licking.
+  (0–2 s after each go cue) vs inter-trial, r in lick bouts vs no licking.
 - Result: r = 0.89 ± 0.01 across mice, peak at 0 lag, flat across the session. Agreement is lower
-  during licking (0.69 vs 0.91) and slightly lower in task periods (0.85 vs 0.91); the side camera's
-  ME varies more than the bottom camera's in lick bouts.
+  during licking (0.69 vs 0.91) and in task periods (0.81 vs 0.91). In lick bouts both cameras' ME
+  is high (mean ~1.1 session SD); the side camera's varies more around that level (SD 0.99 vs 0.84).
 - New helpers: `su.rolling_corr`, `su.interval_mask`, `mu.per_animal_timecourse` (moved out of
   `men_00` §6, which now calls it).
 
