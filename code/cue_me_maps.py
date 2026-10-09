@@ -19,9 +19,9 @@ Steps in :func:`cue_maps`:
    offsets -5..+5 (pooled over clips); the best offset must be 0, or it raises.
 
 Then :func:`smooth_encoder_cycle` (removes the re-encoding cycle of the clips), :func:`region_masks`
-(the pixels that move most after the cue, split by position),
-:func:`fast_component` (minus a running mean) and :func:`band_power_map` (per-pixel power of the fast
-part).
+(the pixels that move most after the cue, split by position), :func:`highpass` and
+:func:`highpass_peaks` (15 Hz zero-phase Butterworth, and its peaks) and :func:`band_power_map`
+(per-pixel power of the high-passed part).
 
 Environment: the video-analysis library (>= v0.3.0) with its ``video-clips`` extra, plus PyAV; ffmpeg
 on the PATH. Both are installed in ``.venv-fip``.
@@ -43,6 +43,7 @@ import pandas as pd
 from aind_dynamic_foraging_behavior_video_analysis import video_alignment as va
 from aind_dynamic_foraging_behavior_video_analysis import video_clips as vc
 from scipy.ndimage import gaussian_filter, uniform_filter1d
+from scipy.signal import butter, filtfilt, find_peaks
 
 OPEN_DATA_URL = "https://aind-open-data.s3.us-west-2.amazonaws.com"
 CO_DATA_ROOT = "/root/capsule/data/"
@@ -221,19 +222,42 @@ def region_masks(maps, lags_s, window_ms=(10, 80), top_pct=3.0, left_frac=0.12, 
             "rest of frame": ~hot}
 
 
-def fast_component(x, dt, smooth_ms=16.0, axis=0):
-    """``x`` minus its centred running mean over ``smooth_ms`` (edges padded with the end value)."""
-    n = max(int(round(smooth_ms / 1000 / dt)), 1)
-    return x - uniform_filter1d(np.asarray(x, float), n, axis=axis, mode="nearest")
+def highpass(x, dt, cutoff_hz=15.0, order=2, axis=0):
+    """Zero-phase Butterworth high-pass (``filtfilt``): the fast part of a cue-triggered trace.
+
+    Run forwards and backwards, so peaks keep their times, but a fast rise is spread over
+    ~±25 ms: before a sharp onset the output dips (and bulges before that) although the input
+    does not. Read the output only from ~20 ms after the cue.
+    """
+    b, a = butter(order, cutoff_hz, "high", fs=1 / dt)
+    return filtfilt(b, a, np.asarray(x, float), axis=axis)
 
 
-def band_power_map(maps, lags_s, window_ms=(15, 110), band_hz=(22, 45), smooth_ms=16.0, nfft=128):
-    """Per-pixel power of the fast part of the post-cue |difference| in ``band_hz``, (H, W)."""
+def highpass_peaks(lags_s, x, cutoff_hz=15.0, window_ms=(20, 110), rel_prominence=0.1):
+    """Peaks of the high-passed trace within ``window_ms`` after the cue.
+
+    Returns
+    -------
+    times_ms, prominence : numpy.ndarray
+        Peak times, and each peak's prominence as a fraction of the high-passed trace's range in
+        the window. A peak counts if that fraction exceeds ``rel_prominence``.
+    """
+    lags_ms = np.asarray(lags_s) * 1000
+    hp = highpass(x, float(np.median(np.diff(lags_s))), cutoff_hz)
+    w = (lags_ms >= window_ms[0]) & (lags_ms <= window_ms[1])
+    span = np.ptp(hp[w])
+    idx, props = find_peaks(hp[w], prominence=rel_prominence * span)
+    return lags_ms[w][idx], props["prominences"] / span
+
+
+def band_power_map(maps, lags_s, window_ms=(20, 110), band_hz=(22, 45), cutoff_hz=15.0, nfft=128):
+    """Per-pixel power in ``band_hz`` of the high-passed post-cue |difference| (:func:`highpass`
+    over the whole clip, then ``window_ms``), (H, W)."""
     lags_ms = lags_s * 1000
     dt = float(np.median(np.diff(lags_s)))
     win = (lags_ms >= window_ms[0]) & (lags_ms <= window_ms[1])
-    x = maps[win].reshape(win.sum(), -1).astype(float)
-    fast = fast_component(x - x.mean(0), dt, smooth_ms, axis=0)
+    hp = highpass(maps.reshape(len(lags_s), -1), dt, cutoff_hz, axis=0)
+    fast = hp[win]
     freqs = np.fft.rfftfreq(nfft, dt)
     power = np.abs(np.fft.rfft(fast, nfft, axis=0)) ** 2
     return power[(freqs >= band_hz[0]) & (freqs <= band_hz[1])].sum(0).reshape(maps.shape[1:])
@@ -281,7 +305,7 @@ def _plot(res, title, path):
         ax.set_yticks([])
     ax = axes[7]
     ax.imshow(band_power_map(res["maps"], res["lags_s"]), cmap="magma")
-    ax.set_title("power 22–45 Hz, 15–110 ms")
+    ax.set_title("power 22–45 Hz, high-passed, 20–110 ms")
     ax.set_xticks([])
     ax.set_yticks([])
     ax = axes[8]

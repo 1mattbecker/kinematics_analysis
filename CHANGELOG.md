@@ -32,14 +32,19 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 - Results (88 sessions, 9 mice; maps from 100 cues of one session per mouse): five mice (809487,
   816214, 808054, 816212, 809491) have a jump in ME 10–16 ms after the cue (0.4–1.3 z), the other
   four have none (≤ 0.11 z); the jump is also there on no-response trials (responded − no response
-  +0.11 z). In every mouse the fast part peaks at about 26, 54 and 78 ms (24 ms apart in the five,
-  an ME rhythm of ~42 Hz, i.e. a movement of ~21 Hz), and the maps put it on the whiskers; the jump
-  adds motion over the face/body edge.
+  +0.11 z). The high-passed ME (15 Hz) peaks again at a median 54 ms (jump mice) / 58 ms (others),
+  in every session of every mouse, and at ~24 ms in most sessions; the maps put both on the whiskers.
+  In mice without the jump the ~24 ms peak coincides with the start of the movement and may be the
+  filter's response to it. Later peaks (~80 ms) are not consistent.
+- Ripples are separated from the rise with a 15 Hz zero-phase Butterworth high-pass
+  (`cm.highpass`, `cm.highpass_peaks`); it replaces a 16 ms running-mean subtraction, which made the
+  ME appear to dip before the jump. Both filters spread a fast rise over ~±25 ms, so only ≥ 20 ms
+  after the cue is read.
 - Clips cut by `video_clips` carry a 4-frame ME cycle from the x264 re-encode (every clip starts on
   the same frame type; 10–25% deep, same in every clip). `cm.smooth_encoder_cycle` (4-frame mean)
   removes it from the maps; timing comes from the ME table (original video).
 - `cue_me_maps.py` is now a module (`cue_maps` with an `.npz` cache, `smooth_encoder_cycle`,
-  `excess_maps`, `region_masks`, `fast_component`, `band_power_map`, `draw_regions`) and still a
+  `excess_maps`, `region_masks`, `highpass`, `highpass_peaks`, `band_power_map`, `draw_regions`) and still a
   script. `video_url` builds the S3 URL from the index's `source_video`, so nested-layout sessions
   (`behavior-videos/BottomCamera/video.mp4`) work; `make_me_example_clip.py` still assumes the flat
   layout.
