@@ -2,28 +2,29 @@
 cue_me_maps.py — where in the image the motion energy (ME) right after the go cue comes from.
 
 The session-average ME map (``aind-motion-energy``'s ``_motion_energy_map.npy``) cannot separate one
-moment after the cue from another. This cuts a frame-exact clip around each of N go cues and averages
-the per-pixel absolute frame difference at every lag, so each 2 ms step after the cue gets its own map.
-Written for the ~30 Hz ringing in ``men_00`` §9b (first 150 ms after the cue, bottom camera).
+moment after the cue from another. :func:`cue_maps` cuts a frame-exact clip around each of N go cues
+and averages the per-pixel absolute frame difference at every lag, so each 2 ms step after the cue
+gets its own map. Used by ``men_04``; also runs as a script for one session.
 
-Steps:
+Steps in :func:`cue_maps`:
 
-1. Go-cue Harp times (``goCue_start_time_raw`` of the CSV-curated FIP trial table) -> frame windows
-   with the library's ``video_alignment.event_frame_ranges`` on the ME table's corrected per-frame
-   ``harp_time``. Windows that span dropped frames (fewer frames than the rest) are left out.
-2. Clips cut from the session's MP4 on public S3 with ``video_clips.cut_clips`` (frame-exact seek from
-   the MP4 sample tables; clips re-encoded near-losslessly, CRF 18).
-3. Each clip decoded (luma plane) with PyAV; ``|frame[k+1] - frame[k]|`` summed per lag over cues. The
-   lag of a difference is the Harp time of its later frame minus the go cue, as in the ME table.
-4. Check: per clip, the mean of each difference image is correlated with the table's ``me_clean`` at
-   frame offsets -5..+5 (summed over clips); the best offset must be 0, or the script stops.
+1. Go-cue Harp times -> frame windows with the library's ``video_alignment.event_frame_ranges`` on
+   the ME table's corrected per-frame ``harp_time``. Windows that span dropped frames (fewer frames
+   than the rest) are left out.
+2. Clips cut from the session's MP4 on public S3 with ``video_clips.cut_clips`` (frame-exact seek
+   from the MP4 sample tables; clips re-encoded near-losslessly, CRF 18; already-cut clips reused).
+3. Each clip decoded (luma plane) with PyAV; ``|frame[k+1] - frame[k]|`` summed per lag over cues.
+   The lag of a difference is the Harp time of its later frame minus the go cue, as in the ME table.
+4. Check: the mean of each difference image is correlated with the table's ``me_clean`` at frame
+   offsets -5..+5 (pooled over clips); the best offset must be 0, or it raises.
 
-Writes ``<out-dir>/cue_me_maps_<session>_<camera>.npz`` (``lags_s``, ``maps`` [lag, H, W] mean
-|difference|, ``reference`` mean frame, ``clip_me`` [cue, lag] per-clip ME, ``cues``) and two figures:
-the maps (``.png``) and ME by image region with the map of the fast part (``_regions.png``).
+Then :func:`smooth_encoder_cycle` (removes the re-encoding cycle of the clips), :func:`region_masks`
+(the pixels that move most after the cue, split by position),
+:func:`fast_component` (minus a running mean) and :func:`band_power_map` (per-pixel power of the fast
+part).
 
-Environment: the video-analysis library with its ``video-clips`` extra, plus PyAV, pandas, pyarrow and
-matplotlib; ffmpeg on the PATH. Not ``.venv-fip``.
+Environment: the video-analysis library (>= v0.3.0) with its ``video-clips`` extra, plus PyAV; ffmpeg
+on the PATH. Both are installed in ``.venv-fip``.
 
 Usage (from ``code/``)::
 
@@ -32,30 +33,44 @@ Usage (from ``code/``)::
 
 import argparse
 import glob
+import json
 import os
 
 import av
-import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from aind_dynamic_foraging_behavior_video_analysis import video_alignment as va
+from aind_dynamic_foraging_behavior_video_analysis import video_clips as vc
+from scipy.ndimage import gaussian_filter, uniform_filter1d
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from aind_dynamic_foraging_behavior_video_analysis import video_alignment as va  # noqa: E402
-from aind_dynamic_foraging_behavior_video_analysis import video_clips as vc  # noqa: E402
-
-VIDEO_URL = "https://aind-open-data.s3.us-west-2.amazonaws.com/{raw}/behavior-videos/{camera}.mp4"
+OPEN_DATA_URL = "https://aind-open-data.s3.us-west-2.amazonaws.com"
+CO_DATA_ROOT = "/root/capsule/data/"
+ME_TABLE_NAME = "fip_motion_energy_aligned"
 # Lag windows (ms after the cue) drawn as maps, minus the pre-cue map
 MAP_WINDOWS_MS = [(10, 16), (18, 30), (34, 46), (50, 62), (66, 80), (100, 150)]
+REGION_COLORS = {"left edge": "#009E73", "upper half": "#D55E00", "lower half": "#0072B2",
+                 "rest of frame": "#999999"}
 
 
-def load_trials(ses_idx, data_roots):
-    """Trial table of a session from the CSV-curated FIP assets."""
-    for root in data_roots:
-        hits = glob.glob(os.path.join(root, "**", ses_idx, "df_trials.parquet"), recursive=True)
-        if hits:
-            return pd.read_parquet(hits[0]).sort_values("trial")
-    raise FileNotFoundError(f"no trial table for {ses_idx}")
+def video_url(index_row):
+    """Public S3 URL of a camera's MP4, from a row of the ME table's ``index.csv``.
+
+    Built from ``source_video`` (the path the table was built from, under the capsule's data
+    folder), so it is right for both raw layouts: ``behavior-videos/bottom_camera.mp4`` (flat) and
+    ``behavior-videos/BottomCamera/video.mp4`` (nested).
+    """
+    path = index_row["source_video"]
+    if not path.startswith(CO_DATA_ROOT):
+        raise ValueError(f"source_video not under {CO_DATA_ROOT}: {path}")
+    return f"{OPEN_DATA_URL}/{path[len(CO_DATA_ROOT):]}"
+
+
+def load_frame_table(me_root, raw_session, camera):
+    """Per-frame ``harp_time`` (corrected) and ``me_clean`` of one camera from the ME table."""
+    path = os.path.join(me_root, ME_TABLE_NAME, raw_session, f"{camera}.parquet")
+    table = pd.read_parquet(path, columns=["harp_time", "me_clean"])
+    return table["harp_time"].to_numpy(), table["me_clean"].to_numpy()
 
 
 def clip_luma(path):
@@ -70,14 +85,21 @@ def clip_luma(path):
 
 
 def check_alignment(clip_me, table_me, starts, max_shift=5):
-    """Summed correlation of clip ME with the table's me_clean at frame offsets -max_shift..max_shift."""
+    """Pooled correlation of clip ME with the table's ``me_clean`` at frame offsets ±max_shift.
+
+    Difference ``k`` of a clip starting at source frame ``s`` is frame ``s+k+1`` minus frame
+    ``s+k``: the table's row ``s+k+1`` (the table's ME is padded with a leading 0).
+
+    Returns
+    -------
+    shifts, r : numpy.ndarray
+    """
     shifts = np.arange(-max_shift, max_shift + 1)
     n_diff = clip_me.shape[1]
     r = []
     for d in shifts:
         a, b = [], []
         for x, s in zip(clip_me, starts):
-            # difference k of a clip is frame s+k+1 minus frame s+k: the table's row s+k+1
             idx = s + 1 + np.arange(n_diff) + d
             if idx[0] < 0 or idx[-1] >= len(table_me):
                 continue
@@ -85,100 +107,195 @@ def check_alignment(clip_me, table_me, starts, max_shift=5):
             b.append(table_me[idx] - table_me[idx].mean())
         a, b = np.concatenate(a), np.concatenate(b)
         r.append(np.sum(a * b) / np.sqrt(np.sum(a * a) * np.sum(b * b)))
-    r = np.array(r)
-    return shifts, r
+    return shifts, np.array(r)
 
 
-def plot(lags_s, maps, reference, clip_me, title, path):
-    lags_ms = lags_s * 1000
-    base = maps[lags_ms < 0].mean(0)
-    excess = [maps[(lags_ms >= a) & (lags_ms < b)].mean(0) - base for a, b in MAP_WINDOWS_MS]
-    vmax = np.nanpercentile(np.abs(np.stack(excess)), 99.8)
-    n = len(MAP_WINDOWS_MS) + 2
-    fig, axes = plt.subplots(2, (n + 1) // 2 + 1, figsize=(4.2 * ((n + 1) // 2 + 1), 7.6))
-    axes = axes.ravel()
-    axes[0].imshow(reference, cmap="gray")
-    axes[0].set_title("mean frame")
-    im = axes[1].imshow(base, cmap="magma")
-    axes[1].set_title("|diff| before the cue (−60–0 ms)")
-    fig.colorbar(im, ax=axes[1], fraction=0.04)
-    for ax, (a, b), e in zip(axes[2:], MAP_WINDOWS_MS, excess):
-        im = ax.imshow(e, cmap="RdBu_r", vmin=-vmax, vmax=vmax)
-        ax.set_title(f"{a}–{b} ms minus before")
-    fig.colorbar(im, ax=axes[2 + len(excess) - 1], fraction=0.04)
-    for ax in axes[: 2 + len(excess)]:
-        ax.set_xticks([])
-        ax.set_yticks([])
-    ax = axes[2 + len(excess)]
-    for x in clip_me[:15]:
-        ax.plot(lags_ms, x, color="0.75", lw=0.6)
-    ax.plot(lags_ms, clip_me.mean(0), "k", lw=1.5, label=f"mean of {len(clip_me)} cues")
-    ax.axvline(0, ls="--", color="0.5", lw=0.8)
-    ax.set(xlabel="time from go cue (ms)", ylabel="mean |diff| (luma)", title="ME of the clips")
-    ax.legend(fontsize=8)
-    for ax in axes[3 + len(excess):]:
-        ax.axis("off")
-    fig.suptitle(title, x=0.01, ha="left")
-    fig.tight_layout()
-    fig.savefig(path, dpi=110)
-    plt.close(fig)
+def cue_maps(url, harp_time, me_clean, cue_times, n_cues=100, before=0.06, after=0.16, seed=0,
+             clip_dir="clips", prefix="clip", cache_path=None):
+    """Mean per-pixel |frame difference| at each lag around a random sample of go cues.
 
+    Parameters
+    ----------
+    url : str
+        The camera's MP4 (local path or URL), frame-aligned with ``harp_time``.
+    harp_time, me_clean : numpy.ndarray
+        Per-frame corrected Harp time and ME from the ME table (:func:`load_frame_table`).
+    cue_times : array-like
+        Go-cue times on the Harp clock (``goCue_start_time_raw``).
+    n_cues : int
+        Cues sampled (without replacement, ``seed``) from those whose window has every frame.
+    before, after : float
+        Seconds before and after each cue.
+    clip_dir, prefix : str
+        Where the clips go and how they are named (``video_clips.cut_clips``); existing ones are reused.
+    cache_path : str, optional
+        ``.npz`` holding the result; reused when its parameters match.
 
-def plot_regions(lags_s, maps, reference, title, path, smooth_ms=16, band_hz=(22, 45)):
-    """ME by image region, and where the fast (~30 Hz) part of the post-cue ME lies.
-
-    Regions: the top 3% of pixels by mean excess |difference| 10–80 ms after the cue, split into the
-    left edge of the frame (x < 12%), the upper half and the lower half (in the bottom camera: the
-    face/body edge and the whiskers on either side of the snout); the rest of the frame is the fourth.
-    The fast part is each trace minus its ``smooth_ms`` running mean; its power in ``band_hz`` over
-    15–110 ms is drawn per pixel.
+    Returns
+    -------
+    dict
+        ``lags_s`` (n_lags,), lag of each difference from the cue; ``maps`` (n_lags, H, W) mean
+        |difference| (luma units); ``reference`` (H, W) mean frame; ``clip_me`` (n_cues, n_lags)
+        per-cue ME of the clip; ``cues``, ``start_frames``; ``align_shifts``, ``align_r``.
     """
+    params = dict(url=str(url), n_cues=int(n_cues), before=float(before), after=float(after),
+                  seed=int(seed))
+    if cache_path and os.path.exists(cache_path):
+        with np.load(cache_path) as f:
+            if json.loads(str(f["params"])) == params:
+                return {k: f[k] for k in f.files if k != "params"}
+
+    ranges = va.event_frame_ranges(np.asarray(cue_times, float), harp_time, before, after)
+    n_full = int(ranges.loc[ranges.in_video, "n_frames"].mode()[0])
+    ranges = ranges[ranges.in_video & (ranges.n_frames == n_full)]       # no drops inside a window
+    ranges = ranges.sample(min(n_cues, len(ranges)), random_state=seed).sort_values("start_frame")
+    clips = vc.cut_clips(url, ranges, clip_dir, prefix)
+    clips = clips[clips.clip_path.notna()]
+
+    acc, ref_acc, clip_me, starts, cues = None, None, [], [], []
+    for row in clips.itertuples():
+        y = clip_luma(row.clip_path)
+        if len(y) != n_full:
+            continue
+        d = np.abs(np.diff(y, axis=0)).astype(np.float32)
+        acc = d if acc is None else acc + d
+        ref_acc = y.mean(0) if ref_acc is None else ref_acc + y.mean(0)
+        clip_me.append(d.mean(axis=(1, 2)))
+        starts.append(int(row.start_frame))
+        cues.append(row.event_time)
+    clip_me, starts, cues = np.array(clip_me), np.array(starts), np.array(cues)
+    lags_s = np.mean([harp_time[s + 1: s + n_full] - c for s, c in zip(starts, cues)], axis=0)
+    shifts, r = check_alignment(clip_me, me_clean, starts)
+    if shifts[np.argmax(r)] != 0:
+        raise RuntimeError(f"{url}: clips are {shifts[np.argmax(r)]} frames off the ME table")
+
+    out = dict(lags_s=lags_s, maps=(acc / len(clip_me)).astype(np.float32),
+               reference=(ref_acc / len(clip_me)).astype(np.float32), clip_me=clip_me, cues=cues,
+               start_frames=starts, align_shifts=shifts, align_r=r)
+    if cache_path:
+        os.makedirs(os.path.dirname(cache_path) or ".", exist_ok=True)
+        np.savez_compressed(cache_path, params=json.dumps(params), **out)
+    return out
+
+
+def smooth_encoder_cycle(maps, n_frames=4):
+    """Mean over ``n_frames`` consecutive lags, to remove the clips' re-encoding cycle.
+
+    ``video_clips`` re-encodes every clip with x264 (CRF 18, default B-frames), and every clip starts
+    on the same frame type, so clip ME carries a cycle of 4 frames (10–25% deep) that is the same in
+    every clip and survives averaging over cues. A running mean over 4 frames cancels any 4- or
+    2-frame pattern; at 500 Hz it keeps ~91% of the amplitude at 30 Hz and ~80% at 45 Hz. The edges
+    use the end value.
+    """
+    return uniform_filter1d(np.asarray(maps, np.float32), n_frames, axis=0, mode="nearest")
+
+
+def excess_maps(maps, lags_s, windows_ms=MAP_WINDOWS_MS):
+    """Mean |difference| in each lag window minus the pre-cue mean, (n_windows, H, W)."""
     lags_ms = lags_s * 1000
-    dt = np.median(np.diff(lags_s))
     base = maps[lags_ms < 0].mean(0)
-    excess = maps[(lags_ms >= 10) & (lags_ms < 80)].mean(0) - base
+    return np.stack([maps[(lags_ms >= a) & (lags_ms < b)].mean(0) - base for a, b in windows_ms])
+
+
+def region_masks(maps, lags_s, window_ms=(10, 80), top_pct=3.0, left_frac=0.12, blur_px=2.0):
+    """Pixels that move most after the cue, split by where they are in the frame.
+
+    The top ``top_pct`` % of pixels by mean excess |difference| over ``window_ms`` (minus before the
+    cue, blurred by a Gaussian of ``blur_px`` so a region is an area, not single pixels), split into
+    the left edge of the frame (x < ``left_frac`` of the width), the upper half and
+    the lower half; ``rest of frame`` is every other pixel. In the bottom camera the left edge is the
+    face/body edge and the two halves hold the whiskers on either side of the snout.
+
+    Returns
+    -------
+    dict
+        ``{name: bool mask (H, W)}``, in :data:`REGION_COLORS` order.
+    """
+    excess = gaussian_filter(excess_maps(maps, lags_s, [window_ms])[0], blur_px)
     h, w = excess.shape
-    hot = excess > np.percentile(excess, 97)
+    hot = excess > np.percentile(excess, 100 - top_pct)
     yy, xx = np.mgrid[:h, :w]
-    regions = {"left edge": hot & (xx < 0.12 * w),
-               "upper half": hot & (xx >= 0.12 * w) & (yy < h / 2),
-               "lower half": hot & (xx >= 0.12 * w) & (yy >= h / 2),
-               "rest of frame": ~hot}
-    colors = ["tab:green", "tab:red", "tab:blue", "0.5"]
-    kernel = np.ones(int(round(smooth_ms / 1000 / dt))) / int(round(smooth_ms / 1000 / dt))
+    return {"left edge": hot & (xx < left_frac * w),
+            "upper half": hot & (xx >= left_frac * w) & (yy < h / 2),
+            "lower half": hot & (xx >= left_frac * w) & (yy >= h / 2),
+            "rest of frame": ~hot}
 
-    win = (lags_ms >= 15) & (lags_ms <= 110)
-    x = maps[win].reshape(win.sum(), -1)
-    x = x - x.mean(0)
-    fast = x - np.apply_along_axis(lambda v: np.convolve(v, kernel, "same"), 0, x)
-    freqs = np.fft.rfftfreq(128, dt)
-    power = (np.abs(np.fft.rfft(fast, 128, axis=0)) ** 2)[(freqs >= band_hz[0]) & (freqs <= band_hz[1])]
-    power = power.sum(0).reshape(h, w)
 
-    fig, axes = plt.subplots(1, 4, figsize=(20, 4.2))
-    axes[0].imshow(reference, cmap="gray")
-    for (name, m), c in zip(regions.items(), colors):
-        if name != "rest of frame":
-            axes[0].contour(m, levels=[0.5], colors=[c], linewidths=0.8)
-    axes[0].set_title("regions: top 3% of excess |diff|, 10–80 ms")
-    axes[1].imshow(power, cmap="magma", vmax=np.percentile(power, 99.7))
-    axes[1].set_title(f"power {band_hz[0]}–{band_hz[1]} Hz, 15–110 ms")
-    for ax in axes[:2]:
+def fast_component(x, dt, smooth_ms=16.0, axis=0):
+    """``x`` minus its centred running mean over ``smooth_ms`` (edges padded with the end value)."""
+    n = max(int(round(smooth_ms / 1000 / dt)), 1)
+    return x - uniform_filter1d(np.asarray(x, float), n, axis=axis, mode="nearest")
+
+
+def band_power_map(maps, lags_s, window_ms=(15, 110), band_hz=(22, 45), smooth_ms=16.0, nfft=128):
+    """Per-pixel power of the fast part of the post-cue |difference| in ``band_hz``, (H, W)."""
+    lags_ms = lags_s * 1000
+    dt = float(np.median(np.diff(lags_s)))
+    win = (lags_ms >= window_ms[0]) & (lags_ms <= window_ms[1])
+    x = maps[win].reshape(win.sum(), -1).astype(float)
+    fast = fast_component(x - x.mean(0), dt, smooth_ms, axis=0)
+    freqs = np.fft.rfftfreq(nfft, dt)
+    power = np.abs(np.fft.rfft(fast, nfft, axis=0)) ** 2
+    return power[(freqs >= band_hz[0]) & (freqs <= band_hz[1])].sum(0).reshape(maps.shape[1:])
+
+
+def draw_regions(ax, reference, masks, alpha=0.45, left_frac=0.12):
+    """Mean frame with each region filled in its colour, and the region boundaries as lines."""
+    ax.imshow(reference, cmap="gray")
+    h, w = reference.shape
+    for name, m in masks.items():
+        if name == "rest of frame":
+            continue
+        rgba = np.zeros((h, w, 4))
+        rgba[m] = (*plt.matplotlib.colors.to_rgb(REGION_COLORS[name]), alpha)
+        ax.imshow(rgba)
+    ax.axvline(left_frac * w, color="w", ls=":", lw=0.8)
+    ax.plot([left_frac * w, w - 1], [h / 2, h / 2], color="w", ls=":", lw=0.8)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+# ── Script ────────────────────────────────────────────────────────────────────
+
+def _load_trials(ses_idx, data_roots):
+    for root in data_roots:
+        hits = glob.glob(os.path.join(root, "**", ses_idx, "df_trials.parquet"), recursive=True)
+        if hits:
+            return pd.read_parquet(hits[0]).sort_values("trial")
+    raise FileNotFoundError(f"no trial table for {ses_idx}")
+
+
+def _plot(res, title, path):
+    lags_ms = res["lags_s"] * 1000
+    exc = excess_maps(res["maps"], res["lags_s"])
+    vmax = np.nanpercentile(np.abs(exc), 99.8)
+    masks = region_masks(res["maps"], res["lags_s"])
+    fig, axes = plt.subplots(2, 5, figsize=(21, 7.6))
+    axes = axes.ravel()
+    draw_regions(axes[0], res["reference"], masks)
+    axes[0].set_title("mean frame, regions")
+    for ax, (a, b), e in zip(axes[1:], MAP_WINDOWS_MS, exc):
+        ax.imshow(e, cmap="RdBu_r", vmin=-vmax, vmax=vmax)
+        ax.set_title(f"{a}–{b} ms minus before")
         ax.set_xticks([])
         ax.set_yticks([])
-    for (name, m), c in zip(regions.items(), colors):
-        trace = maps[:, m].mean(1)
-        pre = trace[lags_ms < 0].mean()
-        axes[2].plot(lags_ms, (trace - pre) / (trace.max() - pre), color=c, label=f"{name} ({m.sum()} px)")
-        if name != "rest of frame":
-            axes[3].plot(lags_ms, trace - np.convolve(trace, kernel, "same"), color=c, label=name)
-    axes[2].set(xlabel="time from go cue (ms)", ylabel="|diff|, 0 = before the cue, 1 = peak",
-                title="ME by region")
-    axes[3].set(xlabel="time from go cue (ms)", ylabel="|diff| (luma)", xlim=(10, 150),
-                title=f"by region, minus {smooth_ms} ms running mean")
-    for ax in axes[2:]:
-        ax.axvline(0, ls="--", color="0.5", lw=0.8)
-        ax.legend(fontsize=7)
+    ax = axes[7]
+    ax.imshow(band_power_map(res["maps"], res["lags_s"]), cmap="magma")
+    ax.set_title("power 22–45 Hz, 15–110 ms")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax = axes[8]
+    for name, m in masks.items():
+        trace = res["maps"][:, m].mean(1)
+        ax.plot(lags_ms, trace - trace[lags_ms < 0].mean(), color=REGION_COLORS[name], label=name)
+    ax.set(xlabel="time from go cue (ms)", ylabel="|diff| minus before", title="ME by region")
+    ax.legend(fontsize=7)
+    ax = axes[9]
+    for x in res["clip_me"][:15]:
+        ax.plot(lags_ms, x, color="0.75", lw=0.6)
+    ax.plot(lags_ms, res["clip_me"].mean(0), "k", lw=1.5, label=f"mean of {len(res['clip_me'])} cues")
+    ax.set(xlabel="time from go cue (ms)", ylabel="mean |diff| (luma)", title="ME of the clips")
+    ax.legend(fontsize=7)
     fig.suptitle(title, x=0.01, ha="left")
     fig.tight_layout()
     fig.savefig(path, dpi=110)
@@ -192,7 +309,6 @@ def main():
     p.add_argument("--n-cues", type=int, default=100)
     p.add_argument("--before", type=float, default=0.06, help="s before the cue")
     p.add_argument("--after", type=float, default=0.16, help="s after the cue")
-    p.add_argument("--trials", choices=["all", "responded", "ignored"], default="all")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--me-root", default=os.environ.get("ME_DATA_ROOT", "../../data"))
     p.add_argument("--fip-roots", nargs="+", default=["../../data/results-a278f830-9bf2-48e8-9928-a2ff78e4818f",
@@ -201,66 +317,27 @@ def main():
     p.add_argument("--out-dir", default="../data/figures/men")
     args = p.parse_args()
 
-    index = pd.read_csv(os.path.join(args.me_root, "fip_motion_energy_aligned", "index.csv"))
+    import matplotlib
+    matplotlib.use("Agg")
+    index = pd.read_csv(os.path.join(args.me_root, ME_TABLE_NAME, "index.csv"))
     index["ses_idx"] = index["session"].str.split("_").str[1:3].str.join("_")
-    row = index[(index.ses_idx == args.session) & (index.camera == args.camera) & (index.status == "ok")]
-    if row.empty:
+    rows = index[(index.ses_idx == args.session) & (index.camera == args.camera) & (index.status == "ok")]
+    if rows.empty:
         raise SystemExit(f"{args.session} {args.camera}: not in the ME table with status ok")
-    row = row.iloc[0]
-    table = pd.read_parquet(os.path.join(args.me_root, "fip_motion_energy_aligned", row.session,
-                                         f"{args.camera}.parquet"), columns=["harp_time", "me_clean"])
-    harp = table["harp_time"].to_numpy()
-
-    trials = load_trials(args.session, args.fip_roots)
-    keep = {"all": np.ones(len(trials), bool),
-            "responded": (trials["animal_response"] != 2).to_numpy(),
-            "ignored": (trials["animal_response"] == 2).to_numpy()}[args.trials]
-    cues = trials.loc[keep, "goCue_start_time_raw"].dropna().to_numpy(float)
-    ranges = va.event_frame_ranges(cues, harp, args.before, args.after)
-    n_full = int(ranges.loc[ranges.in_video, "n_frames"].mode()[0])
-    ranges = ranges[ranges.in_video & (ranges.n_frames == n_full)]       # no drops inside a window
-    ranges = ranges.sample(min(args.n_cues, len(ranges)), random_state=args.seed).sort_values("start_frame")
-    print(f"{args.session} {args.camera}: {len(ranges)} cues ({args.trials}), {n_full} frames each")
-
-    url = VIDEO_URL.format(raw=row.session, camera=row.source_camera)
-    clips = vc.cut_clips(url, ranges, args.clip_dir, f"{args.session}_{args.camera}")
-    clips = clips[clips.clip_path.notna()]
-    print(clips.status.str.split(":").str[0].value_counts().to_dict())
-
-    acc, ref_acc, clip_me, starts, cue_times = None, None, [], [], []
-    for r in clips.itertuples():
-        y = clip_luma(r.clip_path)
-        if len(y) != n_full:
-            print(f"  {r.clip_path}: {len(y)} frames, expected {n_full}; skipped")
-            continue
-        d = np.abs(np.diff(y, axis=0)).astype(np.float32)
-        acc = d if acc is None else acc + d
-        ref_acc = y.mean(0) if ref_acc is None else ref_acc + y.mean(0)
-        clip_me.append(d.mean(axis=(1, 2)))
-        starts.append(int(r.start_frame))
-        cue_times.append(r.event_time)
-    clip_me, starts = np.array(clip_me), np.array(starts)
-    n = len(clip_me)
-    maps, reference = acc / n, ref_acc / n
-    # lag of difference k: Harp time of frame start+k+1 minus the cue, averaged over cues
-    lags_s = np.mean([harp[s + 1: s + n_full] - c for s, c in zip(starts, cue_times)], axis=0)
-
-    shifts, r = check_alignment(clip_me, table["me_clean"].to_numpy(), starts)
-    best = shifts[np.argmax(r)]
-    print("alignment r by offset: " + ", ".join(f"{s:+d}:{v:.3f}" for s, v in zip(shifts, r)))
-    if best != 0:
-        raise RuntimeError(f"clips are {best} frames off the ME table")
-
+    row = rows.iloc[0]
+    harp, me = load_frame_table(args.me_root, row["session"], args.camera)
+    cues = _load_trials(args.session, args.fip_roots)["goCue_start_time_raw"].dropna().to_numpy()
+    stem = f"cue_me_maps_{args.session}_{args.camera}"
+    res = cue_maps(video_url(row), harp, me, cues, args.n_cues, args.before, args.after, args.seed,
+                   args.clip_dir, f"{args.session}_{args.camera}",
+                   cache_path=os.path.join(args.clip_dir, stem + ".npz"))
+    res["maps"] = smooth_encoder_cycle(res["maps"])
+    print("alignment r by offset: " + ", ".join(f"{s:+d}:{v:.3f}" for s, v in
+                                                 zip(res["align_shifts"], res["align_r"])))
     os.makedirs(args.out_dir, exist_ok=True)
-    stem = f"cue_me_maps_{args.session}_{args.camera}" + ("" if args.trials == "all" else f"_{args.trials}")
-    np.savez_compressed(os.path.join(args.out_dir, stem + ".npz"), lags_s=lags_s, maps=maps.astype(np.float32),
-                        reference=reference.astype(np.float32), clip_me=clip_me, cues=np.array(cue_times))
-    plot(lags_s, maps, reference, clip_me,
-         f"{args.session} {args.camera}: per-pixel |frame difference| after the go cue ({n} cues, {args.trials})",
-         os.path.join(args.out_dir, stem + ".png"))
-    plot_regions(lags_s, maps, reference, f"{args.session} {args.camera}: ME by region ({n} cues, {args.trials})",
-                 os.path.join(args.out_dir, stem + "_regions.png"))
-    print("wrote", os.path.join(args.out_dir, stem + ".png"), "and _regions.png")
+    _plot(res, f"{args.session} {args.camera}: per-pixel |frame difference| after the go cue "
+               f"({len(res['clip_me'])} cues)", os.path.join(args.out_dir, stem + ".png"))
+    print("wrote", os.path.join(args.out_dir, stem + ".png"))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,46 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-08
 
+### `fip_11`: section 1 figure as shared fractions
+
+- The section 1 figure is now `plot_section1(view)` and is drawn twice: solo fractions (unchanged)
+  and shared fractions (`fip_11_1_transients_shared`): shared and solo labels in the schematic,
+  shared vs chance, shared fraction by size and by task context. The numbers table adds the DA and
+  NE shared fractions.
+
+### `men_05_camera_agreement` (new)
+
+- Bottom vs side camera ME correlation in the 62 sessions (8 mice) where both cameras pass QC:
+  whole-session r, cross-correlation, r in 60-s windows across the session, r in task periods
+  (0–3 s after each go cue) vs inter-trial, r in lick bouts vs no licking.
+- Result: r = 0.89 ± 0.01 across mice, peak at 0 lag, flat across the session. Agreement is lower
+  during licking (0.69 vs 0.91) and slightly lower in task periods (0.85 vs 0.91); the side camera's
+  ME varies more than the bottom camera's in lick bouts.
+- New helpers: `su.rolling_corr`, `su.interval_mask`, `mu.per_animal_timecourse` (moved out of
+  `men_00` §6, which now calls it).
+
+### `men_04_cue_evoked_motion_maps` (new)
+
+- The `cue_me_maps.py` analysis as a notebook, over all mice: 500 Hz cue-triggered ME per session
+  (early jump 10–16 ms, fast part; responded vs no response), per-pixel maps for one session per
+  mouse, ME by region with the regions drawn as filled masks, and the timing of the fast peaks.
+- Results (88 sessions, 9 mice; maps from 100 cues of one session per mouse): five mice (809487,
+  816214, 808054, 816212, 809491) have a jump in ME 10–16 ms after the cue (0.4–1.3 z), the other
+  four have none (≤ 0.11 z); the jump is also there on no-response trials (responded − no response
+  +0.11 z). In every mouse the fast part peaks at about 26, 54 and 78 ms (24 ms apart in the five,
+  an ME rhythm of ~42 Hz, i.e. a movement of ~21 Hz), and the maps put it on the whiskers; the jump
+  adds motion over the face/body edge.
+- Clips cut by `video_clips` carry a 4-frame ME cycle from the x264 re-encode (every clip starts on
+  the same frame type; 10–25% deep, same in every clip). `cm.smooth_encoder_cycle` (4-frame mean)
+  removes it from the maps; timing comes from the ME table (original video).
+- `cue_me_maps.py` is now a module (`cue_maps` with an `.npz` cache, `smooth_encoder_cycle`,
+  `excess_maps`, `region_masks`, `fast_component`, `band_power_map`, `draw_regions`) and still a
+  script. `video_url` builds the S3 URL from the index's `source_video`, so nested-layout sessions
+  (`behavior-videos/BottomCamera/video.mp4`) work; `make_me_example_clip.py` still assumes the flat
+  layout.
+- `.venv-fip` gained the video-analysis library (`video-clips` extra, editable from the local clone)
+  and PyAV; nothing already installed changed.
+
 ### Where the fast ME after the go cue comes from (`cue_me_maps.py`)
 
 - **`cue_me_maps.py`** (new): per-pixel |frame difference| at each 2 ms lag around N go cues. Frame
