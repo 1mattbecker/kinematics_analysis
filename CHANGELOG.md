@@ -10,6 +10,8 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
   and shared fractions (`fip_11_1_transients_shared`): shared and solo labels in the schematic,
   shared vs chance, shared fraction by size and by task context. The numbers table adds the DA and
   NE shared fractions.
+- The schematic (panel a) is now a stretch holding a shared DA–NE pair, a solo DA and a solo NE
+  transient; the notebook stops if the example session has no such stretch.
 
 ### `men_05_camera_agreement` (new)
 
