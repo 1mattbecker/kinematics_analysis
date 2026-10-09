@@ -22,7 +22,7 @@ Normalising and events
     :func:`zscore`, :func:`threshold_onsets`, :func:`contiguous_runs`, :func:`detect_transients`
 Grids
     :func:`bin_to_grid`, :func:`grid_index`, :func:`peri_event_grid`, :func:`window_mean_grid`,
-    :func:`rolling_mean`
+    :func:`rolling_mean`, :func:`rolling_corr`, :func:`interval_mask`
 Correlation
     :func:`norm_xcorr`, :func:`circular_xcorr`, :func:`xcorr_shift_null`,
     :func:`coherence_shift_null`, :func:`band_corr_with_null`
@@ -244,6 +244,33 @@ def rolling_mean(x: np.ndarray, fs: float, win_s: float, step_s: float
         m = (c[b] - c[a]) / n
     m[n < 0.5 * (2 * half)] = np.nan
     return centres / fs, m
+
+
+def rolling_corr(a, b, fs: float, win_s: float, step_s: float) -> Tuple[np.ndarray, np.ndarray]:
+    """Centred running Pearson r of two equal-length signals, over ``win_s`` s every ``step_s`` s.
+
+    Uses the samples where both are finite; a window is NaN when fewer than half are. Same window
+    placement as :func:`rolling_mean`. Returns ``(offsets_s, r)``, offsets from the start.
+    """
+    a, b = np.asarray(a, float), np.asarray(b, float)
+    both = np.isfinite(a) & np.isfinite(b)
+    a, b = np.where(both, a, np.nan), np.where(both, b, np.nan)
+    t, ma = rolling_mean(a, fs, win_s, step_s)
+    mb, mab, maa, mbb = (rolling_mean(v, fs, win_s, step_s)[1] for v in (b, a * b, a * a, b * b))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        r = (mab - ma * mb) / np.sqrt((maa - ma ** 2) * (mbb - mb ** 2))
+    return t, r
+
+
+def interval_mask(n: int, t0: float, fs: float, starts, ends) -> np.ndarray:
+    """Boolean mask of the grid samples inside any ``[start, end)`` interval (clipped to the grid)."""
+    i0 = np.clip(grid_index(starts, t0, fs), 0, n)
+    i1 = np.clip(grid_index(ends, t0, fs), 0, n)
+    d = np.zeros(n + 1, np.int64)
+    keep = i1 > i0
+    np.add.at(d, i0[keep], 1)
+    np.add.at(d, i1[keep], -1)
+    return np.cumsum(d[:-1]) > 0
 
 
 # ── Correlation ───────────────────────────────────────────────────────────────

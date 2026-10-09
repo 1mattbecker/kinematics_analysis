@@ -13,7 +13,7 @@ tests in ``stats_utils``, mean ± SEM plots in ``plot_utils``, lick bouts and ta
 Contents
 --------
 :func:`inventory_sessions`, :func:`load_session`, :func:`load_sessions`, :func:`normalise`,
-:func:`lick_clock_check`
+:func:`lick_clock_check`, :func:`per_animal_timecourse`
 
 Clock: every time is session time (s from the first go cue). Each session's ME is bin-averaged
 onto a uniform ``fs``-Hz grid; sample ``i`` is the mean over ``[t0 + (i - 0.5) / fs,
@@ -215,3 +215,34 @@ def lick_clock_check(sessions: List[dict], cameras: Sequence[str], fs: float, la
                              peak=np.nanmax(tr)))
             records.append(dict(subject=s["subject"], session=s["session"], camera=cam, trace=tr))
     return pd.DataFrame(rows), pd.DataFrame(records)
+
+
+def per_animal_timecourse(series_by_session, t_grid: np.ndarray, min_sessions: int = 3) -> np.ndarray:
+    """Session time courses averaged within animal on a common time grid.
+
+    Parameters
+    ----------
+    series_by_session : list of tuple
+        ``(subject, t, y)`` per session, ``t`` increasing.
+    t_grid : numpy.ndarray
+        Times to interpolate onto (NaN outside each session).
+    min_sessions : int
+        An animal's mean is NaN where fewer than this many of its sessions (or all of them, if it
+        has fewer) reach that time; the animal rows are then NaN where under half the animals have
+        a value.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_animals, len(t_grid))``, animals sorted.
+    """
+    rows = []
+    for subj in sorted({s_ for s_, _, _ in series_by_session}):
+        ys = np.stack([np.interp(t_grid, t, y, left=np.nan, right=np.nan)
+                       for s_, t, y in series_by_session if s_ == subj])
+        m = np.nanmean(ys, axis=0)
+        m[np.sum(np.isfinite(ys), axis=0) < min(min_sessions, len(ys))] = np.nan
+        rows.append(m)
+    arr = np.stack(rows)
+    arr[:, np.sum(np.isfinite(arr), axis=0) < max(1, arr.shape[0] / 2)] = np.nan
+    return arr
