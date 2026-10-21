@@ -2,6 +2,36 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-21
+
+### ME normalization: `men_03` (new), `fu.normalise_me`, `add_motion_energy(me_norm=...)`
+
+- **`fu.normalise_me`** (`zscore`, `sd`, `floor_sd` = max(0, ME − p1) / SD; `ME_NORMS`, `ME_FLOOR_PCT`)
+  and **`fu.add_motion_energy(me_norm=..., keep_raw=...)`**. The default stays `zscore`, so no notebook
+  changes; ME onsets are still found on the z-scored trace for every scale.
+- **`men_03_me_normalization`** (new): the 88 FIP sessions' bottom-camera ME on the three scales. The
+  floor is measured without onsets (5th percentile per 60 s window of the 20 Hz trace, median over
+  windows). It sits at −0.89 z (median) on the z-score, 0.22–2.92 on ÷ SD, and 0.03–0.17 on floor ÷ SD.
+  It is flat across sessions (p90 − p10 over windows: median 0.09 session SDs). The session SD does not
+  track how much the mouse moves (ρ = −0.20 with ME onsets per minute, p = 0.06).
+  - In the 15 sessions with more than 35% of ME power above 10 Hz (808054 in September, 818586 in
+    January), a 10 Hz low-pass changes the 20 Hz SD by ≤ 2%, except 808054 2025-09-05 (0.85). After p1
+    subtraction their floor sits at 0.06–0.16 SD, as in the rest.
+  - `fip_12` §1–2, `fip_11` §4 and `fip_16` §6 on each scale: responses, differences, coefficients
+    and every p are the same (floor ÷ SD within the clipping of the lowest 1%). Only the ME level around
+    transients reads differently (`fip_11` §4: DA solo 0.30 z vs 1.26 SD above p1).
+- **`men_01` §6** (new): what sets the ME floor (bottom camera, 500 Hz). Spectra show the encoder's
+  lines in every session: an I-frame every 250 frames (2 Hz comb) and, mostly, a P-frame every 4th frame
+  (near 125 Hz). Also the share of ME power above 10 Hz by mouse and date (its correlation with the floor
+  in SDs is ρ = 0.85) and the floor across the session in the high-share sessions. A flickering
+  reflection on the spouts raises their floor as a constant offset. §6 → 7 (Numbers), §7 → 8 (slide panels).
+- **`make_me_noise_clips.py`** (new): frame-exact bottom-camera clips (library `video_clips.cut_clip`,
+  checked against `me_clean` at offset 0) of sessions with low and high floors (`--set across`,
+  `--set 818586`). It writes a side-by-side video with |frame difference| and ME, frame and
+  quiet-second difference images, 500 Hz brightness and spectra, and the encoder frame types (`ffprobe`).
+- `fip_todo.md`: ongoing items. Decide the `me_norm` default after rerunning the `fip_*` notebooks that
+  read ME; switch `men_00` and `men_02` if floor ÷ SD is adopted; 808054 2025-09-05 is kept for now.
+
 ## 2026-10-08
 
 ### `fip_11`: section 1 figure as shared fractions

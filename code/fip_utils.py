@@ -10,7 +10,8 @@ Two data paths, one per kind of FIP asset:
 * **CSV-curated assets read directly** (``DANE_3channels_curated``, the 4-channel rebuild;
   ``fip_10``–``fip_17``, ``men_00``): :func:`find_asset_root`, :func:`inventory_pairs`,
   :func:`choose_side`, :func:`load_pairs` put same-side DA/NE pairs on a uniform grid,
-  :func:`add_motion_energy` adds bottom- or side-camera ME on that grid;
+  :func:`add_motion_energy` adds bottom- or side-camera ME on that grid (scale from
+  :func:`normalise_me`);
   :func:`trial_measures`, :func:`fit_rpe_terms`, :func:`residualize`, :func:`task_residuals`
   measure them. (This was ``fip_coupling.py``.)
 
@@ -707,6 +708,49 @@ ME_TASK_PAD_S = 30.0
 #: seconds so it means the same at the 500 Hz camera rate and on a resampled grid.
 ME_ONSET_KW = {"z_thresh": 2.5, "refractory": 0.5, "min_run_s": 0.03}
 
+#: Percentile of a session's ME taken as its floor by ``normalise_me(..., "floor_sd")``. On the
+#: 20 Hz grid it sits ~0.1 session SD below the quiet level of every session, including those
+#: whose floor a flickering reflection raises (``men_03``).
+ME_FLOOR_PCT = 1.0
+
+#: ``normalise_me`` scales: ``zscore`` (x - mean) / SD; ``sd`` x / SD;
+#: ``floor_sd`` max(0, x - floor) / SD, with the floor at :data:`ME_FLOOR_PCT`.
+ME_NORMS = ("zscore", "sd", "floor_sd")
+
+
+def normalise_me(x: np.ndarray, how: str = "zscore", floor_pct: float = ME_FLOOR_PCT) -> np.ndarray:
+    """One session's ME on a common scale, so sessions can be pooled.
+
+    All three scales divide by the session SD (ddof=1, NaNs ignored), so within a session they
+    differ only by an offset (and, for ``floor_sd``, the clipping of the lowest ``floor_pct`` %):
+    baseline-subtracted responses, correlations and regression fits with an intercept are the
+    same on each. They differ in where stillness sits: below 0 for ``zscore``, at a positive,
+    session-dependent level for ``sd``, near 0 for ``floor_sd`` (``men_03``).
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Raw ME of one session (e.g. on the 20 Hz grid); NaNs are kept.
+    how : str
+        One of :data:`ME_NORMS`.
+    floor_pct : float
+        Percentile taken as the floor for ``floor_sd``.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``x`` on the chosen scale.
+    """
+    x = np.asarray(x, float)
+    if how == "zscore":
+        return su.zscore(x)
+    sd = np.nanstd(x, ddof=1)
+    if how == "sd":
+        return x / sd
+    if how == "floor_sd":
+        return np.clip(x - np.nanpercentile(x, floor_pct), 0, None) / sd
+    raise ValueError(f"how must be one of {ME_NORMS}")
+
 
 def motion_energy_to_session(
     session_id: str,
@@ -981,11 +1025,14 @@ def load_pairs(kept: pd.DataFrame, fs: float = 20.0, pre_s: float = 5.0, post_s:
 
 def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "BottomCamera",
                       data_root: str = ME_DATA_ROOT, onset_fs: Optional[float] = 100.0,
-                      exclude_subjects: Sequence[str] = ()) -> List[dict]:
+                      exclude_subjects: Sequence[str] = (), me_norm: str = "zscore",
+                      keep_raw: bool = False) -> List[dict]:
     """Keep the pairs whose camera passes the ME screen and put DA, NE and ME on their grid.
 
     ME on the session clock (:func:`motion_energy_to_session`) is averaged into the pair's
-    ``fs``-Hz bins (:func:`signal_utils.bin_to_grid`). Every trace is z-scored over the grid.
+    ``fs``-Hz bins (:func:`signal_utils.bin_to_grid`). DA and NE are z-scored over the grid; ME is
+    put on the scale ``me_norm`` (:func:`normalise_me`). ME onsets are found on the z-scored trace
+    whatever ``me_norm`` is, so the same events enter every analysis.
 
     Parameters
     ----------
@@ -1002,13 +1049,18 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
         trace). ``None`` skips onset detection.
     exclude_subjects : sequence of str
         Subjects left out.
+    me_norm : str
+        ME scale, one of :data:`ME_NORMS` (default ``zscore``).
+    keep_raw : bool
+        Also keep the raw ME on the grid as ``me_raw`` (NaN in empty bins).
 
     Returns
     -------
     list of dict
-        Copies of the kept pairs with ``z`` (``{"da", "ne", "me"}``, z-scored; ME's empty bins
-        set to 0), ``lick_events`` (left/right lick rows of ``df_events``) and, with
-        ``onset_fs``, ``me_onsets`` (s).
+        Copies of the kept pairs with ``z`` (``{"da", "ne", "me"}``: DA, NE z-scored, ME on
+        ``me_norm``, its empty bins set to the session mean on that scale, 0 for ``zscore``),
+        ``lick_events`` (left/right lick rows of ``df_events``), with ``onset_fs`` ``me_onsets``
+        (s), and with ``keep_raw`` ``me_raw``.
     """
     path_of = dict(zip(kept["session"], kept["path"]))
     usable = set(me_sessions(camera, data_root=data_root))
@@ -1022,8 +1074,12 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
                                               data_root=data_root)
         n = len(p["da"])
         q = dict(p)
+        raw = su.bin_to_grid(t_me, y, p["t0"], p["fs"], n)
+        me = normalise_me(raw, me_norm)
         q["z"] = {"da": su.zscore(p["da"]), "ne": su.zscore(p["ne"]),
-                  "me": np.nan_to_num(su.zscore(su.bin_to_grid(t_me, y, p["t0"], p["fs"], n)))}
+                  "me": np.where(np.isfinite(me), me, np.nanmean(me) if me_norm != "zscore" else 0.0)}
+        if keep_raw:
+            q["me_raw"] = raw
         if onset_fs is not None:
             n_on = int(n * onset_fs / p["fs"])
             me_on = su.zscore(su.bin_to_grid(t_me, y, p["t0"], onset_fs, n_on))

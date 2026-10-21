@@ -1,7 +1,7 @@
 # fip_* / men_* to-do
 
-Open work for the FIP and motion-energy notebooks (`fip_10`–`fip_17`, `men_00`–`men_02`). `TODO.md`
-tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-09 (isosbestic control added; 2026-10-08: notebooks
+Open work for the FIP and motion-energy notebooks (`fip_10`–`fip_17`, `men_00`–`men_05`). `TODO.md`
+tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-21 (ME normalization items; 2026-10-09: isosbestic control added; 2026-10-08: notebooks
 regrouped by analysis type; old names → new in `archive/README.md`).
 
 ---
@@ -46,6 +46,20 @@ kinetics differ).
 ---
 
 ## Open items
+
+### Motion-energy normalization (ongoing)
+`men_03` compares three ME scales (`fu.normalise_me`: z-score; ÷ SD; floor ÷ SD = max(0, ME − p1) / SD);
+`fu.add_motion_energy(me_norm=...)` takes any of them and still defaults to the z-score. All three divide by
+the session SD, so baseline-subtracted responses, correlations and regression fits are the same; only the
+reading of ME *levels* changes (`fip_11` §4). The flickering reflection on the spouts in some 808054
+(September) and 818586 (January) sessions (`men_01` §6) is constant within a session, so p1 removes it and
+it barely moves the 20 Hz SD.
+- Rerun the analysis notebooks that read ME (`fip_10`–`fip_12`, `fip_16` §6) with `me_norm="floor_sd"`,
+  compare, then decide the default.
+- If floor ÷ SD is adopted: switch `men_00` and `men_02` too (they scale through `men_utils.normalise`).
+- 808054 2025-09-05 is kept for now: its flicker is the strongest (floor 3× any other session's), and ÷ SD
+  shrinks its ME responses by ~15% (SD after a 10 Hz low-pass / SD = 0.85; 0.98–0.99 elsewhere). Revisit if
+  it drives a result.
 
 ### Analyses
 - `fip_11` §4 (Q3) by task context: partnered large transients fall mostly at outcomes and licking, so
