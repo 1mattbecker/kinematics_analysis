@@ -22,7 +22,8 @@ Output (``--out``)::
 Inputs are read over anonymous HTTPS: raw sessions from ``aind-open-data``,
 ME results from ``aind-scratch-data`` (folders named in
 ``inputs/me_assets_fip.csv``). Only CSVs, trigger logs, ME metadata and
-``.npy`` files are read, never videos.
+ME trace files (``.npz`` from aind-motion-energy 0.4.0, ``.npy`` before; see
+``me_results.py``) are read, never videos.
 
 Usage (from ``code/``)::
 
@@ -52,6 +53,7 @@ import pandas as pd
 import aind_dynamic_foraging_behavior_video_analysis as video_analysis
 from aind_dynamic_foraging_behavior_video_analysis import video_timing_qc as vtq
 
+from me_results import is_frame_aligned, me_file_suffix, read_me_clean
 from s3_utils import download, list_keys, read_json
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -160,7 +162,6 @@ def build_camera(camera, info, work_dir, trigger_times, log_error, out_dir, dry_
             f"ME covers frames {me_meta['start_frame']}..{me_meta['end_frame']}, not the whole video"
         )
     n_decoded = int(me_meta["n_frames_decoded"])
-    n_me = int(me_meta["n_me_frames"])
 
     checks = vtq.check_video_timing(timing, trigger_times, video_frame_count=n_decoded)
     by_check = checks.set_index("check")
@@ -188,22 +189,19 @@ def build_camera(camera, info, work_dir, trigger_times, log_error, out_dir, dry_
     for harp_source in HARP_SOURCES:
         info[f"n_{harp_source}"] = int(counts.get(harp_source, 0))
 
-    # aind-motion-energy differences consecutive frames: one fewer value than frames
-    # (none for frame 0). A leading NaN makes row i frame i. Anything else is refused.
-    info["padded"] = n_me == n_decoded - 1
-    if n_me + info["padded"] != len(timing):
-        raise ValueError(f"{n_me} ME values for {len(timing)} CSV rows")
+    # Row i of the ME trace is frame i (NaN at row 0). aind-motion-energy >= 0.4.0 saves
+    # it that way; for 0.3.0 results read_me_clean adds the leading NaN (``padded``).
+    info["padded"] = not is_frame_aligned(me_meta)
+    if n_decoded != len(timing):
+        raise ValueError(f"ME covers {n_decoded} frames, the CSV has {len(timing)} rows")
 
     if dry_run:
         return
-    npy_path = download(f"{me_url}_motion_energy_clean.npy", work_dir / f"{source}_me_clean.npy")
-    if npy_path is None:
-        raise FileNotFoundError(f"{source}_motion_energy_clean.npy missing from the ME asset")
-    me = np.load(npy_path).astype("float32")
-    if len(me) != n_me:
-        raise ValueError(f"ME file has {len(me)} values, its metadata says {n_me}")
-    if info["padded"]:
-        me = np.concatenate([np.array([np.nan], dtype="float32"), me])
+    me_name = f"{source}{me_file_suffix(me_meta)}"
+    me_path = download(f"{me_url}{me_file_suffix(me_meta)}", work_dir / me_name)
+    if me_path is None:
+        raise FileNotFoundError(f"{me_name} missing from the ME asset")
+    me = read_me_clean(me_path, me_meta)
 
     table = pd.DataFrame(
         {

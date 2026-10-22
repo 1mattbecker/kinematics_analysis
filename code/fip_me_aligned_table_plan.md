@@ -26,8 +26,11 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 - **Source video: `.mp4` only.** All 97 sessions' ME comes from `.mp4` once the 808054
   2025-09-02 to 09-15 rerun is in.
 - **Store `me_clean` only** (what `fip_utils` uses), not the raw `me`.
-- **Padding: NaN.** The library emits one fewer value than frames (no value for frame 0). The
-  table pads a leading NaN so row *i* is frame *i*; the current `fip_utils` pads 0.
+- **Padding: NaN.** Row *i* is frame *i*, with NaN at row 0 (frame 0 has no preceding frame).
+  aind-motion-energy 0.3.0 emits one fewer value than frames and the table pads the leading NaN;
+  from 0.4.0 (`output_version` 2) the library saves the padded trace in `_motion_energy.npz`
+  and the table must not pad again (`me_results.read_me_clean` handles both). The current
+  `fip_utils` pads 0.
 - **Camera names: modern convention, `BottomCamera` and `SideCameraRight`,** in file names
   and the `camera` column, for both layouts. Flat-layout sources (`bottom_camera`,
   `side_camera_right`) are mapped on read.
@@ -125,8 +128,9 @@ AWS role. About 170 MB per session.
       and refuse a log that is present but unreadable.
    5. `fixed = correct_video_timing(timing, trigger_times=trigger_times)`. A `ValueError` →
       camera refused, error text recorded.
-   6. Pad a leading NaN when `n_me_frames == n_frames_decoded - 1`; require ME length == rows
-      (refuse otherwise; never truncate).
+   6. Read the frame-aligned ME with `me_results.read_me_clean`: a 0.3.0 result (no
+      `output_version`) gets a leading NaN, a 0.4.0 result is already aligned and is not
+      padded. Require ME length == `n_frames_decoded` == rows (refuse otherwise; never truncate).
    7. Write the per-frame file and the index row.
 
 Nothing raises past a camera: one bad camera does not stop the build. `check_session` is not
@@ -167,7 +171,7 @@ was moved when `frame_number[i] − frame_number[0] ≠ i`). Refused cameras get
   `status` (`ok` / `refused`), `error`, `failed_checks`, `frames_lost`, `glitch_rows`,
   `clock_rate_ppm` (the `clock_rates_agree` count), `video_frame_count_diff`
 - per-row source counts: `n_<harp_source>` for each value present
-- ME: `padded`
+- ME: `padded` (True for 0.3.0 results, padded by the table; False for 0.4.0, padded by the library)
 
 The "flag" for drop sessions is `action == "re-index"` (equivalently `frames_lost > 0`).
 

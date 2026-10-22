@@ -19,7 +19,10 @@ Asset names come from the Code Ocean API, through the launcher's own
 ``scripts/trigger_batch.make_client`` (token from ``API_SECRET``); the name is also
 the result folder under ``s3://aind-scratch-data/matt.becker/motion_energy/``.
 Each camera's ``*_me_metadata.json`` is read anonymously over HTTPS and must
-have a ``.mp4`` ``video_path`` and a null ``end_frame``.
+have a ``.mp4`` ``video_path`` and a null ``end_frame``, with its ME trace file
+alongside: ``_motion_energy.npz`` for aind-motion-energy 0.4.0 results
+(``output_version`` 2; its length is checked when ``build_me_table.py`` reads
+it), or a 0.3.0 result whose ``n_me_frames`` is ``n_frames_decoded - 1``.
 
 Usage::
 
@@ -35,6 +38,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from me_results import is_frame_aligned, me_file_suffix
 from s3_utils import list_keys, read_json
 
 REPO = Path(__file__).resolve().parent.parent
@@ -112,7 +116,10 @@ def main():
                     f"{session} {camera}: frames {meta['start_frame']}"
                     f"..{meta['end_frame']}"
                 )
-            if meta["n_me_frames"] != meta["n_frames_decoded"] - 1:
+            trace_key = key.removesuffix("_me_metadata.json") + me_file_suffix(meta)
+            if trace_key not in keys:
+                problems.append(f"{session} {camera}: no {trace_key.rsplit('/', 1)[1]}")
+            if not is_frame_aligned(meta) and meta["n_me_frames"] != meta["n_frames_decoded"] - 1:
                 problems.append(
                     f"{session} {camera}: {meta['n_me_frames']} ME values for "
                     f"{meta['n_frames_decoded']} frames"
@@ -135,7 +142,7 @@ def main():
         for p in problems:
             print(f"  ✗ {p}")
     else:
-        print("All ME metadata: .mp4 video, full length, N-1 values per camera")
+        print("All ME metadata: .mp4 video, full length, ME trace file present per camera")
 
 
 if __name__ == "__main__":

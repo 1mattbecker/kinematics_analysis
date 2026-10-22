@@ -17,7 +17,7 @@ the last ``n``) against a clean session from the same mouse and rig
 and end of the session. Figures go to ``docs/video_timing_qc/``.
 
 Reads only public S3 objects over HTTPS (camera CSVs, trigger log, lick
-times, register writes, ME ``.npy``); downloads are cached under ``--cache``.
+times, register writes, ME metadata and trace files); downloads are cached under ``--cache``.
 
 Usage (from ``code/``)::
 
@@ -27,6 +27,7 @@ Usage (from ``code/``)::
 from __future__ import annotations
 
 import argparse
+import json
 import tempfile
 from pathlib import Path
 
@@ -37,6 +38,7 @@ import pandas as pd
 from aind_dynamic_foraging_behavior_video_analysis import video_timing_qc as vtq
 
 import plotstyle as ps
+from me_results import me_file_suffix, read_me_clean
 from s3_utils import fetch_cached as fetch
 
 REPO = Path(__file__).resolve().parent.parent
@@ -88,9 +90,11 @@ def load_session(session, cache):
         timing = vtq.load_video_timing(
             fetch(f"{OPEN_DATA_URL}/{session}/behavior-videos/{source}.csv", cache)
         )
-        me = np.load(fetch(f"{SCRATCH_URL}/{me_name}/{source}_motion_energy_clean.npy", cache))
-        # ME has no value for frame 0; pad so row i is frame i
-        data["cameras"][camera] = {"timing": timing, "me": np.concatenate([[np.nan], me])}
+        me_url = f"{SCRATCH_URL}/{me_name}/{source}"
+        meta = json.loads(fetch(f"{me_url}_me_metadata.json", cache).read_text())
+        # Row i is frame i, NaN at row 0, for both aind-motion-energy output versions
+        me = read_me_clean(fetch(f"{me_url}{me_file_suffix(meta)}", cache), meta)
+        data["cameras"][camera] = {"timing": timing, "me": me}
     return data
 
 
