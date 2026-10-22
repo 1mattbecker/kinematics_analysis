@@ -710,7 +710,8 @@ ME_ONSET_KW = {"z_thresh": 2.5, "refractory": 0.5, "min_run_s": 0.03}
 
 #: Percentile of a session's ME taken as its floor by ``normalise_me(..., "floor_sd")``. On the
 #: 20 Hz grid it sits ~0.1 session SD below the quiet level of every session, including those
-#: whose floor a flickering reflection raises (``men_03``).
+#: whose floor a flickering reflection raises (``men_03``). ``floor_sd`` is the scale for ME traces,
+#: levels, responses and regressions since 2026-10-22; ME onsets stay on the z-scored trace.
 ME_FLOOR_PCT = 1.0
 
 #: ``normalise_me`` scales: ``zscore`` (x - mean) / SD; ``sd`` x / SD;
@@ -748,7 +749,7 @@ def normalise_me(x: np.ndarray, how: str = "zscore", floor_pct: float = ME_FLOOR
     if how == "sd":
         return x / sd
     if how == "floor_sd":
-        return np.clip(x - np.nanpercentile(x, floor_pct), 0, None) / sd
+        return su.floor_scale(x, floor_pct)
     raise ValueError(f"how must be one of {ME_NORMS}")
 
 
@@ -1025,7 +1026,7 @@ def load_pairs(kept: pd.DataFrame, fs: float = 20.0, pre_s: float = 5.0, post_s:
 
 def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "BottomCamera",
                       data_root: str = ME_DATA_ROOT, onset_fs: Optional[float] = 100.0,
-                      exclude_subjects: Sequence[str] = (), me_norm: str = "zscore",
+                      exclude_subjects: Sequence[str] = (), me_norm: str = "floor_sd",
                       keep_raw: bool = False) -> List[dict]:
     """Keep the pairs whose camera passes the ME screen and put DA, NE and ME on their grid.
 
@@ -1050,7 +1051,8 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
     exclude_subjects : sequence of str
         Subjects left out.
     me_norm : str
-        ME scale, one of :data:`ME_NORMS` (default ``zscore``).
+        ME scale, one of :data:`ME_NORMS` (default ``floor_sd``, SDs above the session's 1st
+        percentile; ``zscore`` was the default before 2026-10-22).
     keep_raw : bool
         Also keep the raw ME on the grid as ``me_raw`` (NaN in empty bins).
 

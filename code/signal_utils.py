@@ -19,7 +19,7 @@ Lag convention (one for the whole repo): for :func:`norm_xcorr` and :func:`circu
 Contents
 --------
 Normalising and events
-    :func:`zscore`, :func:`threshold_onsets`, :func:`contiguous_runs`, :func:`detect_transients`
+    :func:`zscore`, :func:`floor_scale`, :func:`threshold_onsets`, :func:`contiguous_runs`, :func:`detect_transients`
 Grids
     :func:`bin_to_grid`, :func:`grid_index`, :func:`peri_event_grid`, :func:`window_mean_grid`,
     :func:`rolling_mean`, :func:`rolling_corr`, :func:`interval_mask`
@@ -54,6 +54,18 @@ def zscore(y, ddof: int = 1) -> np.ndarray:
     if not np.isfinite(sd) or sd == 0:
         return y - np.nanmean(y)
     return (y - np.nanmean(y)) / sd
+
+
+def floor_scale(y, floor_pct: float = 1.0, ddof: int = 1) -> np.ndarray:
+    """SDs above a low percentile, clipped at 0: ``max(0, y - percentile(y, floor_pct)) / SD``.
+
+    For a non-negative signal whose quiet level sits well below its mean (e.g. motion energy),
+    this puts the quiet level near 0 instead of below it, with the same divisor as
+    :func:`zscore`: within one series it is the z-score shifted by a constant (and clipped for the
+    lowest ``floor_pct`` %). NaNs are ignored and kept.
+    """
+    y = np.asarray(y, float)
+    return np.clip(y - np.nanpercentile(y, floor_pct), 0, None) / np.nanstd(y, ddof=ddof)
 
 
 def threshold_onsets(

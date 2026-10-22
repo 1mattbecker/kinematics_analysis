@@ -164,17 +164,22 @@ def load_sessions(inv: pd.DataFrame, fs: float = 100.0, cache_path: Optional[str
 def normalise(x: np.ndarray, how: str = "z") -> np.ndarray:
     """Normalise one session's ME so sessions can be pooled.
 
-    ``"z"``: z-score over the grid. ``"median"``: divide by the session median, so 1 is a typical
-    frame and values are multiples of it. ``"none"``: unchanged. NaNs are ignored.
+    ``"floor_sd"``: SDs above the session's 1st percentile, clipped at 0
+    (:func:`signal_utils.floor_scale`; the scale of ME traces and levels since 2026-10-22, ``men_03``).
+    ``"z"``: z-score over the grid (what ME onsets are detected on). ``"median"``: divide by the
+    session median, so 1 is a typical frame and values are multiples of it. ``"none"``: unchanged.
+    NaNs are ignored.
     """
     x = np.asarray(x, float)
+    if how == "floor_sd":
+        return su.floor_scale(x)
     if how == "z":
         return su.zscore(x)
     if how == "median":
         return x / np.nanmedian(x)
     if how == "none":
         return x
-    raise ValueError("how must be 'z', 'median' or 'none'")
+    raise ValueError("how must be 'floor_sd', 'z', 'median' or 'none'")
 
 
 def lick_clock_check(sessions: List[dict], cameras: Sequence[str], fs: float, lags_s: np.ndarray,

@@ -2,6 +2,34 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-22
+
+### ME scale: floor ÷ SD adopted
+
+Decision (`men_03`): ME traces, levels, responses, regressions and figures use **floor ÷ SD**
+(max(0, ME − p1) / SD per session). ME onsets stay on the z-scored trace, and DA and NE stay z-scored.
+Within a session the two ME scales differ only by a constant, so only ME *levels* read differently. For
+levels, stillness is the zero that means the same in every session.
+
+- `su.floor_scale` (new): SDs above a low percentile, clipped at 0. `fu.normalise_me("floor_sd")` and
+  `mu.normalise("floor_sd")` (new option) use it.
+- `fu.add_motion_energy`: `me_norm` now defaults to `floor_sd` (was `zscore`).
+- `fip_10`–`fip_14`, `fip_16`: `ME_NORM = "floor_sd"` in the config cell. ME axes take their unit from it
+  ("SD above p1"); the prose says DA/NE are z-scored and ME is floor ÷ SD.
+  - Every response, difference, coefficient, R² and p-value is unchanged, or changes in the 4th digit
+    (`fip_13`/`fip_14` ME increments, from the zero-padded edge lags).
+  - Only ME levels move. In `fip_11` §4, ME around large transients goes from 0.72/0.30/0.70/0.31 z to
+    1.68/1.25/1.65/1.26 SD above p1 (DA with NE / DA solo / NE with DA / NE solo); the solo − shared
+    differences are the same. In `fip_12` §1, the peak of ME at ME onsets goes from 2.67 to 3.63.
+- `men_00`, `men_02`: `ME_NORM = "floor_sd"` with an `ME_UNIT` label. `men_00`'s ME events are detected on
+  the raw trace z-scored, as before. Its §9 (onset latency after the go cue, 500 Hz) stays on the
+  z-score, because it detects onsets.
+- `men_01`, `men_05`: ME on floor ÷ SD for the example traces and levels. `men_01`'s onset rate now
+  z-scores the raw trace itself; correlations between cameras are unchanged.
+- `men_03`: states the decision; the "z-score (current)" label becomes "z-score". Its check now confirms
+  that floor ÷ SD matches `add_motion_energy`'s default.
+- All the notebooks above were rerun.
+
 ## 2026-10-21
 
 ### ME normalization: `men_03` (new), `fu.normalise_me`, `add_motion_energy(me_norm=...)`
