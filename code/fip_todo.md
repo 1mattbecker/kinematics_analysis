@@ -1,7 +1,7 @@
 # fip_* / men_* to-do
 
 Open work for the FIP and motion-energy notebooks (`fip_10`–`fip_17`, `men_00`–`men_05`). `TODO.md`
-tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-21 (ME normalization items; 2026-10-09: isosbestic control added; 2026-10-08: notebooks
+tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-22 (ROI traces in the ME table; 2026-10-21: ME normalization items; 2026-10-09: isosbestic control added; 2026-10-08: notebooks
 regrouped by analysis type; old names → new in `archive/README.md`).
 
 ---
@@ -60,6 +60,13 @@ it barely moves the 20 Hz SD.
 - 808054 2025-09-05 is kept for now: its flicker is the strongest (floor 3× any other session's), and ÷ SD
   shrinks its ME responses by ~15% (SD after a 10 Hz low-pass / SD = 0.85; 0.98–0.99 elsewhere). Revisit if
   it drives a result.
+
+### Aligned ME table: ROI traces (later)
+aind-motion-energy 0.4.0 (2026-10-21) computes one trace per ROI next to the whole frame, from one ROI set
+per batch. The table reads both 0.3.0 and 0.4.0 results (`me_results.py`) but stores only the whole-frame
+`me_clean`, so nothing needs rebuilding until ROI traces are wanted.
+- `build_me_table.py`: add one column per `roi_ids` entry from the 0.4.0 NPZ (`me_clean[:, k]`).
+- `fu.load_me` (and `motion_energy_to_session`): an ROI argument, returning that column instead of the whole frame.
 
 ### Analyses
 - `fip_11` §4 (Q3) by task context: partnered large transients fall mostly at outcomes and licking, so
