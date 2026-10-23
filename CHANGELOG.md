@@ -4,6 +4,28 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-23
 
+### Video clips and frames by frame index; `get_video_time` gone
+
+Every place that cut a clip or grabbed a frame did it by seconds into the MP4: session time plus a
+constant offset (`get_video_time`, `session_time_to_video_time`), or `tongue_kins.time` as the
+`ffmpeg -ss` value. Frame `i` sits at about `i / fps` in the MP4, but its Harp time also counts
+every frame dropped before it, so in drop sessions those clips started late by the dropped time.
+The analyses themselves were not affected: pose, lickometer, trial and ME times are all per-frame
+corrected Harp time, and shifting between Harp-clock bases by a constant is exact.
+
+- `clip_utils.py` (new): `event_clips` (event times → `video_alignment.event_frame_ranges` on the
+  per-frame times → `video_clips.cut_clips`) and `frame_pngs` (frames by index, seeking to each
+  frame's own MP4 timestamp). Needs the library ≥ v0.3.0 with `video-clips`.
+- `val_02` §9, `val_03` §6, `val_04` §8, `kin_00` §7, `tongue_movements_all`
+  (`extract_clip_for_movements`) use them. `val_02`'s clips also used to take session time as video
+  time with no offset at all, from a fixed label-test video; they now come from the session's own
+  labeled video.
+- `lickometer_qc.load_session` and `val_03`'s `load_session` no longer return `video_offset`, and
+  the per-session sidecar and `val_03_summary.json` no longer carry it.
+- Not yet on Code Ocean: the capsule pins library v0.2.0 and its apt `ffmpeg` (4.4) lacks
+  `-fps_mode`, which `video_clips.cut_clip` passes. Until the image moves, these clip cells fail
+  on Code Ocean; the analyses in those notebooks are unchanged.
+
 - `make_me_example_clip.py` takes the video URL from `cue_me_maps.video_url` (the ME index's
   `source_video`), so sessions with the nested raw layout (`behavior-videos/BottomCamera/video.mp4`)
   work; it no longer builds the flat-layout path itself.

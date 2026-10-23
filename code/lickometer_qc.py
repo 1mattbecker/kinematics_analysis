@@ -128,15 +128,12 @@ def load_session(inter, conf: float = 0.8) -> Dict[str, object]:
     dict
         ``tongue`` (masked keypoint table on session time, with ``spout_distance``),
         ``spoutL`` / ``spoutR`` (mean positions, de-mirrored), ``licks`` (sorted lickometer
-        times on session time), ``video_offset`` (seconds to add to session time to get video
-        time) and ``trial_bounds`` (first go cue, last trial stop; NaN pair when the trials
-        table is missing).
+        times on session time) and ``trial_bounds`` (first go cue, last trial stop; NaN pair
+        when the trials table is missing). Row ``i`` of ``tongue`` is video frame ``i``, so
+        ``tongue["time"]`` is the per-frame time ``clip_utils.event_clips`` takes to cut clips.
     """
     from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_kinematics_utils import (
         mask_keypoint_data,
-    )
-    from aind_dynamic_foraging_behavior_video_analysis.kinematics.video_clip_utils import (
-        get_video_time,
     )
 
     inter = Path(inter)
@@ -144,7 +141,7 @@ def load_session(inter, conf: float = 0.8) -> Dict[str, object]:
         key: pd.read_parquet(inter / "kps_raw_{}.parquet".format(key))
         for key in ["tongue_tip_center", "spout_l", "spout_r"]
     }
-    kins = pd.read_parquet(inter / "tongue_kins.parquet", columns=["time", "time_in_session"])
+    kins = pd.read_parquet(inter / "tongue_kins.parquet", columns=["time_in_session"])
 
     tongue = mask_keypoint_data(keypoint_dfs, "tongue_tip_center", confidence_threshold=conf)
     tongue["time"] = kins["time_in_session"].values
@@ -163,9 +160,6 @@ def load_session(inter, conf: float = 0.8) -> Dict[str, object]:
     return {
         "tongue": tongue, "spoutL": spoutL, "spoutR": spoutR,
         "licks": np.sort(pd.read_parquet(inter / "nwb_df_licks.parquet")["timestamps"].to_numpy()),
-        # kps_raw_* `time` is video-relative and tongue_kins carries both bases, so
-        # get_video_time at 0 returns the session -> video offset itself.
-        "video_offset": float(get_video_time(0.0, kins)),
         "trial_bounds": trial_bounds(inter),
     }
 
@@ -227,7 +221,7 @@ def build_event_tables(session_dirs: Iterable, d: float, conf: float = 0.8,
     -------
     (pose_events, lickometer_events, sessions)
         The two event tables and a per-session sidecar with ``lick_coverage``,
-        ``trial_start`` / ``trial_end``, ``video_offset``, ``duration_s`` and ``tracked_frac``.
+        ``trial_start`` / ``trial_end``, ``duration_s`` and ``tracked_frac``.
     """
     needed = ["kps_raw_tongue_tip_center.parquet", "kps_raw_spout_l.parquet",
               "kps_raw_spout_r.parquet", "tongue_kins.parquet", "nwb_df_licks.parquet"]
@@ -259,7 +253,6 @@ def build_event_tables(session_dirs: Iterable, d: float, conf: float = 0.8,
             "session": sdir.name,
             "lick_coverage": lick_coverage(tongue, sess["licks"], coverage_halfwidth),
             "trial_start": t0, "trial_end": t1,
-            "video_offset": sess["video_offset"],
             "duration_s": float(tongue["time"].max() - tongue["time"].min()),
             "tracked_frac": float(tongue["x"].notna().mean()),
         })
