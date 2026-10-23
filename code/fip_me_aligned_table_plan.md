@@ -11,7 +11,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 
 | Item | State |
 |---|---|
-| ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29 (runs `ce719ee8`, `2b3a9315`). The 10 808054 sessions from 2025-09-02 to 2025-09-15 (ME first computed June 2026, from `.avi`) rerun from `.mp4` (run `342a45f7`); manifest not yet pulled |
+| ME computed for all 97 sessions (`.mp4`, full length) | 87 done 2026-09-29 (runs `ce719ee8`, `2b3a9315`). The 10 808054 sessions from 2025-09-02 to 2025-09-15 (ME first computed June 2026, from `.avi`) rerun from `.mp4` (run `342a45f7`, all 10 completed 2026-09-30). All 97 in `inputs/me_assets_fip.csv` |
 | Video timing QC and correction | In the library: `video_timing_qc`, released in `v0.1.0` (`41e5b59`, merged to `main`). The build calls it; nothing is reimplemented here |
 | Library pin | Done 2026-09-30: `wild` merged into `fip-motion-energy`, which pinned `v0.1.0` (`41e5b59`). 2026-10-05: branch `timing-verdict` pins `v0.2.0` (`0e1c8df`) and the build uses `timing_verdict`; rebuilt, dry run identical to `v0.1.0` (178 ok, 16 refused) |
 | Scratch QC (`video_csv_qc_fip.csv`, `qc_class`) | Superseded by `video_timing_qc`; deleted 2026-10-02 (in git history at `59c31b2`) |
@@ -317,16 +317,13 @@ In the workstation, from `/root/capsule`:
    If it stops, run it again; built sessions are skipped.
 4. Save `/scratch/fip_motion_energy_aligned` as a data asset.
 
-## Before building
+## Before building (all done 2026-09-30)
 
-1. ~~Merge `wild` into `fip-motion-energy` to get the `v0.1.0` pin~~ (done); rebuild the environment.
-2. Pull the rerun manifest (`342a45f7`) and check all 10 completed from `.mp4`.
-3. Dry pass on all 97 (timing only, no ME, no writes): confirm the expected actions above,
-   that the trigger log's event count equals exposures for every camera (open question 3 in
-   the library plan; held on 7 sessions so far), and that `clock_rates_agree` passes. Review
-   any refusal before the full build.
-4. Check `enrich_dfs` / PSTH code for sample-count assumptions (none should see uneven ME
-   once the loader resamples, but confirm the loader's grid is what they expect).
+1. ~~Merge `wild` into `fip-motion-energy` for the library pin; rebuild the environment.~~
+2. ~~Pull the rerun manifest (`342a45f7`) and check all 10 completed from `.mp4`.~~
+3. ~~Dry pass on all 97.~~ See "Dry pass" above: 178 cameras ok, 16 refused.
+4. ~~Check `enrich_dfs` / PSTH code for sample-count assumptions.~~ See "Sample-count check"
+   under "`fip_utils` changes": nothing needs changing.
 
 ## Open questions
 
