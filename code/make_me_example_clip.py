@@ -47,7 +47,8 @@ from aind_dynamic_foraging_behavior_video_analysis import video_alignment as va 
 from aind_video_utils import read_mp4_frame_index  # noqa: E402
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
-VIDEO_URL = "https://aind-open-data.s3.us-west-2.amazonaws.com/{raw}/behavior-videos/{camera}.mp4"
+import cue_me_maps as cmm  # noqa: E402  # video_url: S3 URL from the ME index, either raw layout
+
 FONT = "/System/Library/Fonts/Supplemental/Arial.ttf"
 EVENTS = [  # label, colour, how long the label stays lit (s)
     ("GO CUE", (0, 0, 0), 0.3),
@@ -156,7 +157,7 @@ def main():
                                 columns=["harp_time", "me_clean"])
         harp = table["harp_time"].to_numpy()
         i0, i1 = va.behavior_time_to_frame_index(np.array([t0, t1]) + first_cue, harp)
-        url = VIDEO_URL.format(raw=r.session, camera=r.source_camera)
+        url = cmm.video_url(r)
         check_frame = int(va.behavior_time_to_frame_index(t0 + ev_rel[0][0] - 0.2 + first_cue, harp))
         offset, rmax, rnext = check_alignment(url, check_frame, table["me_clean"].to_numpy())
         print(f"{cam}: frames {i0}–{i1}; ME check from frame {check_frame}: best offset {offset} frames "

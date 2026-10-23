@@ -243,7 +243,7 @@ out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py
 `TransferToNWB.py` / `backup_nwb_utils_dynamicforaging.py` · `build_me_table.py` (aligned
 motion-energy table for the FIP sessions, run in a cloud workstation; `build_me_asset_map.py`
 maps sessions to ME assets, `check_leading_lost_frames.py` is the lick-triggered-ME timing check;
-all three read S3 through `s3_utils.py`; see `fip_me_aligned_table_plan.md`) · `make_me_example_clip.py` (frame-exact two-camera clip with task events and ME; session time → frame via the table's corrected `harp_time`, frame → MP4 time via `aind_video_utils`; needs the library's `video-qc` extra, not `.venv-fip`) · `make_me_noise_clips.py` (`men_01` §6: bottom-camera clips of sessions with low and high ME floors cut with the library's `video_clips.cut_clip`, frame and quiet-second |frame difference| images, 500 Hz brightness and spectra, the encoder's frame types via `ffprobe`; `.venv-fip`).
+all three read S3 through `s3_utils.py`; see `fip_me_aligned_table_plan.md`) · `make_me_example_clip.py` (frame-exact two-camera clip with task events and ME; session time → frame via the table's corrected `harp_time`, frame → MP4 time via `aind_video_utils`; video URL from `cue_me_maps.video_url`; runs on `.venv-fip`) · `make_me_noise_clips.py` (`men_01` §6: bottom-camera clips of sessions with low and high ME floors cut with the library's `video_clips.cut_clip`, frame and quiet-second |frame difference| images, 500 Hz brightness and spectra, the encoder's frame types via `ffprobe`; `.venv-fip`).
 
 ### Repo modules (`code/*.py`, flat by necessity)
 

@@ -2,6 +2,13 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-23
+
+- `make_me_example_clip.py` takes the video URL from `cue_me_maps.video_url` (the ME index's
+  `source_video`), so sessions with the nested raw layout (`behavior-videos/BottomCamera/video.mp4`)
+  work; it no longer builds the flat-layout path itself.
+- `men_04` open questions in `fip_todo.md`; `men_00` §9 points to `men_04` for the post-cue peaks.
+
 ## 2026-10-22
 
 ### ME scale: floor ÷ SD adopted

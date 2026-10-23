@@ -62,6 +62,17 @@ per batch. The table reads both 0.3.0 and 0.4.0 results (`me_results.py`) but st
 - `build_me_table.py`: add one column per `roi_ids` entry from the 0.4.0 NPZ (`me_clean[:, k]`).
 - `fu.load_me` (and `motion_energy_to_session`): an ROI argument, returning that column instead of the whole frame.
 
+### `men_04`: ME in the first 150 ms after the go cue
+Found so far: five mice jump 10–16 ms after the cue, four don't; the high-passed ME peaks at ~24 and
+~55 ms, on the whiskers (maps).
+- Is the ~24 ms peak real in the mice without the jump? It falls where their movement starts, and the
+  15 Hz high-pass turns a fast rise into a peak there. Pass a ripple-free rise shaped like theirs
+  through the same filter and see whether it makes a ~24 ms peak. (The ~55 ms peak is clear of this.)
+- Startle plus whisking is inferred from the maps only. Look at the movement: a slowed-down,
+  cue-aligned clip of a few trials, or whisker-angle tracking.
+- Why five mice jump and four don't: check rig, cohort and go-cue sound settings against the split.
+- The maps (where the motion is) come from one session per mouse; repeat on a second session per mouse.
+
 ### Analyses
 - `fip_11` §4 (Q3) by task context: partnered large transients fall mostly at outcomes and licking, so
   their higher ME may be context. Label each transient with `bu.label_context` (as `fip_11` §1 panel f) and
