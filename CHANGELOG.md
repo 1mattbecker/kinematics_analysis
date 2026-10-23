@@ -13,23 +13,16 @@ every frame dropped before it, so in drop sessions those clips started late by t
 The analyses themselves were not affected: pose, lickometer, trial and ME times are all per-frame
 corrected Harp time, and shifting between Harp-clock bases by a constant is exact.
 
-- `clip_utils.py` (new): `event_clips` (event times → `video_alignment.event_frame_ranges` on the
-  per-frame times → `video_clips.cut_clips`) and `frame_pngs` (frames by index, seeking to each
-  frame's own MP4 timestamp). Needs the library ≥ v0.3.0 with `video-clips`.
-- `val_02` §9, `val_03` §6, `val_04` §8, `kin_00` §7, `tongue_movements_all`
-  (`extract_clip_for_movements`) use them. `val_02`'s clips also used to take session time as video
-  time with no offset at all, from a fixed label-test video; they now come from the session's own
-  labeled video.
+- `val_02` §9, `val_03` §6, `val_04` §8, `kin_00` §7 and `tongue_movements_all`
+  (`extract_clip_for_movements`) find frames on the per-frame times and cut by frame index with the
+  library's `video_clips.cut_event_clips` / `write_frames` (library PR #14, 0.4.0). `val_02`'s clips
+  also used to take session time as video time with no offset at all, from a fixed label-test
+  video; they now come from the session's own labeled video.
 - `lickometer_qc.load_session` and `val_03`'s `load_session` no longer return `video_offset`, and
   the per-session sidecar and `val_03_summary.json` no longer carry it.
-- Not yet on Code Ocean: the capsule pins library v0.2.0 and its apt `ffmpeg` (4.4) lacks
-  `-fps_mode`, which `video_clips.cut_clip` passes. Until the image moves, these clip cells fail
-  on Code Ocean; the analyses in those notebooks are unchanged.
-
-- `make_me_example_clip.py` takes the video URL from `cue_me_maps.video_url` (the ME index's
-  `source_video`), so sessions with the nested raw layout (`behavior-videos/BottomCamera/video.mp4`)
-  work; it no longer builds the flat-layout path itself.
-- `men_04` open questions in `fip_todo.md`; `men_00` §9 points to `men_04` for the post-cue peaks.
+- Not yet on Code Ocean: these clip cells need the library at 0.4.0 with `video-clips` and
+  ffmpeg ≥ 5.1. The capsule pins v0.2.0 and its apt ffmpeg is 4.4, so they fail there until the
+  image is rebuilt; the analyses in those notebooks are unchanged.
 
 ## 2026-10-22
 

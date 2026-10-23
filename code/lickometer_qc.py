@@ -130,7 +130,8 @@ def load_session(inter, conf: float = 0.8) -> Dict[str, object]:
         ``spoutL`` / ``spoutR`` (mean positions, de-mirrored), ``licks`` (sorted lickometer
         times on session time) and ``trial_bounds`` (first go cue, last trial stop; NaN pair
         when the trials table is missing). Row ``i`` of ``tongue`` is video frame ``i``, so
-        ``tongue["time"]`` is the per-frame time ``clip_utils.event_clips`` takes to cut clips.
+        ``tongue["time"]`` is the per-frame time the library's ``video_clips.cut_event_clips``
+        takes to cut clips.
     """
     from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_kinematics_utils import (
         mask_keypoint_data,

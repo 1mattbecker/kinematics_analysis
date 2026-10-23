@@ -104,7 +104,8 @@ says "the library", it means this one.
 | `kinematics/video_clip_utils.py` | Clip extraction (`extract_clips_ffmpeg_encode` = frame-accurate re-encode, `extract_clips_ffmpeg_after_reencode` = fast `-c copy`) + labeling, `find_labeled_video`, `get_video_time` |
 | `kinematics/kinematics_nwb_utils.py` | Session-ID parsing, NWB file lookup |
 | `ephys/tongue_ephys.py` | Raster/PETH machinery — `make_rp_and_events`, `compute_psth`, `RasterPlotter`, `load_intermediate_data`, `get_session_prefix` |
-| `video_alignment.py` | Video↔session/behavior clock conversion — `compute_video_session_offset`, `session_time_to_video_time` |
+| `video_alignment.py` | Clocks and frames: `behavior_time_to_frame_index`, `event_frame_ranges` (events → frame windows on corrected per-frame times), `read_trial_times`. Its constant-offset `video_time` conversions (`compute_video_session_offset`, `session_time_to_video_time`, …) are deprecated from 0.4.0 |
+| `video_clips.py` | Frame-exact clips and frames by index (≥ v0.3.0, `video-clips` extra, ffmpeg ≥ 5.1): `cut_clip(s)`, `cut_event_clips` and `write_frames` (0.4.0), frames for labeling |
 | `TransferToNWB.py` | Bonsai JSON/mat → NWB (a copy also sits in `code/`) |
 
 ### Library vs repo boundary
@@ -266,7 +267,6 @@ all three read S3 through `s3_utils.py`; see `fip_me_aligned_table_plan.md`) · 
 | `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
 | `fip_utils.py` | All FIP code (imported as `fu`). NWB-list path, used only by the archived `fip_00`–`fip_04`: `load_curated_sessions` (JSON curation; `use_curation=False` for assets curated at build time), `select_session`, `build_meta`, `pick_example`, `enrich_trials` (Rachel's `enrich_df_trials`), `process_session`. CSV-curated path for `fip_10`–`fip_17`/`men_00` (was `fip_coupling.py`): `find_asset_root`, `inventory_pairs`, `choose_side`, `load_pairs`, `add_motion_energy` (keeps the pairs with a usable camera and puts z-scored DA, NE, ME on the `me_norm` scale (default `floor_sd`), ME onsets (from the z-scored trace) and lick events on the pair grid; `keep_raw` keeps raw ME), `normalise_me` / `ME_NORMS` / `ME_FLOOR_PCT` (`zscore`, `sd`, `floor_sd`; `men_03`), `trial_measures`, `fit_rpe_terms`, `residualize`, `event_design` / `task_events` (task-model event regressors, incl. trial-weighted Q_sum/RPE, `TASK_EVENTS`), `task_residuals`. Motion energy on the FIP clock from the aligned ME table: `load_me`, `me_sessions`, `motion_energy_to_session` (cut to the task ± 30 s), `ME_ONSET_KW` (the one ME onset rule). Does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook |
 | `men_utils.py` | `men_*` loading: `inventory_sessions` (ME table × trial/event parquets), `load_sessions` (ME bin-averaged onto a 100 Hz session grid, lick events kept), `normalise` (`floor_sd`, the ME scale since 2026-10-22; `z`, `median`, `none`), `lick_clock_check` (lick-triggered ME peak lag per session and camera), `per_animal_timecourse` |
-| `clip_utils.py` | Video clips and frames at event times, by frame index (never seconds into the MP4): `event_clips` (events → `video_alignment.event_frame_ranges` on per-frame times → `video_clips.cut_clips`), `frame_pngs` (frames by index at their own MP4 timestamps). Row `i` of `kps_raw_*`/`tongue_kins`/the ME table is frame `i`. Needs the library ≥ v0.3.0 with `video-clips` |
 | `s3_utils.py` | Public-S3 reads over HTTPS for the ME scripts (standard library only): `urlopen` with retries, `download`, `fetch_cached`, `read_json`, `list_keys` |
 | `cue_me_maps.py` | `men_04`'s per-pixel ME after the go cue (also a script for one session): `cue_maps` (go cues → `event_frame_ranges` on the ME table's corrected `harp_time` → `video_clips.cut_clips` from the S3 MP4 → mean \|frame difference\| per lag; must match `me_clean` at offset 0; cached `.npz`), `smooth_encoder_cycle` (removes the clips' 4-frame re-encoding cycle), `excess_maps`, `region_masks`, `highpass` / `highpass_peaks` (15 Hz zero-phase Butterworth), `band_power_map`, `draw_regions`. Needs the library ≥ v0.3.0 with `video-clips` plus PyAV |
 
@@ -286,6 +286,11 @@ copying it. Code needed by two or more notebooks goes in a module, not inline.
 - **Spike-count windows are load-bearing.** `eph_08`/`eph_09` use
   `count_window_s=(0.0, 0.5)`, `baseline_window_s=(-2.0, 0.0)`, matching the paper and the
   poster figure. Changing them silently breaks the replication — see `TODO.md`.
+- **Finding video frames:** row `i` of `kps_raw_*`, `tongue_kins` and the ME table is frame `i`
+  of the video, also when frames were dropped. Find frames from per-frame times
+  (`video_clips.cut_event_clips` / `write_frames`, or `event_frame_ranges`), never as seconds into
+  the MP4: after *n* dropped frames, session time + a constant offset lands *n*/fps late. Shifting
+  between Harp-clock bases (session time, behavior time, spikes, FIP) by a constant is exact.
 - **Column-name trap:** in `all_tongue_movements_*.parquet`, `endpoint_x/y` and
   `max_x_from_jaw`/`max_y_from_jaw` are **absolute camera pixel positions** despite the names;
   the jaw-relative distances are `max_x_distance`/`max_y_distance`. They are not pooled-safe
