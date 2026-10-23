@@ -30,8 +30,17 @@ RUN apt-get update \
         libgl1-mesa-glx \
         pandoc \
         pkg-config \
-        ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
+# ffmpeg 8.1 (GPL build, with libx264) in its own conda env so it cannot change the base env's
+# packages, linked onto PATH. The apt ffmpeg (4.4 on Ubuntu 22.04) lacks -fps_mode, which the
+# library's video_clips needs (ffmpeg >= 5.1, checked by video_clips.check_ffmpeg). Tested in this
+# image's base on 2026-10-23. moviepy keeps its own bundled ffmpeg.
+RUN mamba create -y -p /opt/ffmpeg -c conda-forge "ffmpeg=8.1.2=gpl*" \
+    && mamba clean -afy \
+    && ln -s /opt/ffmpeg/bin/ffmpeg /opt/ffmpeg/bin/ffprobe /usr/local/bin/ \
+    && ffmpeg -hide_banner -version | head -1 \
+    && ffmpeg -hide_banner -encoders | grep -q libx264
 
 # Every pip install below uses -c /constraints.txt, which fixes the version of each package
 # (see its header for history). Change a version there, not here, to upgrade it deliberately.
@@ -40,9 +49,13 @@ COPY constraints.txt /
 # jupyterlab and ipywidgets: this base image has no IDE, and a hand-edited Dockerfile blocks
 # Code Ocean's automatic IDE install. They move from 3.6 / 7.7 to current versions (JupyterLab
 # 3.6 doesn't fit this base). No code in this repo uses ipywidgets directly.
-# aind-dynamic-foraging-behavior-video-analysis is pinned to tag v0.2.0 (0e1c8df): the video
-# timing QC (added in v0.1.0) with timing_verdict, and video screening. To go back, pin tag v0.1.0
-# (41e5b59), or pre-video-timing-qc (5738b32) for the last version without the QC, and rebuild.
+# aind-dynamic-foraging-behavior-video-analysis is pinned to tag v0.4.0 (a6bac04): the video
+# timing QC with timing_verdict, video screening, and frame-exact clips and frames
+# (video_clips: cut_event_clips, write_frames). aind-video-utils is what its video-clips extra
+# adds (scikit-learn, the other, is already here); it is listed directly rather than as
+# [video-clips] on the editable install. To go back, pin tag v0.2.0 (0e1c8df; no video_clips)
+# or v0.1.0 (41e5b59), or pre-video-timing-qc (5738b32) for the last version without the QC,
+# and rebuild.
 RUN pip install -U --no-cache-dir -c /constraints.txt \
     jupyterlab \
     ipywidgets \
@@ -59,7 +72,8 @@ RUN pip install -U --no-cache-dir -c /constraints.txt \
     aind_analysis_arch_result_access --upgrade \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@0e1c8df198bcb2f0b30f06d4f07a40dfa1d2aaa1#egg=aind-dynamic-foraging-behavior-video-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@a6bac04805203413b876acf1d8b6509a28c66760#egg=aind-dynamic-foraging-behavior-video-analysis \
+    aind-video-utils \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \
     scikit-image==0.26.0 \

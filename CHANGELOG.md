@@ -20,9 +20,11 @@ corrected Harp time, and shifting between Harp-clock bases by a constant is exac
   video; they now come from the session's own labeled video.
 - `lickometer_qc.load_session` and `val_03`'s `load_session` no longer return `video_offset`, and
   the per-session sidecar and `val_03_summary.json` no longer carry it.
-- Not yet on Code Ocean: these clip cells need the library at 0.4.0 with `video-clips` and
-  ffmpeg ≥ 5.1. The capsule pins v0.2.0 and its apt ffmpeg is 4.4, so they fail there until the
-  image is rebuilt; the analyses in those notebooks are unchanged.
+- Environment: the library pin moves to `v0.4.0` (`a6bac04`), `aind-video-utils==0.7.0` is
+  installed (the `video-clips` extra; new line in `constraints.txt`), and ffmpeg 8.1.2 (conda-forge
+  GPL build, with libx264) replaces the apt ffmpeg 4.4, which lacks `-fps_mode`. It sits in its own
+  conda env, `/opt/ffmpeg`, linked into `/usr/local/bin`. The clip cells run on Code Ocean once the
+  image is rebuilt.
 
 ## 2026-10-22
 

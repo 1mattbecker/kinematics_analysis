@@ -23,6 +23,8 @@
 #               probeinterface, quantities, zmq, distinctipy, cuda-*, PyMuPDFb).
 #               Deliberately NOT upgraded: pandas stays 2.3.3 because hdmf 4.3.1 (with
 #               pynwb 3.0.0) requires pandas<3; pandas 3 and the NWB stack move together later.
+#   2026-10-23  aind-video-utils==0.7.0 added (new): the video-analysis library's video-clips
+#               extra, with the library pin moving to v0.4.0. Its only dependency is numpy.
 #
 # Bumped from the 3.9 baseline because the 3.9 version has no Linux wheel for Python 3.12
 # (2026-09-25; found when PyYAML 6.0 broke the first build). None is used in numerical code:
@@ -42,6 +44,7 @@
 aind-analysis-arch-result-access==1.2.0
 aind-data-access-api==1.10.0
 aind-ephys-utils==0.4.0
+aind-video-utils==0.7.0
 aind_hierarchical_bootstrap==0.0.8
 aiobotocore==2.26.0
 aiofiles==22.1.0
