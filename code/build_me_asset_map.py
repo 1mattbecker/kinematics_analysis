@@ -12,8 +12,10 @@ behavior asset the ME run read).
 The mapping comes only from the batch launcher's manifests
 (``aind-motion-energy-batch-capsule/results/batch_manifest_<run id>.json``),
 never from "newest result by tag": ~31 leftover test results share the tag.
-Runs are applied in ``RUNS`` order, so a later run (the ``.mp4`` rerun of the
-10 808054 2025-09-02 to 09-15 sessions) replaces an earlier one.
+Runs are applied in ``RUNS`` order, so a later run replaces an earlier one: the
+``.mp4`` rerun of the 10 808054 2025-09-02 to 09-15 sessions, then the 0.4.0
+``rois_v2`` run (whole frame plus a whisker-pad ROI on the side camera), which
+covers every session.
 
 Asset names come from the Code Ocean API, through the launcher's own
 ``scripts/trigger_batch.make_client`` (token from ``API_SECRET``); the name is also
@@ -52,6 +54,7 @@ RUNS = [
     "ce719ee8-ca14-4f52-8f8b-8655237a3c8e",
     "2b3a9315-22b5-47f9-b929-687240392f82",
     "342a45f7-f157-47d6-b4dd-763438fbeadf",  # .mp4 rerun, 808054 09-02..09-15
+    "5a12ee5d-1f56-4fc8-80cf-8e97e12d1acb",  # 0.4.0 rois_v2, all sessions
 ]
 
 SCRATCH_URL = "https://aind-scratch-data.s3.amazonaws.com"

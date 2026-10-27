@@ -2,6 +2,16 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-27
+
+### ME asset map: the 0.4.0 `rois_v2` run (branch `me-roi`)
+
+- `build_me_asset_map.py`: the aind-motion-energy 0.4.0 `rois_v2` batch run (`5a12ee5d…`; whole frame plus a
+  whisker-pad ROI on the side camera, every session) is the last entry in `RUNS`, so it replaces the earlier
+  runs. `inputs/me_assets_fip.csv` was regenerated from it: all 97 sessions now point to their 0.4.0 ME asset.
+- The aligned ME table is not rebuilt yet: nothing that reads ME changes until it is. This branch is for the
+  ROI processing (table columns per ROI, an ROI argument in `fu.load_me`; see `fip_todo.md`).
+
 ## 2026-10-23
 
 ### Video clips and frames by frame index; `get_video_time` gone
