@@ -2,7 +2,8 @@
 build_me_table.py — aligned motion-energy table for the FIP sessions.
 
 For every ``used_in_fip05_07`` session and each camera, writes per-frame
-corrected Harp time plus the cleaned motion-energy trace, so the FIP notebooks
+corrected Harp time plus the cleaned motion-energy traces (whole frame and, for
+aind-motion-energy 0.4.0 runs given ROI masks, one per ROI), so the FIP notebooks
 attach one data asset instead of ~200 raw-behavior and ME assets. The spec is
 ``code/fip_me_aligned_table_plan.md``.
 
@@ -18,12 +19,19 @@ Output (``--out``)::
     build_info.json                  library commit, build date, ME run ids
     <session>/BottomCamera.parquet   row i is video frame i
     <session>/SideCameraRight.parquet
+    <session>/SideCameraRight_roi_masks.npz   the ROI masks the ME run used (0.4.0, if any)
+
+Columns: ``harp_time``, ``harp_source``, ``frame_number``, ``camera_time``,
+``me_clean`` (whole frame) and ``me_clean_<roi id>`` per ROI (``me_results.me_column``).
+``index.csv`` lists each camera's ROI ids in ``rois`` (``;``-separated) and the masks
+file the run was given in ``roi_masks``. A table built before ROIs is read the same way
+(no ROI columns); rebuild with ``--force`` to add them.
 
 Inputs are read over anonymous HTTPS: raw sessions from ``aind-open-data``,
 ME results from ``aind-scratch-data`` (folders named in
 ``inputs/me_assets_fip.csv``). Only CSVs, trigger logs, ME metadata and
 ME trace files (``.npz`` from aind-motion-energy 0.4.0, ``.npy`` before; see
-``me_results.py``) are read, never videos.
+``me_results.py``) and ROI masks are read, never videos.
 
 Usage (from ``code/``)::
 
@@ -41,6 +49,7 @@ import importlib.metadata
 import json
 import os
 import platform
+import shutil
 import subprocess
 import tempfile
 import traceback
@@ -53,7 +62,10 @@ import pandas as pd
 import aind_dynamic_foraging_behavior_video_analysis as video_analysis
 from aind_dynamic_foraging_behavior_video_analysis import video_timing_qc as vtq
 
-from me_results import is_frame_aligned, me_file_suffix, read_me_clean
+from me_results import (
+    FULL_FRAME, ROI_MASKS_SUFFIX, is_frame_aligned, me_column, me_file_suffix, read_me_traces,
+    read_roi_masks,
+)
 from s3_utils import download, list_keys, read_json
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -88,7 +100,7 @@ INDEX_COLUMNS = [
     "timing_source", "verdict", "action", "status", "error", "failed_checks",
     "frames_lost", "glitch_rows", "clock_rate_ppm", "video_frame_count_diff",
     *[f"n_{source}" for source in HARP_SOURCES],
-    "padded",
+    "padded", "rois", "roi_masks",
 ]
 # Dry-run report only: what the log was checked against
 REPORT_COLUMNS = INDEX_COLUMNS + ["n_trigger_events", "n_exposures", "me_asset_name"]
@@ -192,6 +204,8 @@ def build_camera(camera, info, work_dir, trigger_times, log_error, out_dir, dry_
     # Row i of the ME trace is frame i (NaN at row 0). aind-motion-energy >= 0.4.0 saves
     # it that way; for 0.3.0 results read_me_clean adds the leading NaN (``padded``).
     info["padded"] = not is_frame_aligned(me_meta)
+    roi_masks_path = me_meta.get("roi_masks_path")
+    info["roi_masks"] = os.path.basename(roi_masks_path) if roi_masks_path else None
     if n_decoded != len(timing):
         raise ValueError(f"ME covers {n_decoded} frames, the CSV has {len(timing)} rows")
 
@@ -201,7 +215,19 @@ def build_camera(camera, info, work_dir, trigger_times, log_error, out_dir, dry_
     me_path = download(f"{me_url}{me_file_suffix(me_meta)}", work_dir / me_name)
     if me_path is None:
         raise FileNotFoundError(f"{me_name} missing from the ME asset")
-    me = read_me_clean(me_path, me_meta)
+    # Whole frame plus one trace per ROI, all on the same rows (frames)
+    traces = read_me_traces(me_path, me_meta)
+    rois = [roi_id for roi_id in traces if roi_id != FULL_FRAME]
+    info["rois"] = ";".join(rois) or None
+
+    masks_path = None
+    if rois:
+        masks_name = f"{source}{ROI_MASKS_SUFFIX}"
+        masks_path = download(f"{me_url}{ROI_MASKS_SUFFIX}", work_dir / masks_name)
+        if masks_path is None:
+            raise FileNotFoundError(f"{masks_name} missing from the ME asset")
+        if list(read_roi_masks(masks_path)) != rois:
+            raise ValueError(f"{masks_name} does not hold the ROIs {rois} of the ME file")
 
     table = pd.DataFrame(
         {
@@ -209,11 +235,16 @@ def build_camera(camera, info, work_dir, trigger_times, log_error, out_dir, dry_
             "harp_source": pd.Categorical(fixed["harp_source"]),
             "frame_number": fixed["frame_number"].to_numpy("int64"),
             "camera_time": fixed["camera_time"].to_numpy("float64"),
-            "me_clean": me,
+            **{me_column(roi_id): trace for roi_id, trace in traces.items()},
         }
     )
     session_dir = out_dir / info["session"]
     session_dir.mkdir(parents=True, exist_ok=True)
+    if masks_path is not None:
+        # Before the parquet, so a camera whose parquet exists has its masks too
+        tmp_masks = session_dir / f".{camera}{ROI_MASKS_SUFFIX}.tmp"
+        shutil.copyfile(masks_path, tmp_masks)
+        os.replace(tmp_masks, session_dir / f"{camera}{ROI_MASKS_SUFFIX}")
     # Write then rename, so an interrupted build never leaves a partial file
     tmp_path = session_dir / f".{camera}.parquet.tmp"
     table.to_parquet(tmp_path, index=False, compression="zstd")
@@ -307,10 +338,16 @@ def load_sessions(selected=None):
     return merged.to_dict("records")
 
 
-def is_built(index, out_dir, session):
-    """Both cameras indexed, and every ``ok`` camera's file present."""
+def is_built(index, out_dir, session, me_asset_id=None):
+    """Both cameras indexed, and every ``ok`` camera's file present.
+
+    With ``me_asset_id``, also built from that ME asset: a session whose asset in
+    ``inputs/me_assets_fip.csv`` has changed (a rerun) is rebuilt.
+    """
     rows = index[index["session"] == session]
     if set(rows["camera"]) != set(CAMERAS):
+        return False
+    if me_asset_id is not None and not (rows["me_asset_id"] == me_asset_id).all():
         return False
     ok = rows[rows["status"] == "ok"]
     return all((out_dir / session / f"{camera}.parquet").exists() for camera in ok["camera"])
@@ -392,7 +429,10 @@ def main():
         if index_path.exists():
             index = pd.read_csv(index_path)
         if not args.force:
-            built = [s for s in sessions if is_built(index, args.out, s["raw_session"])]
+            built = [
+                s for s in sessions
+                if is_built(index, args.out, s["raw_session"], s["me_asset_id"])
+            ]
             if built:
                 print(f"Skipping {len(built)} sessions already built (--force to rebuild)")
             sessions = [s for s in sessions if s not in built]

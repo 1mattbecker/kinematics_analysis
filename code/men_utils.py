@@ -12,7 +12,7 @@ tests in ``stats_utils``, mean ± SEM plots in ``plot_utils``, lick bouts and ta
 
 Contents
 --------
-:func:`inventory_sessions`, :func:`load_session`, :func:`load_sessions`, :func:`normalise`,
+:func:`inventory_sessions`, :func:`split_source`, :func:`load_session`, :func:`load_sessions`, :func:`normalise`,
 :func:`lick_clock_check`, :func:`per_animal_timecourse`
 
 Clock: every time is session time (s from the first go cue). Each session's ME is bin-averaged
@@ -33,6 +33,20 @@ import pandas as pd
 import signal_utils as su
 
 CAMERAS = ("BottomCamera", "SideCameraRight")
+
+#: Separates camera and ROI in an ME source name, e.g. ``"SideCameraRight:whiskerpad_box"``.
+ROI_SEP = ":"
+
+
+def split_source(source: str) -> Tuple[str, Optional[str]]:
+    """``(camera, roi)`` of an ME source: a camera name, or ``"<camera>:<roi>"`` for an ROI trace.
+
+    ``roi`` is None for the whole frame; it is passed to ``fip_utils.load_me`` as is, so it may
+    leave out the camera prefix of the ROI id (``"SideCameraRight:whiskerpad_box"``).
+    """
+    camera, _, roi = source.partition(ROI_SEP)
+    return camera, roi or None
+
 
 #: Trial columns carried into the cache. ``animal_response``: 0 left, 1 right, 2 no response.
 #: ``num_reward_past`` (Rachel's ``enrich_df_trials``) is the run length of consecutive rewarded
@@ -92,8 +106,10 @@ def load_session(row, fs: float = 100.0, pre_s: float = 30.0, post_s: float = 30
     pre_s, post_s : float
         The grid runs from ``pre_s`` before the first go cue to ``post_s`` after the last one.
     cameras : sequence of str
-        Cameras to load. A camera with no ME in the table, or one the table refused, is stored
-        as ``None``; any other error is raised.
+        ME sources to load: camera names (whole frame) or ``"<camera>:<roi>"`` for an ROI trace
+        (:func:`split_source`, e.g. ``"SideCameraRight:whiskerpad_box"``). A source with no ME in
+        the table (no row, or no such ROI), or one the table refused, is stored as ``None``;
+        any other error is raised.
     data_root : str, optional
         Passed to :func:`fip_utils.motion_energy_to_session` (default: Code Ocean's).
 
@@ -102,7 +118,8 @@ def load_session(row, fs: float = 100.0, pre_s: float = 30.0, post_s: float = 30
     dict
         ``subject, session, asset, t0, fs, trials, licks, lick_events, me``: ``licks`` the sorted
         lick times (either side), ``lick_events`` their ``df_events`` rows (``timestamps,
-        event``), ``me`` a dict ``{camera: float32 array or None}`` of raw per-exposure ME.
+        event``), ``me`` a dict ``{source: float32 array or None}`` of raw per-exposure ME, keyed
+        by the entries of ``cameras``.
     """
     import fip_utils as fu
 
@@ -119,13 +136,14 @@ def load_session(row, fs: float = 100.0, pre_s: float = 30.0, post_s: float = 30
 
     kw = {} if data_root is None else {"data_root": data_root}
     me = {}
-    for cam in cameras:
+    for source in cameras:
+        cam, roi = split_source(source)
         try:
-            t_me, y, _ = fu.motion_energy_to_session(row.ses_idx, trials, camera=cam, **kw)
+            t_me, y, _ = fu.motion_energy_to_session(row.ses_idx, trials, camera=cam, roi=roi, **kw)
         except (FileNotFoundError, fu.MotionEnergyRefused):
-            me[cam] = None
+            me[source] = None
             continue
-        me[cam] = su.bin_to_grid(t_me, y, t0, fs, n).astype(np.float32)
+        me[source] = su.bin_to_grid(t_me, y, t0, fs, n).astype(np.float32)
 
     cols = [c for c in TRIAL_COLS if c in trials]
     return dict(subject=str(row.subject), session=row.ses_idx, asset=row.asset, t0=t0, fs=fs,

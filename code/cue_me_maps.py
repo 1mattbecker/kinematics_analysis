@@ -89,7 +89,7 @@ def check_alignment(clip_me, table_me, starts, max_shift=5):
     """Pooled correlation of clip ME with the table's ``me_clean`` at frame offsets ±max_shift.
 
     Difference ``k`` of a clip starting at source frame ``s`` is frame ``s+k+1`` minus frame
-    ``s+k``: the table's row ``s+k+1`` (the table's ME is padded with a leading 0).
+    ``s+k``: the table's row ``s+k+1`` (row i of the table is frame i; row 0 is NaN).
 
     Returns
     -------

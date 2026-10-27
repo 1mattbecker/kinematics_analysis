@@ -15,7 +15,9 @@ Two data paths, one per kind of FIP asset:
   :func:`trial_measures`, :func:`fit_rpe_terms`, :func:`residualize`, :func:`task_residuals`
   measure them. (This was ``fip_coupling.py``.)
 
-Motion energy on the FIP clock (:func:`load_me`, :func:`motion_energy_to_session`) serves both.
+Motion energy on the FIP clock (:func:`load_me`, :func:`motion_energy_to_session`) serves both;
+``roi=`` picks an ROI trace from the table instead of the whole frame (:func:`me_rois` lists them,
+:func:`load_roi_masks` gives their masks).
 Generic signal code is in ``signal_utils``, across-animal statistics in ``stats_utils``, task
 context and lick bouts in ``behavior_utils``.
 
@@ -64,6 +66,7 @@ import pandas as pd
 from scipy.sparse import csr_matrix, hstack
 
 import signal_utils as su
+from me_results import ROI_MASKS_SUFFIX, me_column, read_roi_masks
 
 import fastparquet  # noqa: F401  # load_nwb_list uses pd.read_parquet(engine="fastparquet")
 
@@ -524,6 +527,8 @@ def streak_go_cues(df_trials: pd.DataFrame, bin_fn) -> Optional[np.ndarray]:
 #: Aligned motion-energy table under ``data_root`` (asset 90c2d0a7-82e3-4abf-b205-e398c2f7736e,
 #: built by ``build_me_table.py``): per session and camera, the corrected Harp time and
 #: ``me_clean`` of every video frame, plus ``index.csv`` with each camera's timing status.
+#: Tables built from aind-motion-energy 0.4.0 ROI runs add ``me_clean_<roi id>`` per ROI,
+#: ``<camera>_roi_masks.npz`` and the ``rois`` / ``roi_masks`` index columns.
 ME_TABLE_NAME = "fip_motion_energy_aligned"
 
 #: Folder holding the ME table: Code Ocean's data mount, or ``$ME_DATA_ROOT`` when set (a local
@@ -579,15 +584,61 @@ def load_me_index(data_root: str = ME_DATA_ROOT, screen: bool = True) -> pd.Data
             reason = verdict["reason"].reindex(key).to_numpy()
             excluded = (index["status"] == "ok").to_numpy() & (use == False)  # noqa: E712 (NaN = not screened)
             index.loc[excluded, "status"] = "excluded"
+            index["error"] = index["error"].astype(object)  # all NaN (float) when nothing was refused
             index.loc[excluded, "error"] = reason[excluded]
         _ME_INDEX[(path, screen)] = index
     return _ME_INDEX[(path, screen)]
+
+
+def _table_rois(info: dict) -> List[str]:
+    """ROI ids of one ``index.csv`` row (none for a table built before ROIs)."""
+    rois = info.get("rois")
+    return rois.split(";") if isinstance(rois, str) and rois else []
+
+
+def resolve_roi(info: dict, roi: Optional[str]) -> Optional[str]:
+    """Full ROI id of ``roi`` in one ``index.csv`` row, or None if the camera has no such ROI.
+
+    ``roi`` may be the full id (``SideCameraRight_whiskerpad_box``) or the id without the
+    ``<camera>_`` prefix the ROI sets use (``whiskerpad_box``). ``None`` and ``"full_frame"``
+    mean the whole frame and return ``"full_frame"``.
+    """
+    if roi is None or roi == "full_frame":
+        return "full_frame"
+    available = _table_rois(info)
+    for candidate in (roi, "%s_%s" % (info["camera"], roi)):
+        if candidate in available:
+            return candidate
+    return None
+
+
+def me_rois(camera: str = "SideCameraRight", data_root: str = ME_DATA_ROOT) -> pd.Series:
+    """ROI ids in the ME table for ``camera``, with the number of usable sessions holding each.
+
+    Parameters
+    ----------
+    camera : str
+        ``BottomCamera`` or ``SideCameraRight``.
+    data_root : str
+        Folder holding the ME table (:data:`ME_DATA_ROOT`).
+
+    Returns
+    -------
+    pandas.Series
+        Sessions per ROI id (refused and screen-excluded cameras not counted); empty for a
+        table built before ROIs.
+    """
+    index = load_me_index(data_root)
+    usable = index[(index["camera"] == camera) & (index["status"] == "ok")]
+    ids = [r for row in usable.to_dict("records") for r in _table_rois(row)]
+    return pd.Series(ids, dtype=object).value_counts().rename("n_sessions")
 
 
 def me_sessions(
     camera: str = "BottomCamera",
     exclude_actions: Sequence[str] = (),
     data_root: str = ME_DATA_ROOT,
+    roi: Optional[str] = None,
 ) -> List[str]:
     """Session ids (``<subject>_<date>``) with usable motion energy for ``camera``.
 
@@ -600,6 +651,9 @@ def me_sessions(
         ``("fix glitches",)`` for the Harp-glitch ones. Refused and screen-excluded cameras are always left out.
     data_root : str
         Folder holding the ME table (:data:`ME_DATA_ROOT`).
+    roi : str, optional
+        Keep only sessions whose camera has this ROI trace (id with or without the camera
+        prefix, :func:`resolve_roi`). None: the whole frame, every usable session.
 
     Returns
     -------
@@ -612,11 +666,61 @@ def me_sessions(
         & (index["status"] == "ok")
         & ~index["action"].isin(list(exclude_actions))
     )
+    if roi is not None:
+        usable &= np.array([resolve_roi(row, roi) is not None for row in index.to_dict("records")],
+                           dtype=bool)
     return sorted(index.loc[usable, "ses_idx"])
 
 
+def _me_row(session_id: str, camera: str, data_root: str) -> dict:
+    """The usable ``index.csv`` row of one session and camera (errors as :func:`load_me`)."""
+    index = load_me_index(data_root)
+    rows = index[(index["ses_idx"] == session_id) & (index["camera"] == camera)]
+    if len(rows) == 0:
+        raise FileNotFoundError("no %s motion energy for %s in the ME table" % (camera, session_id))
+    if len(rows) > 1:
+        raise ValueError("%d ME table rows for %s %s" % (len(rows), session_id, camera))
+    info = rows.iloc[0].to_dict()
+    if info["status"] != "ok":
+        raise MotionEnergyRefused(
+            "%s %s has no usable ME (%s): %s" % (session_id, camera, info["status"], info["error"])
+        )
+    return info
+
+
+def load_roi_masks(session_id: str, camera: str = "SideCameraRight",
+                   data_root: str = ME_DATA_ROOT) -> Dict[str, np.ndarray]:
+    """ROI masks the camera's ME was computed with (the table's ``<camera>_roi_masks.npz``).
+
+    Parameters
+    ----------
+    session_id : str
+        ``<subject>_<date>``, as ``nwb.session_id``.
+    camera : str
+        ``BottomCamera`` or ``SideCameraRight``.
+    data_root : str
+        Folder holding the ME table (:data:`ME_DATA_ROOT`).
+
+    Returns
+    -------
+    dict
+        ROI id -> bool mask ``(H, W)`` in video pixels; empty if the camera has no ROIs.
+
+    Raises
+    ------
+    FileNotFoundError, MotionEnergyRefused, ValueError
+        As :func:`load_me`.
+    """
+    info = _me_row(session_id, camera, data_root)
+    if not _table_rois(info):
+        return {}
+    return read_roi_masks(os.path.join(data_root, ME_TABLE_NAME, info["session"],
+                                       camera + ROI_MASKS_SUFFIX))
+
+
 def load_me(
-    session_id: str, camera: str = "BottomCamera", data_root: str = ME_DATA_ROOT
+    session_id: str, camera: str = "BottomCamera", data_root: str = ME_DATA_ROOT,
+    roi: Optional[str] = None,
 ) -> Tuple[np.ndarray, np.ndarray, dict]:
     """Motion energy for one camera, normalised per exposure, on an even Harp-time grid.
 
@@ -635,6 +739,12 @@ def load_me(
        rate) sees a uniform series.
 
     Frame 0 has no ME value (the table stores NaN there), so the grid starts at frame 1.
+    This holds for tables built from aind-motion-energy 0.3.0 (N−1 values, the build adds the
+    NaN) and 0.4.0 (N values, NaN already at row 0): ``build_me_table.py`` reads both through
+    ``me_results``, so the table is frame-aligned either way and nothing is padded here.
+
+    An ROI trace (``roi``) is the mean |frame difference| over the ROI's pixels, on the same
+    frames, so both steps apply to it unchanged.
 
     Parameters
     ----------
@@ -644,37 +754,37 @@ def load_me(
         ``BottomCamera`` or ``SideCameraRight``.
     data_root : str
         Folder holding the ME table (:data:`ME_DATA_ROOT`).
+    roi : str, optional
+        ROI trace to read instead of the whole frame: the id in the table's ``rois`` column,
+        with or without the ``<camera>_`` prefix (``"whiskerpad_box"``). See :func:`me_rois`.
 
     Returns
     -------
     tuple
         ``(t_harp, me, info)``: grid times on the Harp clock (s), per-exposure ME on that
-        grid, and the camera's ``index.csv`` row as a dict.
+        grid, and the camera's ``index.csv`` row as a dict (with ``roi``, the full ROI id or
+        ``"full_frame"``).
 
     Raises
     ------
     FileNotFoundError
-        If the table has no row for this session and camera, so a multi-session loop can skip.
+        If the table has no row for this session and camera, or the camera has no trace for
+        ``roi``, so a multi-session loop can skip.
     MotionEnergyRefused
         If the build refused the camera or the video screen excluded it (``info['error']`` says why).
     ValueError
         If the file does not match its index row (a length mismatch is never truncated).
     """
-    index = load_me_index(data_root)
-    rows = index[(index["ses_idx"] == session_id) & (index["camera"] == camera)]
-    if len(rows) == 0:
-        raise FileNotFoundError("no %s motion energy for %s in the ME table" % (camera, session_id))
-    if len(rows) > 1:
-        raise ValueError("%d ME table rows for %s %s" % (len(rows), session_id, camera))
-    info = rows.iloc[0].to_dict()
-    if info["status"] != "ok":
-        raise MotionEnergyRefused(
-            "%s %s has no usable ME (%s): %s" % (session_id, camera, info["status"], info["error"])
-        )
+    info = _me_row(session_id, camera, data_root)
+    info["roi"] = resolve_roi(info, roi)
+    if info["roi"] is None:
+        raise FileNotFoundError("%s %s has no ROI %r in the ME table (ROIs: %s)"
+                                % (session_id, camera, roi, _table_rois(info) or "none"))
+    column = me_column(info["roi"])
 
     frames = pd.read_parquet(
         os.path.join(data_root, ME_TABLE_NAME, info["session"], "%s.parquet" % camera),
-        columns=["harp_time", "frame_number", "me_clean"],
+        columns=["harp_time", "frame_number", column],
     )
     if len(frames) != info["n_frames"]:
         raise ValueError(
@@ -687,7 +797,7 @@ def load_me(
         raise ValueError("%s %s: frame numbers do not increase" % (session_id, camera))
 
     # Per-exposure ME (step 1); row 0 has no value
-    me = frames["me_clean"].to_numpy(float)[1:] / exposures
+    me = frames[column].to_numpy(float)[1:] / exposures
     t = harp[1:]
     finite = np.isfinite(me)
 
@@ -760,6 +870,7 @@ def motion_energy_to_session(
     camera: str = "BottomCamera",
     data_root: str = ME_DATA_ROOT,
     pad_s: Optional[float] = ME_TASK_PAD_S,
+    roi: Optional[str] = None,
 ) -> Tuple[np.ndarray, np.ndarray, float]:
     """Motion energy on the session clock (t=0 at the first go cue), evenly sampled.
 
@@ -789,6 +900,8 @@ def motion_energy_to_session(
         Folder holding the ME table (:data:`ME_DATA_ROOT`).
     pad_s : float or None
         Margin kept around the go cues, in s. ``None`` returns the whole video.
+    roi : str, optional
+        ROI trace instead of the whole frame (:func:`load_me`).
 
     Returns
     -------
@@ -801,7 +914,7 @@ def motion_energy_to_session(
     FileNotFoundError, MotionEnergyRefused, ValueError
         As :func:`load_me`.
     """
-    t_harp, me, info = load_me(session_id, camera, data_root)
+    t_harp, me, info = load_me(session_id, camera, data_root, roi=roi)
     go_cues = df_trials.sort_values("trial")[go_cue_col].dropna()  # Harp clock
     first_go_cue = float(go_cues.iloc[0])
     t_session = t_harp - first_go_cue
@@ -1027,7 +1140,7 @@ def load_pairs(kept: pd.DataFrame, fs: float = 20.0, pre_s: float = 5.0, post_s:
 def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "BottomCamera",
                       data_root: str = ME_DATA_ROOT, onset_fs: Optional[float] = 100.0,
                       exclude_subjects: Sequence[str] = (), me_norm: str = "floor_sd",
-                      keep_raw: bool = False) -> List[dict]:
+                      keep_raw: bool = False, roi: Optional[str] = None) -> List[dict]:
     """Keep the pairs whose camera passes the ME screen and put DA, NE and ME on their grid.
 
     ME on the session clock (:func:`motion_energy_to_session`) is averaged into the pair's
@@ -1055,6 +1168,9 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
         percentile; ``zscore`` was the default before 2026-10-22).
     keep_raw : bool
         Also keep the raw ME on the grid as ``me_raw`` (NaN in empty bins).
+    roi : str, optional
+        Use this ROI's trace (:func:`load_me`) as ``me`` instead of the whole frame; pairs
+        whose camera has no such ROI are left out.
 
     Returns
     -------
@@ -1065,7 +1181,7 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
         (s), and with ``keep_raw`` ``me_raw``.
     """
     path_of = dict(zip(kept["session"], kept["path"]))
-    usable = set(me_sessions(camera, data_root=data_root))
+    usable = set(me_sessions(camera, data_root=data_root, roi=roi))
     out = []
     for p in pairs:
         if p["session"] not in usable or p["subject"] in exclude_subjects:
@@ -1073,7 +1189,7 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
         path = path_of[p["session"]]
         trials_raw = pd.read_parquet(os.path.join(path, "df_trials.parquet"))
         t_me, y, _ = motion_energy_to_session(p["session"], trials_raw, camera=camera,
-                                              data_root=data_root)
+                                              data_root=data_root, roi=roi)
         n = len(p["da"])
         q = dict(p)
         raw = su.bin_to_grid(t_me, y, p["t0"], p["fs"], n)

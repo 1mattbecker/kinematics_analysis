@@ -55,12 +55,15 @@ notebooks); ME onsets stay on the z-scored trace; DA and NE stay z-scored.
   shrinks its ME responses by ~15% (SD after a 10 Hz low-pass / SD = 0.85; 0.98–0.99 elsewhere). Revisit if
   it drives a result.
 
-### Aligned ME table: ROI traces (later)
-aind-motion-energy 0.4.0 (2026-10-21) computes one trace per ROI next to the whole frame, from one ROI set
-per batch. The table reads both 0.3.0 and 0.4.0 results (`me_results.py`) but stores only the whole-frame
-`me_clean`, so nothing needs rebuilding until ROI traces are wanted.
-- `build_me_table.py`: add one column per `roi_ids` entry from the 0.4.0 NPZ (`me_clean[:, k]`).
-- `fu.load_me` (and `motion_energy_to_session`): an ROI argument, returning that column instead of the whole frame.
+### Aligned ME table: ROI traces
+aind-motion-energy 0.4.0 `rois_v2` run (2026-10-23, all sessions): whole frame on both cameras plus
+`SideCameraRight_whiskerpad_box` on the side camera. Code done 2026-10-27 (branch `me-roi`): `build_me_table.py`
+writes `me_clean_<roi id>` and `<camera>_roi_masks.npz`; `roi=` in `fu.load_me` / `motion_energy_to_session` /
+`add_motion_energy` / `me_sessions`, `fu.me_rois`, `fu.load_roi_masks`; `"<camera>:<roi>"` sources in
+`men_utils.load_session`. Tested on two sessions: whole-frame columns identical to the current table.
+- Rebuild the table from the 0.4.0 assets (cloud workstation, `--force`: the asset map changed, so every session is
+  rebuilt anyway) and register it as a new data asset; then point `ME_TABLE_NAME`'s asset id at it.
+- The whisker-pad trace has not been looked at yet (scale vs whole frame, per-group box placement).
 
 ### `men_04`: ME in the first 150 ms after the go cue
 Found so far: five mice jump 10–16 ms after the cue, four don't; the high-passed ME peaks at ~24 and

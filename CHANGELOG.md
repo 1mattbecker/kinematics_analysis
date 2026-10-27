@@ -4,6 +4,23 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-10-27
 
+### ME table and loaders: ROI traces (branch `me-roi`)
+
+- `me_results.py`: `read_me_traces` returns the whole frame and every ROI of a result (`read_me_clean` keeps its
+  signature and returns `full_frame`); `me_column` names the table columns; `read_roi_masks` reads the masks
+  copy. Padding is unchanged: 0.3.0's N−1 values get one leading NaN, 0.4.0's N rows (NaN at row 0) are taken as
+  written. Checked on 800886 2025-08-28: the 0.4.0 `full_frame` column equals the current table's `me_clean` at
+  offset 0 (shift ±1: r 0.96–0.97), both cameras. A 0.3.0 result computed on a `--roi` box is now refused.
+- `build_me_table.py`: one `me_clean_<roi id>` column per ROI (whole frame stays `me_clean`), the run's masks
+  saved as `<session>/<camera>_roi_masks.npz`, `rois` and `roi_masks` in `index.csv`; a session whose ME asset
+  changed in `inputs/me_assets_fip.csv` counts as not built. Two sessions rebuilt locally (800886 2025-08-28,
+  816214 2025-12-02, a re-index session): every existing column is identical to the current table.
+- `fip_utils`: `roi=` in `load_me`, `motion_energy_to_session`, `add_motion_energy`, `me_sessions` (id with or
+  without the `<camera>_` prefix, `resolve_roi`); `me_rois` (ROI ids and session counts); `load_roi_masks`.
+  `load_me_index` no longer warns when no camera was refused.
+- `men_utils.load_session`: `cameras` entries may be `"<camera>:<roi>"` (`split_source`).
+- The table on Code Ocean is not rebuilt yet; until it is, `roi=` raises `FileNotFoundError` (no ROIs listed).
+
 ### ME asset map: the 0.4.0 `rois_v2` run (branch `me-roi`)
 
 - `build_me_asset_map.py`: the aind-motion-energy 0.4.0 `rois_v2` batch run (`5a12ee5d…`; whole frame plus a
