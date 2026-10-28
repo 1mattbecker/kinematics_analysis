@@ -65,8 +65,8 @@ writes `me_clean_<roi id>` and `<camera>_roi_masks.npz`; `roi=` in `fu.load_me` 
   `fip_motion_energy_aligned` symlink now points there, the old download `results-90c2d0a7…` is kept). Same 178 ok / 16
   refused; every existing column of all 178 cameras identical to asset `90c2d0a7`; all 90 ok side cameras carry the
   whisker-pad trace (64 after the video screen). Index wording follows library 0.5.0 (refused rows: empty `action`).
-- Code Ocean: build it in a workstation as before (`python build_me_table.py --out /scratch/fip_motion_energy_aligned
-  --workers 4`), save as a data asset, attach it in place of `90c2d0a7`, update the asset id in `fu.ME_TABLE_NAME`'s comment.
+- Code Ocean: built in a workstation 2026-10-28 (`/scratch/fip_motion_energy_aligned_rois_v2`) and saved as asset
+  `e542022e-7d56-48ec-a940-d2dcc7ec4733`, attached at `fip_motion_energy_aligned` in place of `90c2d0a7`.
 - The whisker-pad trace has not been looked at yet (scale vs whole frame, per-group box placement).
 
 ### `men_04`: ME in the first 150 ms after the go cue

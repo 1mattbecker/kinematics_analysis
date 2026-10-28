@@ -22,8 +22,9 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 - Full table built locally from the 0.4.0 assets (97 sessions; 178 cameras ok, 16 refused, as before). Every
   existing column of all 178 cameras is identical to asset `90c2d0a7`, so whole-frame results do not change; all
   90 ok side cameras have `me_clean_SideCameraRight_whiskerpad_box` (64 pass the video screen). Refused rows now
-  have an empty `action` and the library 0.5.0 error wording. The Code Ocean asset is not rebuilt yet; until it
-  is, `roi=` raises `FileNotFoundError` there.
+  have an empty `action` and the library 0.5.0 error wording.
+- Code Ocean: the same build run in a workstation (2026-10-28) and saved as asset `e542022e-7d56-48ec-a940-d2dcc7ec4733`,
+  attached at `fip_motion_energy_aligned` in place of `90c2d0a7`.
 
 ### ME asset map: the 0.4.0 `rois_v2` run (branch `me-roi`)
 

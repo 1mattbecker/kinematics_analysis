@@ -18,7 +18,7 @@ capsule attaches one asset instead of ~200 raw-behavior and ME assets.
 | 31 leftover test ME results | Kept in place (not moved or deleted); excluded by the explicit session → result mapping |
 | Session → ME asset mapping | Done 2026-09-30: `inputs/me_assets_fip.csv` (97 rows) from the three run manifests, by `code/build_me_asset_map.py`; every `me_metadata.json` is `.mp4`, full length, N−1 values |
 | `code/build_me_table.py` | Written 2026-09-30; tested locally on 4 sessions, dry pass on all 97, then run in a workstation (same result) |
-| Data asset | Built 2026-09-30 in a cloud workstation (`12af263`, library `41e5b59`): 178 cameras ok, 16 refused, 5.8 GB; asset `90c2d0a7-82e3-4abf-b205-e398c2f7736e`, mounted at `/root/capsule/data/fip_motion_energy_aligned` |
+| Data asset | Rebuilt 2026-10-28 from the aind-motion-energy 0.4.0 `rois_v2` run (whole frame + side-camera whisker pad), asset `e542022e-7d56-48ec-a940-d2dcc7ec4733`, same mount. First built 2026-09-30 in a cloud workstation (`12af263`, library `41e5b59`): 178 cameras ok, 16 refused, 5.8 GB; asset `90c2d0a7-82e3-4abf-b205-e398c2f7736e`, mounted at `/root/capsule/data/fip_motion_energy_aligned` |
 | `fip_utils` loader switch | Done 2026-09-30 (below); notebooks not re-run |
 
 ## Decisions
