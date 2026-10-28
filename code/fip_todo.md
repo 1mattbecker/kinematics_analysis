@@ -61,8 +61,12 @@ aind-motion-energy 0.4.0 `rois_v2` run (2026-10-23, all sessions): whole frame o
 writes `me_clean_<roi id>` and `<camera>_roi_masks.npz`; `roi=` in `fu.load_me` / `motion_energy_to_session` /
 `add_motion_energy` / `me_sessions`, `fu.me_rois`, `fu.load_roi_masks`; `"<camera>:<roi>"` sources in
 `men_utils.load_session`. Tested on two sessions: whole-frame columns identical to the current table.
-- Rebuild the table from the 0.4.0 assets (cloud workstation, `--force`: the asset map changed, so every session is
-  rebuilt anyway) and register it as a new data asset; then point `ME_TABLE_NAME`'s asset id at it.
+- Built locally 2026-10-27 from the 0.4.0 assets (`Code/data/me_table_rois_v2/`, 6.2 GB; the local
+  `fip_motion_energy_aligned` symlink now points there, the old download `results-90c2d0a7…` is kept). Same 178 ok / 16
+  refused; every existing column of all 178 cameras identical to asset `90c2d0a7`; all 90 ok side cameras carry the
+  whisker-pad trace (64 after the video screen). Index wording follows library 0.5.0 (refused rows: empty `action`).
+- Code Ocean: build it in a workstation as before (`python build_me_table.py --out /scratch/fip_motion_energy_aligned
+  --workers 4`), save as a data asset, attach it in place of `90c2d0a7`, update the asset id in `fu.ME_TABLE_NAME`'s comment.
 - The whisker-pad trace has not been looked at yet (scale vs whole frame, per-group box placement).
 
 ### `men_04`: ME in the first 150 ms after the go cue
