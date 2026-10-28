@@ -450,10 +450,6 @@
 			"mount": "behavior_763590_2025-05-01_10-59-16_videoprocessed_2025-10-29_21-59-06"
 		},
 		{
-			"id": "90c2d0a7-82e3-4abf-b205-e398c2f7736e",
-			"mount": "fip_motion_energy_aligned"
-		},
-		{
 			"id": "912a5b0d-7ab3-4282-b575-bf7cf5ea85e2",
 			"mount": "behavior_758017_2025-02-07_14-11-05_videoprocessed_2025-10-28_23-21-23"
 		},
@@ -752,6 +748,10 @@
 		{
 			"id": "e5258d95-c786-4f12-9807-204557c11b40",
 			"mount": "behavior_751181_2025-02-25_12-12-30_videoprocessed_2025-10-28_23-21-23"
+		},
+		{
+			"id": "e542022e-7d56-48ec-a940-d2dcc7ec4733",
+			"mount": "fip_motion_energy_aligned"
 		},
 		{
 			"id": "e613e630-66e3-4456-a98b-e2edfe280ac3",
