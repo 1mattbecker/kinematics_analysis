@@ -84,7 +84,11 @@ says "the library", it means this one.
 - **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
   branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
-  to a commit: tag `v0.4.0` (`a6bac04`, 2026-10-23): the video timing QC (added in `v0.1.0`,
+  to a commit. On `fip-motion-energy` / `me-roi` the pin is `v0.5.0` (`5d13a7b`), which removes
+  `tongue_analysis`, `tongue_kinematics_utils` and `video_clip_utils` and renames the kinematics outputs; the
+  `kin_*` / `eph_*` / `val_*` code here still uses them, so that migration (its own handoff doc) comes before
+  those notebooks run on a rebuilt image or the branch is merged into `wild`. `fip_*` / `men_*` are unaffected.
+  Before it: tag `v0.4.0` (`a6bac04`, 2026-10-23): the video timing QC (added in `v0.1.0`,
   `41e5b59`) with `timing_verdict`, video screening, and `video_clips` (frame-exact clips and
   frames: `cut_event_clips`, `write_frames`; ffmpeg ≥ 5.1, which the image installs from
   conda-forge as 8.1.2 in `/opt/ffmpeg`). `v0.2.0` (`0e1c8df`) is the version before `video_clips`. Library
@@ -244,7 +248,8 @@ which sets `ME_DATA_ROOT`).
 `test_session_wrapper.ipynb` (batch runner wrapping `run_batch_analysis`; mostly commented
 out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py` /
 `TransferToNWB.py` / `backup_nwb_utils_dynamicforaging.py` · `build_me_table.py` (aligned
-motion-energy table for the FIP sessions, run in a cloud workstation: whole-frame `me_clean` plus `me_clean_<roi id>`
+motion-energy table for the FIP sessions, run in a cloud workstation and saved as asset `e542022e` (2026-10-28, mounted
+`fip_motion_energy_aligned`; aind-motion-energy 0.4.0 with the side-camera whisker-pad ROI): whole-frame `me_clean` plus `me_clean_<roi id>`
 per ROI and a copy of the ROI masks; ME files of either aind-motion-energy version read through `me_results.py`, which
 adds the leading NaN to 0.3.0's N−1 values and leaves 0.4.0's N rows as written; `build_me_asset_map.py`
 maps sessions to ME assets, `check_leading_lost_frames.py` is the lick-triggered-ME timing check;

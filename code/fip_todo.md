@@ -1,7 +1,7 @@
 # fip_* / men_* to-do
 
 Open work for the FIP and motion-energy notebooks (`fip_10`–`fip_17`, `men_00`–`men_05`). `TODO.md`
-tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-22 (ME normalization decided; ROI traces in the ME table; 2026-10-21: ME normalization items; 2026-10-09: isosbestic control added; 2026-10-08: notebooks
+tracks the `kin_*` / `eph_*` work. History is in `CHANGELOG.md`. Last revised 2026-10-28 (whisker-pad ROI table built and attached; next steps for ME; 2026-10-22: ME normalization decided; 2026-10-21: ME normalization items; 2026-10-09: isosbestic control added; 2026-10-08: notebooks
 regrouped by analysis type; old names → new in `archive/README.md`).
 
 ---
@@ -67,7 +67,31 @@ writes `me_clean_<roi id>` and `<camera>_roi_masks.npz`; `roi=` in `fu.load_me` 
   whisker-pad trace (64 after the video screen). Index wording follows library 0.5.0 (refused rows: empty `action`).
 - Code Ocean: built in a workstation 2026-10-28 (`/scratch/fip_motion_energy_aligned_rois_v2`) and saved as asset
   `e542022e-7d56-48ec-a940-d2dcc7ec4733`, attached at `fip_motion_energy_aligned` in place of `90c2d0a7`.
-- The whisker-pad trace has not been looked at yet (scale vs whole frame, per-group box placement).
+
+**Where it stands (2026-10-28).** Work from branch `me-roi`. It does not wait for the library 0.5.0 kinematics
+migration (separate handoff): no `fip_*` / `men_*` notebook or the modules they use imports what 0.5.0 removed, and the
+table build and ME modules ran on 0.5.1. Only merging `me-roi` into `wild` waits, because it carries the 0.5.0 pin.
+
+**Coverage.** Whisker pad: 64 sessions, bottom camera: 88; 62 have both. The video screen drops most side cameras
+of two mice (overexposure): 809487 0 of 8, 818586 4 of 22. Whisker-pad results pool 8 mice, 7 with most of
+their sessions:
+
+| Mouse | 800886 | 808054 | 809487 | 809491 | 815334 | 816212 | 816214 | 818585 | 818586 |
+|---|---|---|---|---|---|---|---|---|---|
+| Bottom | 4 | 15 | 8 | 19 | 3 | 5 | 5 | 7 | 22 |
+| Whisker pad | 4 | 15 | 0 | 19 | 3 | 7 | 5 | 7 | 4 |
+
+**Next, in order:**
+1. Describe the whisker-pad trace (a new `men_06`, loading as `men_00` with
+   `cameras=("BottomCamera", "SideCameraRight", "SideCameraRight:whiskerpad_box")`):
+   - the box on one frame per mask group (7 groups, `fu.load_roi_masks`; groups in `index.csv` `roi_masks`);
+   - the trace against the whole frame around the go cue, the choice and licking;
+   - whether `floor_sd` behaves on it (the scale was chosen on bottom-camera whole-frame ME).
+2. `men_04`'s go-cue items on the whisker pad: 500 Hz whisker-pad ME in the first 150 ms. Is the 10–16 ms jump and the
+   ~24 / ~55 ms peaks there, and in which of the five "jump" and four "no jump" mice? This tests the startle-plus-whisking
+   reading that so far rests on the maps.
+3. If it holds up, a second ME signal in the FIP analyses: `fu.add_motion_energy(..., camera="SideCameraRight",
+   roi="whiskerpad_box")` next to the bottom camera in `fip_12` (DA/NE at ME onsets) and `fip_13` (task + ME regression).
 
 ### `men_04`: ME in the first 150 ms after the go cue
 Found so far: five mice jump 10–16 ms after the cue, four don't; the high-passed ME peaks at ~24 and
