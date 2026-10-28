@@ -524,8 +524,8 @@ def streak_go_cues(df_trials: pd.DataFrame, bin_fn) -> Optional[np.ndarray]:
 
 # ── Motion energy ─────────────────────────────────────────────────────────────
 
-#: Aligned motion-energy table under ``data_root`` (asset 90c2d0a7-82e3-4abf-b205-e398c2f7736e,
-#: built by ``build_me_table.py``): per session and camera, the corrected Harp time and
+#: Aligned motion-energy table under ``data_root`` (asset e542022e-7d56-48ec-a940-d2dcc7ec4733, 2026-10-28,
+#: aind-motion-energy 0.4.0 with ROIs; before it 90c2d0a7-82e3-4abf-b205-e398c2f7736e; built by ``build_me_table.py``): per session and camera, the corrected Harp time and
 #: ``me_clean`` of every video frame, plus ``index.csv`` with each camera's timing status.
 #: Tables built from aind-motion-energy 0.4.0 ROI runs add ``me_clean_<roi id>`` per ROI,
 #: ``<camera>_roi_masks.npz`` and the ``rois`` / ``roi_masks`` index columns.
