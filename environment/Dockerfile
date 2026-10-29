@@ -72,7 +72,7 @@ RUN pip install -U --no-cache-dir -c /constraints.txt \
     aind_analysis_arch_result_access --upgrade \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@5d13a7bf4184e39fcf227f11cdecfd0a752b77cb#egg=aind-dynamic-foraging-behavior-video-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@a6bac04805203413b876acf1d8b6509a28c66760#egg=aind-dynamic-foraging-behavior-video-analysis \
     aind-video-utils \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \
