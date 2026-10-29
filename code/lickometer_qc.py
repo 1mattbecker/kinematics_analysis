@@ -46,6 +46,16 @@ from stats_utils import wilson_ci
 
 # ── Event detection ───────────────────────────────────────────────────────────
 
+def filter_timestamps_refractory(timestamps: Sequence[float], t_refractory: float) -> List[float]:
+    """Sorted event times with every event within ``t_refractory`` of the last kept one removed.
+
+    The video-analysis library's function of the same name before 0.5.0 (it also sorted its input
+    in place and printed how many events it removed); see :func:`refractory_mask` for the rule.
+    """
+    t = np.sort(np.asarray(timestamps, dtype=float))
+    return t[refractory_mask(t, t_refractory)].tolist()
+
+
 def refractory_mask(times: Sequence[float], t_refractory: float) -> np.ndarray:
     """Which events survive a refractory period, as a positional mask.
 

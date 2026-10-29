@@ -43,6 +43,7 @@ no longer exist.
 | `tongue_movements_all.ipynb` | `build_all_tongue_movements.py` run directly |
 | `verify_library_migration.ipynb` | the 2026-09 migration it checked; the 0.5.x check is `verify_kinematics_v053.ipynb` |
 | `attach_data.ipynb` | attached the old pipeline's input assets by hand |
+| `model_quality.ipynb` | step-by-step walkthrough of the old pipeline on its step functions and QC plotters (removed in 0.5.0); `kin_sandbox_core.ipynb` walks through the 0.5.x core |
 
 ### FIP notebooks, reorganized by analysis type (archived 2026-10-08)
 
