@@ -53,33 +53,28 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
 
 1. [x] **Library 0.5.3.** The `extremes` feature group (`x_max`, `y_at_x_max`, …; `kin_06`, `kin_07` read these
    columns): PR #19 merged and tagged `v0.5.3` (`c904311`) 2026-10-29.
-2. [ ] **Rerun the batch on v0.5.3** with `force=True` (also gives the 30 first-run sessions
-   `trials.reward_before_choice`):
-   ```bash
-   git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 fetch -q --tags origin
-   git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 checkout -q v0.5.3
-   export PYTHONPATH=/root/capsule/scratch/kinematics_compare/dfbva_v050/src
-   cd /root/capsule/code
-   python - <<'EOF'
-   import json
-   from aind_dynamic_foraging_behavior_video_analysis.kinematics.tasks import dynamic_foraging_tongue as dft
-   pose = list(dict.fromkeys(json.load(open("/root/capsule/scratch/pred_csv_list_20250113.json"))))
-   print(dft.run_batch(pose, "/root/capsule/data", "/root/capsule/scratch/kinematics_v050",
-                       ignore_trial_errors=True, force=True).to_string())
-   EOF
-   python build_all_tongue_movements.py
-   ```
-   Expect 48 `done` and the same 5 timing errors, then `all_tongue_movements_v053.parquet` and
-   `all_landmarks_v053.parquet` in `/root/capsule/scratch/all_tongue_movements/`.
-3. [ ] **Run `verify_kinematics_v053.ipynb`.** Decide on the sessions whose quality-filter result changes (§2) and
-   accept the new list; note the ephys sessions lost (3 expected: 754897 03-14, 758018 03-20, 761038 04-15).
-4. [ ] **Image.** Rebuild the image (the Dockerfile pins v0.5.3, `c904311`). Until then the batch runs from the
-   scratch checkout as in step 2.
+2. [x] **Batch on v0.5.3** (2026-10-29, `python -u run_batch_analysis.py --force` on the rebuilt image, log
+   `scratch/batch_v053.log`): 48 `done`, the 5 known timing errors (758017 02-04, 751181 02-26, 754897 03-14,
+   758018 03-20, 761038 04-15); every `record.json` says 0.5.3. Pooled: 226,610 movements from 40 sessions
+   (`scratch/all_tongue_movements/all_tongue_movements_v053.parquet`, `all_landmarks_v053.parquet`).
+3. [x] **`verify_kinematics_v053.ipynb`** (2026-10-29). The data is handled as the handoff predicted:
+   - Quality filter: 784806 06-18 now fails (coverage 0.991 → 0.873, now over all licks, not only licks with a
+     trial); accepted. With the 3 timing-refused sessions, 44 → 40 pooled sessions.
+   - Movements: 226,610 / 226,610 matched one to one; positions within ~0.01 px once the jaw shift (median
+     2.8 / 1.2 px, max 5.8) is removed; the `extremes` columns reproduce `max_x_from_jaw` etc.; `peak_speed`
+     median 8.8% different, `path_length` 1.5% (smoothing per tracked run); `out_duration` identical in 84%.
+   - Per trial (ephys sessions): RTs and cue-response movement numbers identical wherever both have the trial;
+     trials gained in the 2025 sessions (§2.3), the last trial sometimes dropped (§2.10); `firstMove` differs
+     only in the old spanning-movement trials.
+   - `all_counts_df`: spike counts, baselines and both RTs identical in all 28,365 shared unit-trials. Units
+     lost: 11, all in the 3 refused sessions (754897 03-14: 5, 758018 03-20: 4, 761038 04-15: 2). Four other
+     sessions keep every unit but lose one trial each (the capped last trial).
+4. [x] **Image** rebuilt on v0.5.3 (2026-10-29).
 5. [ ] **Data asset.** Save `scratch/kinematics_v050` as a data asset and point `kin_utils.KINEMATICS_ROOT` at its
    mount (one line).
 6. [ ] **Rerun the notebooks on Code Ocean**, `kin_00`–`kin_07`, `eph_00`–`eph_09`, `val_02`–`val_05`, and compare each
-   with its committed figures (`git diff` shows old vs new outputs). In `eph_01`, also save `all_counts_df` to
-   `/root/capsule/scratch/all_counts_df_v053.parquet` for the verify notebook's §6.
+   with its committed figures (`git diff` shows old vs new outputs). Expect `eph_*` to lose the 11 units above
+   and `eph_08`'s poster-figure replication to move with them.
 7. [ ] **Local copies.** Copy the two pooled v053 tables and the new `all_counts_df.parquet` to `data/for_local/`
    (the `eph_*` notebooks read the cached `all_counts_df` locally; its kinematics columns are renamed).
 8. [ ] Merge `kinematics-v052` into `wild`.
