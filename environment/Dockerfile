@@ -49,8 +49,9 @@ COPY constraints.txt /
 # jupyterlab and ipywidgets: this base image has no IDE, and a hand-edited Dockerfile blocks
 # Code Ocean's automatic IDE install. They move from 3.6 / 7.7 to current versions (JupyterLab
 # 3.6 doesn't fit this base). No code in this repo uses ipywidgets directly.
-# aind-dynamic-foraging-behavior-video-analysis is pinned to tag v0.5.2 (6860b60): the
-# kinematics core (kinematics.pipeline, kinematics.tasks.dynamic_foraging_tongue) that replaced
+# aind-dynamic-foraging-behavior-video-analysis is pinned to tag v0.5.3 (c904311): the
+# kinematics core (kinematics.pipeline, kinematics.tasks.dynamic_foraging_tongue; 0.5.3 adds the
+# extremes feature group) that replaced
 # tongue_analysis / tongue_kinematics_utils / video_clip_utils, plus the video timing QC, video
 # screening and frame-exact clips and frames (video_clips) of v0.4.0. aind-video-utils is what
 # its video-clips extra adds (scikit-learn, the other, is already here); it is listed directly
@@ -73,7 +74,7 @@ RUN pip install -U --no-cache-dir -c /constraints.txt \
     aind_analysis_arch_result_access --upgrade \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-basic-analysis.git@main#egg=aind-dynamic-foraging-basic-analysis \
     -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-data-utils.git@main#egg=aind-dynamic-foraging-data-utils \
-    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@6860b6071211a9ad9e8563d33246c36deab8ce3f#egg=aind-dynamic-foraging-behavior-video-analysis \
+    -e git+https://github.com/AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis.git@c904311c4433baac8374ee171b561dbefede2dbe#egg=aind-dynamic-foraging-behavior-video-analysis \
     aind-video-utils \
     opencv_python==4.11.0.86 \
     moviepy==1.0.3 \

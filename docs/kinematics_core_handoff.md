@@ -21,7 +21,7 @@ kinematics outputs", steps 1-8). How each item below was handled:
 | §2.7 dropped columns | Renamed throughout; `has_lick` = `n_licks > 0` and `movement_before_cue_response` derived where used; `kin_07`'s absolute-pixel columns and `time_to_endpoint` dropped from its screen; `kin_04` keeps `rewarded` NA on lick-less movements |
 | §2.8 frame table | `kinematics.parquet` read by keypoint and time window; video frames from the `frame` column; `lickometer_qc` on `pose.parquet` + `signal.mask` |
 | §2.9 bouts | `eph_07` keeps the repo rule (`behavior_utils.annotate_movement_bouts`) |
-| §3 step 1 image | Pinned v0.5.2; move to v0.5.3 once tagged |
+| §3 step 1 image | Pinned v0.5.3 (`c904311`, PR #19, 2026-10-29); rebuild the image |
 | §3 steps 2-5 | Shared modules, pooled builder, one session root (`kin_utils.KINEMATICS_ROOT`), every notebook in the table; the "file names only" notebooks and other pre-0.5.0 tools archived (`code/archive/README.md`) |
 
 Each migrated notebook gave the same numbers as before when run locally on the old pooled table

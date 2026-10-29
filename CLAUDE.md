@@ -86,11 +86,11 @@ says "the library", it means this one.
 - **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
   branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
-  to a commit. On `kinematics-v052` the pin is `v0.5.2` (`6860b60`): the kinematics core
+  to a commit. On `kinematics-v052` the pin is `v0.5.3` (`c904311`): the kinematics core
   (`kinematics.pipeline` + `kinematics.tasks.dynamic_foraging_tongue`) that replaced `tongue_analysis`,
   `tongue_kinematics_utils` and `video_clip_utils`. The repo's tongue code moved to it on that branch
-  (`docs/kinematics_core_handoff.md`, "Status"). The batch output it reads needs `v0.5.3` (the `extremes`
-  feature group), library PR pending; move the pin there once it is tagged. `fip_*` / `men_*` are unaffected.
+  (`docs/kinematics_core_handoff.md`, "Status"); 0.5.3 adds the `extremes` feature group the batch output
+  needs (`kin_06`, `kin_07`). `fip_*` / `men_*` are unaffected.
   Before 0.5.0: tag `v0.4.0` (`a6bac04`, 2026-10-23): the video timing QC (added in `v0.1.0`,
   `41e5b59`) with `timing_verdict`, video screening, and `video_clips` (frame-exact clips and
   frames: `cut_event_clips`, `write_frames`; ffmpeg ≥ 5.1, which the image installs from

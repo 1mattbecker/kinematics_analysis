@@ -16,7 +16,7 @@ names are the library's (`peak_speed`, `path_length`, `end_x`, `angle_deg`, `num
   eph_* notebooks on the cached `all_counts_df` with renamed columns) against the pre-migration notebook on the old
   data. Identical numbers except where listed below. What the new *data* change is checked on Code Ocean by
   `verify_kinematics_v053.ipynb`.
-- **Library 0.5.3 (PR pending):** an `extremes` feature group (`x_max`, `y_at_x_max`, `x_min`, … `y_at_extent_x`,
+- **Library 0.5.3 (PR #19, tagged `c904311`):** an `extremes` feature group (`x_max`, `y_at_x_max`, `x_min`, … `y_at_extent_x`,
   `x_at_extent_y`), so the old `max_x_distance` (= |`x_max`|), `max_y_distance` (= |`extent_y`|) and
   `max_*_from_jaw_*` are reproduced exactly instead of approximated by `extent_x`.
 - Shared modules: `kin_utils` holds the data locations (`KINEMATICS_ROOT`, pooled names, `pooled_path`; `load_kps_raw`
@@ -38,7 +38,7 @@ names are the library's (`peak_speed`, `path_length`, `end_x`, `angle_deg`, `num
 - Archived (pre-0.5.0 pipeline or finished one-off checks): `add_outbound`, `attach_data`, `test_session_wrapper`,
   `run_batch_analysis_modeltest.py`, `tongue_movements_all`, `verify_library_migration`, `model_quality`,
   `env_00_reference_sessions`, `verify_video_timing_qc`, `test_session_quality_analysis`.
-- `environment/Dockerfile`: library pinned to v0.5.2 (`6860b60`); move to v0.5.3 once tagged.
+- `environment/Dockerfile`: library pinned to v0.5.3 (`c904311`); the image needs a rebuild.
 - 3 of the 32 ephys sessions (754897 03-14, 758018 03-20, 761038 04-15) fail the new timing checks and are not in
   the new batch, so their units leave the `eph_*` analyses.
 

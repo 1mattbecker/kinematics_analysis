@@ -51,8 +51,8 @@ rule is a choice; nobody has looked at what these movements are.
 _Logged 2026-10-28; code migrated 2026-10-29 on branch `kinematics-v052`._ Plan, definition changes, and what was
 done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
 
-1. [ ] **Library 0.5.3.** Review and merge the library branch `feat/extremes-feature-group` (the `extremes` feature
-   group: `x_max`, `y_at_x_max`, …), then tag `v0.5.3`. `kin_06` and `kin_07` read these columns.
+1. [x] **Library 0.5.3.** The `extremes` feature group (`x_max`, `y_at_x_max`, …; `kin_06`, `kin_07` read these
+   columns): PR #19 merged and tagged `v0.5.3` (`c904311`) 2026-10-29.
 2. [ ] **Rerun the batch on v0.5.3** with `force=True` (also gives the 30 first-run sessions
    `trials.reward_before_choice`):
    ```bash
@@ -73,7 +73,8 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
    `all_landmarks_v053.parquet` in `/root/capsule/scratch/all_tongue_movements/`.
 3. [ ] **Run `verify_kinematics_v053.ipynb`.** Decide on the sessions whose quality-filter result changes (§2) and
    accept the new list; note the ephys sessions lost (3 expected: 754897 03-14, 758018 03-20, 761038 04-15).
-4. [ ] **Image.** Move the Dockerfile pin from v0.5.2 to the v0.5.3 commit and rebuild.
+4. [ ] **Image.** Rebuild the image (the Dockerfile pins v0.5.3, `c904311`). Until then the batch runs from the
+   scratch checkout as in step 2.
 5. [ ] **Data asset.** Save `scratch/kinematics_v050` as a data asset and point `kin_utils.KINEMATICS_ROOT` at its
    mount (one line).
 6. [ ] **Rerun the notebooks on Code Ocean**, `kin_00`–`kin_07`, `eph_00`–`eph_09`, `val_02`–`val_05`, and compare each
