@@ -1,6 +1,8 @@
-# Handoff: moving kinematics_analysis to the library's v0.5.1 outputs
+# Handoff: moving kinematics_analysis to the library's v0.5.2 outputs
 
-_Written 2026-10-28. Library: `aind-dynamic-foraging-behavior-video-analysis` tag `v0.5.1`._
+_Written 2026-10-28. Library: `aind-dynamic-foraging-behavior-video-analysis` tag `v0.5.2`.
+The batch outputs below were made with v0.5.1, so rerun with
+`force=True` (§2.1 and §2.10 change `movements` and `trials`; command in `TODO.md`)._
 
 The library replaced the old tongue pipeline (`tongue_analysis`, `tongue_kinematics_utils`) with a
 general kinematics core plus a dynamic-foraging task module. New outputs for the 53-session list
@@ -11,7 +13,7 @@ means, or which rows it covers, changed**, so that an analysis quietly computes 
 Each item says how big the change is (measured where possible) and what to do.
 
 References, in the library repo:
-- `KINEMATICS_PLAN.md` § "Old → new": file, function and column map. One row is wrong, see §2.5.
+- `KINEMATICS_PLAN.md` § "Old → new": file, function and column map.
 - `KINEMATICS_GUIDE.md`: how to use the core, plus the output tables.
 
 ## 1. What did not change (verified, no need to re-check)
@@ -32,47 +34,42 @@ Full batch, all 30 sessions both versions processed (old: `session_analysis_fall
 
 ## 2. Definition changes
 
-### 2.1 Movements that span a go cue keep their trial
+### 2.1 Movements that span a go cue: no trial, as before
 
-| | Old | New |
-|---|---|---|
-| `trial` | NA | trial whose go cue precedes the start |
-| `cue_response` | NA | from its first lick |
-| `latency_from_go` | NA | start − that go cue |
-| flag | none | `spans_go_cue = True` |
+0.5.0–0.5.1 gave these a trial. **0.5.2 restores the old rule**: `trial`, `go_cue_time`,
+`latency_from_go` and `number_in_trial` are NA, and the new `spans_go_cue = True` marks them.
+`dropna(subset=["trial"])` drops them, as it always did.
 
-**Size.** About 1% of trials in typical sessions (median 0.01 spanning movements per trial).
-Up to 0.24 per trial in 761038 (04-16, 04-18) and 0.07–0.15 in 784803. Measured on the old pooled
-table: trial NA after the first go cue, excluding the sessions in §2.3.
+One difference remains: their `cue_response`, `rewarded`, `lick_time` and `lick_side` describe
+their first lick. Before 0.5.0 they were NA. A per-trial step drops them anyway, since `trial` is
+NA. A pooled count of `cue_response` movements includes them; filter `~spans_go_cue` to match.
 
-**Affected.** Every `dropna(subset=["trial"])` or `trial.notna()` used to drop these rows, for
-example in `kin_02` cell 25 and `kin_05` cell 16. Now it keeps them.
+**Size**, in the old pooled table: about 1% of trials in typical sessions (median 0.01 spanning
+movements per trial). Up to 0.24 per trial in 761038 (04-16, 04-18) and 0.07–0.15 in 784803.
+`TODO.md` → `kin_08_go_cue_spanning_movements` is about what these movements are.
 
-**Do.** To reproduce the old rows, filter on `~spans_go_cue` wherever you filter on trial.
+### 2.2 Cue response and first movement per trial
 
-### 2.2 Trial-level cue response and first movement
-
-- **Cue response in `trials.parquet`** (`summarize_trials`): **possible library bug.** Take a trial
-  k with no cue-response movement of its own, followed by a movement that starts before go cue
-  k+1 and holds trial k+1's cue-response lick. Old: that movement had `cue_response = NA`, so
-  trial k had no cue response. New: the movement is in trial k with `cue_response = True`. Trial k
-  then gets `cue_response_movement_id`, `cue_response_movement_number` and a `lick_latency` of a
-  whole trial or more. The same applies to anything built from `movements[cue_response]`, such as
-  `ephys_utils.build_trial_features` and `cfg.only_cue_response_trials`. Proposed library fix
-  (0.5.2): leave `spans_go_cue` movements out of the cue-response lookup. Until then, filter
-  `~spans_go_cue` before any per-trial cue-response step.
+- **What a cue response is**, unchanged and defined upstream:
+  - basic-analysis `annotate_cue_response`: the first lick that *starts a lick bout* (no lick in
+    the previous 0.7 s) within (go cue, go cue + 1 s].
+  - So `lick_latency` is at most 1 s. A lick that continues licking from before the cue is never
+    a cue response.
+  - data-utils' `choice_time` is a different measure: the trial's first lick, set to NaN when
+    later than `response_duration` + 5 ms on unrewarded trials.
+- **Trial summaries** (`trials.parquet`) count only movements with a trial. A trial can no longer
+  take its cue response from a movement that began before the next go cue. That was a 0.5.0–0.5.1
+  bug, fixed in 0.5.2.
 - **`firstMove`** (`get_events_dict`, used for the `eph_*` alignment):
   - Old: built from frames that each carried a trial label. When a movement spanned the go cue,
     its frames after the cue counted, so `firstMove` was the first frame after the cue, about
     2 ms after it.
-  - New: the first movement that *starts* after the go cue.
+  - New: the first movement that *starts* after the go cue, excluding spanning movements.
 
-  In the roughly 1% of trials with a spanning movement, the event moves later, from about 2 ms
-  to the next movement's start. The new definition is the intended one; re-check any reaction-time
-  distribution near 0.
+  In the roughly 1% of trials with a spanning movement, the event moves from about 2 ms to the
+  next movement's start. Re-check any reaction-time distribution near 0.
 - **First movement per trial** (`kin_02`, `kin_04`, `build_trial_features` from
-  `number_in_trial == 1`): unchanged, except for a trial whose only movement spans the next cue.
-  Old: no first movement. New: that movement.
+  `number_in_trial == 1`): unchanged.
 
 ### 2.3 Trials in the 2025 sessions that data-utils now rejects
 
@@ -127,7 +124,7 @@ where current data-utils raises "Reward before choice time". v0.5.1 processes th
 - **`out_*`**: the farthest frame can move by a frame when the jaw moves, so `out_duration`
   changes for some movements, and some that were exactly 0 no longer are. This matters for
   filters like `out_duration > 0.01` / `> 0.05` (`kin_00`, `kin_01`); check how many rows they keep.
-- **`max_x_distance` is not `abs(extent_x)`**: the library plan's map is wrong here.
+- **`max_x_distance` is not `abs(extent_x)`**: the library plan's map was wrong here (corrected in 0.5.2).
   - Old: the distance of the *most positive* x offset from the jaw.
   - New: `extent_x` is the signed offset farthest from the jaw *in either direction*.
   - On the old pooled table the two differ in 12.1% of movements (9.6% of lick movements), where
@@ -189,16 +186,17 @@ Booleans: `cue_response` and `rewarded` are real booleans, and False on movement
 The library rule gives longer bouts. Keep `annotate_movement_bouts` for `eph_07` so results stay
 comparable, or switch deliberately.
 
-### 2.10 Unchanged, but now visible: the last trial
+### 2.10 The last trial ends at the longest go-cue interval
 
-Both versions give movements after the last go cue to the last trial. In the old pooled table the
-video runs a median of about 18 minutes past the last go cue. `trials.n_movements` /
-`n_licks` of the last trial now include all of that. Exclude the last trial from per-trial counts,
-or cap its window.
+Before 0.5.2, the last trial ran to the end of the video. In the old pooled table that is a
+median of about 18 minutes past the last go cue. Now it ends one *longest go-cue-to-go-cue
+interval* of the session after its go cue (`dft.trial_windows`). Movements after that get no
+trial, and the last trial's `n_movements`, `n_licks` and coverage stop there. The old pipeline
+gave all of those movements to the last trial.
 
 ## 3. Order of work
 
-1. **Environment.** Pin `v0.5.1` in `environment/Dockerfile` (currently the v0.4.0 commit
+1. **Environment.** Pin `v0.5.2` in `environment/Dockerfile` (currently the v0.4.0 commit
    `a6bac04`) and rebuild. This is a deliberate `/environment` change.
 2. **Shared modules.** They import functions that no longer exist, so they fail on import until
    updated:
@@ -207,8 +205,8 @@ or cap its window.
    - `kin_utils.py`: `jaw_position` and `load_kps_raw` → `landmarks.parquet` / `pose.parquet` (§2.5).
    - `ephys_utils.py`:
      - Pass `movs`, not `kins`, to `get_events_dict`.
-     - `build_trial_features`: merge `cue_response_movement_number` from `trials`, rename the
-       `kcols`, and filter `~spans_go_cue` (§2.1, §2.2).
+     - `build_trial_features`: merge `cue_response_movement_number` from `trials` and
+       rename the `kcols` (§2.2, §2.7).
    - `lickometer_qc.py`: `pose.parquet` + `signal.mask`; session time from `pose.time` (§2.8).
    - `run_batch_analysis*.py`: `dft.run_batch(..., ignore_trial_errors=True)`.
 3. **Pooled table.** Rebuild `all_tongue_movements` from `kinematics_v050` with the new filter, as
@@ -223,10 +221,10 @@ or cap its window.
 |---|---|
 | `kin_00_movement_qc` | §2.5 `out_duration` filter, §2.7 dropped frames, §2.8 frame table |
 | `kin_01_population` | §2.5 `out_duration` filter, §2.6 speeds |
-| `kin_02_latency` | §2.1 trial filter, §2.2, §2.7 per-trial columns, §2.8 |
+| `kin_02_latency` | §2.2, §2.7 per-trial columns, §2.8 |
 | `kin_03_umap` | §2.5, §2.6 (the feature set changes) |
 | `kin_04_timecourse` | §2.2 first movement, §2.3 sessions |
-| `kin_05_nonlick_movements` | §2.1 trial filter, §2.7 `movement_before_cue_response`, §2.8 |
+| `kin_05_nonlick_movements` | §2.1 (pooled lick counts), §2.7 `movement_before_cue_response`, §2.8 |
 | `kin_06_lick_geometry_choice` | §2.5 (jaw, spouts, `max_x_distance`) |
 | `kin_07_value_encoding` | §2.5 (`max_x_distance`, `max_x_from_jaw_y`), §2.7 absolute columns |
 | `eph_00`–`eph_09` | through `ephys_utils`: §2.2 `firstMove`, cue-response trials, §2.4 session list |
@@ -248,19 +246,15 @@ trigger log one event short (761038 04-15). The 30 sessions from the first run l
 Run with `PYTHONPATH=/root/capsule/scratch/kinematics_compare/dfbva_v050/src` until the image is
 rebuilt.
 
-**A. Spanning movements and cue responses taken across trials (§2.1, §2.2)**
+**A. Spanning movements (§2.1)**
 
 ```python
 import pandas as pd
 from pathlib import Path
 root = Path("/root/capsule/scratch/kinematics_v050")
 mv = pd.concat([pd.read_parquet(p) for p in root.glob("*/movements.parquet")])
-tr = pd.concat([pd.read_parquet(p) for p in root.glob("*/trials.parquet")])
-print(mv.groupby("session").spans_go_cue.sum().describe())
-cue = mv[mv.cue_response.fillna(False) & mv.spans_go_cue]
-hit = tr.merge(cue[["session", "movement_id"]], left_on=["session", "cue_response_movement_id"],
-               right_on=["session", "movement_id"])
-print("trials whose cue response is a spanning movement:", len(hit))
+print((mv.groupby("session").spans_go_cue.sum() / mv.groupby("session").trial.max()).describe())
+assert mv.loc[mv.spans_go_cue, "trial"].isna().all()  # true from 0.5.2
 ```
 
 **B. Quality filter, old vs new (§2.4)**
@@ -288,10 +282,11 @@ count `out_duration > 0.01`, `> 0.05` and `< 5` per session.
 
 ## 6. Decisions for you
 
-1. Library fix for §2.2 (cue response taken from a spanning movement) in 0.5.2, or a filter in
-   this repo.
-2. Drop trials with `reward_before_choice` (§2.3)?
-3. Keep exact `max_x_distance` / `max_x_from_jaw_y` (compute from frames), or move to
+Settled 2026-10-28: spanning movements get no trial (§2.1), and the last trial ends at the
+longest go-cue interval (§2.10).
+
+1. Drop trials with `reward_before_choice` (§2.3)?
+2. Keep exact `max_x_distance` / `max_x_from_jaw_y` (compute from frames), or move to
    `extent_x` / `end_*` (§2.5)?
-4. The bout rule for `eph_07` (§2.9).
-5. Whether to keep the absolute-pixel columns in `kin_07`'s value screen (§2.7).
+3. The bout rule for `eph_07` (§2.9).
+4. Whether to keep the absolute-pixel columns in `kin_07`'s value screen (§2.7).

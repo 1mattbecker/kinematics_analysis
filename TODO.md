@@ -5,6 +5,72 @@ Deferred work items. Newest first. Dates are YYYY-MM-DD. FIP and motion-energy w
 
 ---
 
+## Create `kin_08_go_cue_spanning_movements.ipynb`
+
+_Logged 2026-10-28._
+
+**Question.** What are the tongue movements that are already under way when the go cue plays,
+and should any of them count toward a trial?
+
+**Why.** In the library, a movement that spans a go cue gets no trial (`trial` NA,
+`spans_go_cue = True`). That rule held before 0.5.0 and holds again in 0.5.2. The
+rule is a choice; nobody has looked at what these movements are.
+- In the old pooled table (`all_tongue_movements_04022026`) they are about 1% of trials in
+  typical sessions.
+- They reach 22–24% in 761038 (04-16, 04-18) and 7–15% in 784803.
+- Before 0.5.0, `firstMove` in the `eph_*` alignment took a spanning movement's first frame after
+  the cue, about 2 ms after it.
+
+**What to do** (data: library v0.5.2 outputs; `movements.spans_go_cue`, `licks`, `trials`,
+`kinematics`):
+1. Rate per trial by session and animal, and over a session (early vs late, which training
+   stage).
+2. Timing: when the movement started relative to the cue, and where in the movement the cue
+   falls.
+3. Licks:
+   - Did the tongue touch a spout before the cue, after it, or both?
+   - Is the first lick after the cue a `cue_response`? Under basic-analysis's rule it can't be
+     if it continues a lick bout. The rule is in the notes.
+4. The trial it runs into: choice or ignore, reward, latency of the next movement.
+5. Kinematics against non-spanning movements: amplitude, duration, peak speed, `out_*`.
+6. Recommendation: keep the rule, or assign some of them (for example, ones that started too
+   late to be a reaction to anything) to the next trial. Any rule change goes into the library's
+   `annotate_movements`.
+
+**Notes.**
+- basic-analysis `annotate_cue_response`: a cue response is the first lick that *starts a lick
+  bout* (no lick in the previous 0.7 s, `BOUT_THRESHOLD`), within (go cue, go cue + 1 s]
+  (`CUE_TO_LICK_TOLERANCE`).
+- data-utils `create_df_trials`: `choice_time` is the trial's first lick. It is set to NaN when
+  it comes later than `response_duration` + 5 ms on an unrewarded trial.
+
+---
+
+## Move to the library's v0.5.2 kinematics outputs
+
+_Logged 2026-10-28._ Plan, definition changes and checks: `docs/kinematics_core_handoff.md`.
+
+- [ ] **Rerun the batch on v0.5.2** (tagged 2026-10-28). The outputs in
+  `/root/capsule/scratch/kinematics_v050` were made with v0.5.1. That version gave a trial to
+  movements spanning a go cue, and its last trial ran to the end of the video. Rerun every
+  session with `force=True`, which also gives the 30 first-run sessions
+  `trials.reward_before_choice`:
+  ```bash
+  git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 fetch -q --tags origin
+  git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 checkout -q v0.5.2
+  export PYTHONPATH=/root/capsule/scratch/kinematics_compare/dfbva_v050/src
+  python - <<'EOF'
+  import json
+  from aind_dynamic_foraging_behavior_video_analysis.kinematics.tasks import dynamic_foraging_tongue as dft
+  pose = list(dict.fromkeys(json.load(open("/root/capsule/scratch/pred_csv_list_20250113.json"))))
+  print(dft.run_batch(pose, "/root/capsule/data", "/root/capsule/scratch/kinematics_v050",
+                      ignore_trial_errors=True, force=True).to_string())
+  EOF
+  ```
+  Expect 48 `done` and the same 5 timing errors. Then run check A of the handoff doc.
+
+---
+
 ## Upgrade the environment's package versions (post-3.12)
 
 _Logged 2026-09-28. Follows the Python 3.12 migration (library `PYTHON_311_UPGRADE_PLAN.md`)._
