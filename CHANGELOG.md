@@ -10,7 +10,7 @@ New notebook toward default kinematics-core settings and quality numbers for `no
 ranks every batch session by the confident fraction (likelihood ≥ 0.9) and frame-to-frame steps of both keypoints
 and exports four example sessions for local work. §2–§10 describe one session from the raw pose: traces, drift,
 likelihood, positions and principal axes, steps, video frames at low likelihood and large steps (CO), spectra
-(1-s windows, ≥ 90% confident, gaps ≤ 5 frames filled) and speed after `signal.smooth` at 50/30/20/10 Hz, by lick
+(1-s windows, ≥ 95% of frames confident, gaps ≤ 5 frames filled) and speed after `signal.smooth` at 50/30/20/10 Hz, by lick
 context; jaw relative to nose; position around licks. Checked locally on a synthetic session only.
 
 ### Tongue kinematics on the library's 0.5.x core (branch `kinematics-v052`)
