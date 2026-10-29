@@ -84,11 +84,12 @@ says "the library", it means this one.
 - **Repo:** `AllenNeuralDynamics/aind-dynamic-foraging-behavior-video-analysis`, default
   branch `main`. **Local clone:** `../aind-dynamic-foraging-behavior-video-analysis`.
 - **Installed on Code Ocean** by `environment/Dockerfile` as an editable git checkout pinned
-  to a commit. On `fip-motion-energy` / `me-roi` the pin is `v0.5.0` (`5d13a7b`), which removes
-  `tongue_analysis`, `tongue_kinematics_utils` and `video_clip_utils` and renames the kinematics outputs; the
-  `kin_*` / `eph_*` / `val_*` code here still uses them, so that migration (its own handoff doc) comes before
-  those notebooks run on a rebuilt image or the branch is merged into `wild`. `fip_*` / `men_*` are unaffected.
-  Before it: tag `v0.4.0` (`a6bac04`, 2026-10-23): the video timing QC (added in `v0.1.0`,
+  to a commit. On `kinematics-v052` the pin is `v0.5.2` (`6860b60`): the kinematics core
+  (`kinematics.pipeline` + `kinematics.tasks.dynamic_foraging_tongue`) that replaced `tongue_analysis`,
+  `tongue_kinematics_utils` and `video_clip_utils`. The repo's tongue code moved to it on that branch
+  (`docs/kinematics_core_handoff.md`, "Status"). The batch output it reads needs `v0.5.3` (the `extremes`
+  feature group), library PR pending; move the pin there once it is tagged. `fip_*` / `men_*` are unaffected.
+  Before 0.5.0: tag `v0.4.0` (`a6bac04`, 2026-10-23): the video timing QC (added in `v0.1.0`,
   `41e5b59`) with `timing_verdict`, video screening, and `video_clips` (frame-exact clips and
   frames: `cut_event_clips`, `write_frames`; ffmpeg ≥ 5.1, which the image installs from
   conda-forge as 8.1.2 in `/opt/ffmpeg`). `v0.2.0` (`0e1c8df`) is the version before `video_clips`. Library
@@ -104,12 +105,11 @@ says "the library", it means this one.
 
 | Library module | What it owns |
 |---|---|
-| `kinematics/tongue_kinematics_utils.py` | Keypoint I/O and masking, filtering, `segment_movements`, `aggregate_tongue_movements` (emits the `out_*` outbound metrics natively via `compute_outbound_metrics`), `annotate_trials_*`, `assign_movements_to_licks`, `get_trial_level_df`, `filter_timestamps_refractory` |
-| `kinematics/tongue_analysis.py` | Batch driver — `run_batch_analysis`, `generate_tongue_dfs`, `analyze_tongue_movement_quality`; declares the `tongue_quality_stats.json` contract (`TONGUE_QUALITY_STATS_FILENAME`, `load_tongue_quality_stats`, `get_quality_summary`) |
+| `kinematics/` core (`pipeline`, `pose_io`, `signal`, `landmarks`, `segment`, `features`, `intervals`) | Any keypoint, from settings: pose → mask → smooth (per tracked run) → segments (`tracked_runs`, `zero_crossings`, `bouts`, …) → feature groups (`path`, `excursion`, `extremes` (0.5.3), `outbound`, `spectrum`), relative to a landmark; `pl.process`, `pl.write` / `pl.read`, `record.json`. Usage: the library's `KINEMATICS_GUIDE.md`; old → new map: `KINEMATICS_PLAN.md` |
+| `kinematics/tasks/dynamic_foraging_tongue.py` | The tongue batch: `TONGUE_SETTINGS`, `run_batch` / `run_session` (timing QC, NWB trials and licks, session clock), `annotate_movements` (trial, `spans_go_cue`, lick columns), `summarize_trials`, `quality` / `quality_summary` (the `record.json → quality` contract), `trial_windows`, `find_labeled_video`, `cut_trial_clips`. Writes `<root>/<session>/`: `pose, kinematics, landmarks, movements, submovements, bouts, trials, licks, events` + `record.json` |
 | `kinematics/tongue_lickometer_utils.py` | Spout-*contact* lick detection and event scoring — `detect_licks`, `calculate_metrics`, `calculate_metrics_witheventkeys`; used by `val_02`/`val_03` |
-| `kinematics/video_clip_utils.py` | Clip extraction (`extract_clips_ffmpeg_encode` = frame-accurate re-encode, `extract_clips_ffmpeg_after_reencode` = fast `-c copy`) + labeling, `find_labeled_video`, `get_video_time` |
 | `kinematics/kinematics_nwb_utils.py` | Session-ID parsing, NWB file lookup |
-| `ephys/tongue_ephys.py` | Raster/PETH machinery — `make_rp_and_events`, `compute_psth`, `RasterPlotter`, `load_intermediate_data`, `get_session_prefix` |
+| `ephys/tongue_ephys.py` | Raster/PETH machinery — `make_rp_and_events`, `compute_psth`, `RasterPlotter`, `load_intermediate_data` (the session tables above), `get_events_dict` (`firstMove` from `movements.start_time`), `get_session_prefix` |
 | `video_alignment.py` | Clocks and frames: `behavior_time_to_frame_index`, `event_frame_ranges` (events → frame windows on corrected per-frame times), `read_trial_times`. Its constant-offset `video_time` conversions (`compute_video_session_offset`, `session_time_to_video_time`, …) are deprecated from 0.4.0 |
 | `video_clips.py` | Frame-exact clips and frames by index (≥ v0.3.0, `video-clips` extra, ffmpeg ≥ 5.1): `cut_clip(s)`, `cut_event_clips` and `write_frames` (0.4.0), frames for labeling |
 | `TransferToNWB.py` | Bonsai JSON/mat → NWB (a copy also sits in `code/`) |
@@ -119,9 +119,9 @@ says "the library", it means this one.
 Decided 2026-09-17 (the library records the same rule in its `README.md`, "Scope").
 One test: **would another AIND project doing tongue kinematics want this, unchanged?**
 
-- **Library:** code that produces or annotates the per-session intermediates
-  (`tongue_kins.parquet`, `tongue_movs.parquet`, `kps_raw_*.parquet`,
-  `tongue_quality_stats.json`), runs in the batch pipeline, or is generic to tongue-kinematics
+- **Library:** code that produces or annotates the per-session tables
+  (`movements`, `kinematics`, `trials`, `licks`, `landmarks`, `pose`, `record.json`), runs in the batch
+  pipeline, or is generic to tongue-kinematics
   sessions — keypoint I/O and filtering, segmentation, aggregation (including `out_*`),
   trial/lick annotation, QC stats, lick detection, video/NWB lookup, clip extraction,
   raster/PSTH primitives. It must stay stable: other consumers take `main` when they move their pins.
@@ -133,9 +133,9 @@ One test: **would another AIND project doing tongue kinematics want this, unchan
   figures shown in notebooks here; presentation plotting is this repo's job (`plotstyle.py`,
   `plot_utils.py`, `encoding_plots.py`). Do not restyle the library's plotters and do not add plotters there.
 - **Contracts:** a file the library writes and this repo reads is declared next to the writer
-  and read through the accessor, never by path — `tongue_quality_stats.json` is read via
-  `load_tongue_quality_stats` / `get_quality_summary` in `data_loading.py` and
-  `build_all_tongue_movements.py`.
+  and read through the accessor, never by path — the session quality in `record.json` is read via
+  `pipeline.is_done` / `dynamic_foraging_tongue.quality_summary` in `data_loading.session_quality`
+  (used by `build_all_tongue_movements.py`).
 - **Ambiguous cases** stay here until a second consumer appears: `build_trial_features` (its
   column set is chosen for this project's encoding models), `kin_06`'s landmark plot. The bout
   helpers (`annotate_movement_bouts`, `classify_bout_times`) got their second consumer (`men_00`)
@@ -234,19 +234,21 @@ which sets `ME_DATA_ROOT`).
 ### Model quality / methods evaluation
 
 - `pixel_error.ipynb` — keypoint-tracking pixel error vs. confidence (Lightning-Pose accuracy)
-- `test_session_quality_analysis.ipynb` — session-level quality and session selection; feeds
-  the `data_loading` inclusion filter
-- `model_quality.ipynb` — a single-session **Lightning-Pose pipeline walkthrough** (load →
-  mask `tongue_tip_center` @0.90 → filter → segment → annotate → lick coverage), already on
-  modern library imports. Despite the name it is not about foraging behavioral-model quality
+- `kin_sandbox_core.ipynb` — playground for the library's kinematics core on processed sessions
+  (what a session folder holds, one lick frame by frame, per-trial summaries, rerunning with other
+  settings, adding a feature group)
+- `verify_kinematics_v053.ipynb` — Code Ocean check of the 0.5.x batch against the pre-0.5.0 outputs
+  (spanning movements, quality filter and ephys sessions lost, `out_duration` filters, pooled movements
+  matched one to one, per-trial features and `firstMove`, `all_counts_df`). Run once after the batch
+- The pre-0.5.0 session-selection and pipeline-walkthrough notebooks (`test_session_quality_analysis`,
+  `model_quality`) are in `archive/`
 
 ### Pipeline / data generation
 
-`build_all_tongue_movements.py` (per-session `tongue_movs.parquet` → quality filter →
-`all_tongue_movements.parquet`; `%run` by `tongue_movements_all.ipynb`) · `add_outbound.ipynb`
-(computes `out_*` outbound metrics into per-session parquets) · `attach_data.ipynb` ·
-`test_session_wrapper.ipynb` (batch runner wrapping `run_batch_analysis`; mostly commented
-out — operations, not evaluation) · `run_batch_analysis.py` / `run_capsule.py` /
+`run_batch_analysis.py` (the capsule's run script: library `dynamic_foraging_tongue.run_batch` over
+`pred_csv_list_20250113.json` into `kin_utils.KINEMATICS_ROOT`, `ignore_trial_errors=True`, then the pooled
+tables) · `build_all_tongue_movements.py` (per-session `movements.parquet` + trial columns → quality filter →
+`all_tongue_movements_v053.parquet`, and `all_landmarks_v053.parquet`) · `run_capsule.py` /
 `TransferToNWB.py` / `backup_nwb_utils_dynamicforaging.py` · `build_me_table.py` (aligned
 motion-energy table for the FIP sessions, run in a cloud workstation and saved as asset `e542022e` (2026-10-28, mounted
 `fip_motion_energy_aligned`; aind-motion-energy 0.4.0 with the side-camera whisker-pad ROI): whole-frame `me_clean` plus `me_clean_<roi id>`
@@ -263,7 +265,7 @@ all three read S3 through `s3_utils.py`; see `fip_me_aligned_table_plan.md`) · 
 | `stats_utils.py` | Pooling and tests, imported as `st`: `mean_sem` (ddof=1, per-point n), `group_means` (sessions → animals), `animal_means`, `wilcoxon_animals`, `corr`, `shift_p` / `shift_z`, `cluster_test`, `hier_bootstrap` (wraps `aind_hierarchical_bootstrap`; session-weighted), `fdr_bh` / `wilson_ci` (statsmodels), `stars`, `fmt_p` |
 | `plot_utils.py` | Summary plots, imported as `pu`: `plot_mean_sem`, `plot_etr` (tidy ETR → mean ± SEM), `strip_by_measure`, `strip_by_animal`, `animal_styles`. Style itself stays in `plotstyle.py` |
 | `behavior_utils.py` | Task behaviour shared across series, imported as `bu`: `lick_bouts` (library `annotate_lick_bouts`, 0.7 s gap), `annotate_movement_bouts` / `classify_bout_times` / `get_session_bout_times`, `label_context` (rewarded / unrewarded / cue-no-response / licking / quiet) |
-| `data_loading.py` | Session/unit QC and inclusion filters, `load_units_with_spike_times` |
+| `data_loading.py` | Session/unit QC and inclusion filters: `session_quality` / `passes_quality` / `load_session_quality_filter` (lick coverage > 0.90, median movement duration > 0.06 s, from `record.json`), `filter_ephys_units`, `load_units_with_spike_times` |
 | `ephys_utils.py` | `AnalysisConfig`, spike counting (`count_spikes`, `count_spikes_in_window`), `session_offset`, `load_example_session_and_unit`, session bundles, `build_all_counts_df`, `build_trial_features` |
 | `encoding_methods.py` | Generic per-unit encoding — `AnalysisSpec`, `fit_encoding`, OLS/GLM/Spearman/partial |
 | `per_unit_stats_registry.py` | Results store + FDR + cross-analysis `compare`; used by `eph_01/02/03/04/06` |
@@ -272,8 +274,8 @@ all three read S3 through `s3_utils.py`; see `fip_me_aligned_table_plan.md`) · 
 | `spatial_axes.py` | Fitting/comparing 3-D gradient *directions* — linear/CCA/LDA + bootstrap, `compare_bootstrap_directions`, `cone_half_angle`. Coordinate-frame agnostic (takes plain Nx3) |
 | `ccf_utils.py` | CCF conversions — `pir_to_lps`, `ccf_pts_convert_to_mm`, `project_to_plane` |
 | `plotstyle.py` | Figure standards — `apply_style`, `style_ax`, `save_fig`, Okabe-Ito colors |
-| `kin_utils.py` | `kin_*` helpers (numpy/pandas only): `coerce_bool`, `load_kps_raw`, `jaw_position` |
-| `lickometer_qc.py` | Shared machinery for `val_04`/`val_05` — builds the pose-excursion and lickometer event tables from intermediates (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
+| `kin_utils.py` | Where the tongue data live (numpy/pandas only): `KINEMATICS_ROOT` (the library batch, one folder per session), the pooled table names `POOLED_MOVEMENTS` / `POOLED_LANDMARKS` / `POOLED_MOVEMENTS_OLD` and `pooled_path` (Code Ocean scratch, else `data/for_local`); `coerce_bool` |
+| `lickometer_qc.py` | Shared machinery for `val_02`–`val_05` — loads a session's tongue keypoints, spouts and licks from the library's tables (`load_session`: `pose.parquet` masked with `signal.mask`), `filter_timestamps_refractory` (the library's pre-0.5.0 function), builds the pose-excursion and lickometer event tables (`build_event_tables`, CO only), scores excursions against the lickometer (`annotate_pose_events`), calibrates "contact-like" per session (`contact_reference`), labels candidates and their context, and reduces to one row per session (`summarize_sessions`). numpy/pandas only; the library is imported lazily |
 | `fip_utils.py` | All FIP code (imported as `fu`). NWB-list path, used only by the archived `fip_00`–`fip_04`: `load_curated_sessions` (JSON curation; `use_curation=False` for assets curated at build time), `select_session`, `build_meta`, `pick_example`, `enrich_trials` (Rachel's `enrich_df_trials`), `process_session`. CSV-curated path for `fip_10`–`fip_17`/`men_00` (was `fip_coupling.py`): `find_asset_root`, `inventory_pairs`, `choose_side`, `load_pairs`, `add_motion_energy` (keeps the pairs with a usable camera and puts z-scored DA, NE, ME on the `me_norm` scale (default `floor_sd`), ME onsets (from the z-scored trace) and lick events on the pair grid; `keep_raw` keeps raw ME), `normalise_me` / `ME_NORMS` / `ME_FLOOR_PCT` (`zscore`, `sd`, `floor_sd`; `men_03`), `trial_measures`, `fit_rpe_terms`, `residualize`, `event_design` / `task_events` (task-model event regressors, incl. trial-weighted Q_sum/RPE, `TASK_EVENTS`), `task_residuals`. Motion energy on the FIP clock from the aligned ME table: `load_me`, `me_sessions`, `motion_energy_to_session` (cut to the task ± 30 s), all with `roi=` for an ROI trace
 (e.g. `"whiskerpad_box"` on `SideCameraRight`) instead of the whole frame, `me_rois`, `load_roi_masks`, `ME_ONSET_KW` (the one ME onset rule). Does *not* own the choice of FIP normalization — which `enrich_dfs` call a notebook runs stays visible in that notebook |
 | `men_utils.py` | `men_*` loading: `inventory_sessions` (ME table × trial/event parquets), `load_sessions` (ME bin-averaged onto a 100 Hz session grid, lick events kept; `cameras` entries may be `"<camera>:<roi>"`, e.g. `"SideCameraRight:whiskerpad_box"`), `normalise` (`floor_sd`, the ME scale since 2026-10-22; `z`, `median`, `none`), `lick_clock_check` (lick-triggered ME peak lag per session and camera), `per_animal_timecourse` |
@@ -296,15 +298,22 @@ copying it. Code needed by two or more notebooks goes in a module, not inline.
 - **Spike-count windows are load-bearing.** `eph_08`/`eph_09` use
   `count_window_s=(0.0, 0.5)`, `baseline_window_s=(-2.0, 0.0)`, matching the paper and the
   poster figure. Changing them silently breaks the replication — see `TODO.md`.
-- **Finding video frames:** row `i` of `kps_raw_*`, `tongue_kins` and the ME table is frame `i`
-  of the video, also when frames were dropped. Find frames from per-frame times
+- **Finding video frames:** the `frame` column of `pose.parquet` / `kinematics.parquet`, and row `i`
+  of the ME table, is frame `i` of the video, also when frames were dropped. Find frames from per-frame times
   (`video_clips.cut_event_clips` / `write_frames`, or `event_frame_ranges`), never as seconds into
   the MP4: after *n* dropped frames, session time + a constant offset lands *n*/fps late. Shifting
   between Harp-clock bases (session time, behavior time, spikes, FIP) by a constant is exact.
-- **Column-name trap:** in `all_tongue_movements_*.parquet`, `endpoint_x/y` and
-  `max_x_from_jaw`/`max_y_from_jaw` are **absolute camera pixel positions** despite the names;
-  the jaw-relative distances are `max_x_distance`/`max_y_distance`. They are not pooled-safe
-  raw — each session carries its own camera/jaw offset. Use `kin_06`'s `get_jaw_positions()`.
+- **Positions are jaw-relative** (library ≥ 0.5.0): `start_*`, `end_*`, `extent_*` and the `extremes`
+  columns (`x_max`, `y_at_x_max`, …) are measured from the session's jaw landmark (median of points with
+  likelihood ≥ 0.9, `landmarks.parquet`); don't subtract a jaw again. `spout_l` is the animal's
+  **right** spout (the bottom camera mirrors); `lick_side` is the animal's side. In the pre-0.5.0 table
+  (`all_tongue_movements_04022026`), `endpoint_x/y` and `max_*_from_jaw` were absolute pixels and the jaw
+  was the mean of all points. Old → new column map: the library's `KINEMATICS_PLAN.md`; what changed in
+  meaning: `docs/kinematics_core_handoff.md` §2.
+- **Movements without a trial:** `trial` is NA for movements that span a go cue (`spans_go_cue`), come
+  before the first go cue or after the last trial; their lick columns (`cue_response`, …) still describe
+  their first lick, so filter `trial.notna()` before merging on `trial` (pandas matches missing keys).
+  `cue_response` / `rewarded` are False, not None, on movements without a lick.
 - **QC "noise"** means confident misdetection of the wrong body part. Lickometer agreement,
   confidence, and duration are *not* valid noise filters — use cross-keypoint geometry and
   trajectory shape.
@@ -319,7 +328,8 @@ A subset of data is available locally for development and testing in:
 
 | File | Size | Contents |
 |---|---|---|
-| `all_tongue_movements_04022026.parquet` | 66.9 MB | Main kinematics dataset — tongue movement bouts |
+| `all_tongue_movements_04022026.parquet` | 66.9 MB | Pre-0.5.0 pooled tongue movements (old column names), kept for comparison |
+| `all_tongue_movements_v053.parquet`, `all_landmarks_v053.parquet` | — | Pooled movements and landmarks from the 0.5.3 batch (`build_all_tongue_movements.py`); copy here from Code Ocean scratch `all_tongue_movements/` for local `kin_*` runs |
 | `features_combined_beh_all.pkl` | 2.9 MB | Combined behavioral features |
 | `filtered_ephys.pkl` | 2.5 MB | Filtered electrophysiology data |
 | `all_counts_df.parquet` | 2.7 MB | Count data |

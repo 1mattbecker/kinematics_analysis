@@ -46,28 +46,42 @@ rule is a choice; nobody has looked at what these movements are.
 
 ---
 
-## Move to the library's v0.5.2 kinematics outputs
+## Move to the library's v0.5.x kinematics outputs
 
-_Logged 2026-10-28._ Plan, definition changes and checks: `docs/kinematics_core_handoff.md`.
+_Logged 2026-10-28; code migrated 2026-10-29 on branch `kinematics-v052`._ Plan, definition changes, and what was
+done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
 
-- [ ] **Rerun the batch on v0.5.2** (tagged 2026-10-28). The outputs in
-  `/root/capsule/scratch/kinematics_v050` were made with v0.5.1. That version gave a trial to
-  movements spanning a go cue, and its last trial ran to the end of the video. Rerun every
-  session with `force=True`, which also gives the 30 first-run sessions
-  `trials.reward_before_choice`:
-  ```bash
-  git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 fetch -q --tags origin
-  git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 checkout -q v0.5.2
-  export PYTHONPATH=/root/capsule/scratch/kinematics_compare/dfbva_v050/src
-  python - <<'EOF'
-  import json
-  from aind_dynamic_foraging_behavior_video_analysis.kinematics.tasks import dynamic_foraging_tongue as dft
-  pose = list(dict.fromkeys(json.load(open("/root/capsule/scratch/pred_csv_list_20250113.json"))))
-  print(dft.run_batch(pose, "/root/capsule/data", "/root/capsule/scratch/kinematics_v050",
-                      ignore_trial_errors=True, force=True).to_string())
-  EOF
-  ```
-  Expect 48 `done` and the same 5 timing errors. Then run check A of the handoff doc.
+1. [ ] **Library 0.5.3.** Review and merge the library branch `feat/extremes-feature-group` (the `extremes` feature
+   group: `x_max`, `y_at_x_max`, …), then tag `v0.5.3`. `kin_06` and `kin_07` read these columns.
+2. [ ] **Rerun the batch on v0.5.3** with `force=True` (also gives the 30 first-run sessions
+   `trials.reward_before_choice`):
+   ```bash
+   git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 fetch -q --tags origin
+   git -C /root/capsule/scratch/kinematics_compare/dfbva_v050 checkout -q v0.5.3
+   export PYTHONPATH=/root/capsule/scratch/kinematics_compare/dfbva_v050/src
+   cd /root/capsule/code
+   python - <<'EOF'
+   import json
+   from aind_dynamic_foraging_behavior_video_analysis.kinematics.tasks import dynamic_foraging_tongue as dft
+   pose = list(dict.fromkeys(json.load(open("/root/capsule/scratch/pred_csv_list_20250113.json"))))
+   print(dft.run_batch(pose, "/root/capsule/data", "/root/capsule/scratch/kinematics_v050",
+                       ignore_trial_errors=True, force=True).to_string())
+   EOF
+   python build_all_tongue_movements.py
+   ```
+   Expect 48 `done` and the same 5 timing errors, then `all_tongue_movements_v053.parquet` and
+   `all_landmarks_v053.parquet` in `/root/capsule/scratch/all_tongue_movements/`.
+3. [ ] **Run `verify_kinematics_v053.ipynb`.** Decide on the sessions whose quality-filter result changes (§2) and
+   accept the new list; note the ephys sessions lost (3 expected: 754897 03-14, 758018 03-20, 761038 04-15).
+4. [ ] **Image.** Move the Dockerfile pin from v0.5.2 to the v0.5.3 commit and rebuild.
+5. [ ] **Data asset.** Save `scratch/kinematics_v050` as a data asset and point `kin_utils.KINEMATICS_ROOT` at its
+   mount (one line).
+6. [ ] **Rerun the notebooks on Code Ocean**, `kin_00`–`kin_07`, `eph_00`–`eph_09`, `val_02`–`val_05`, and compare each
+   with its committed figures (`git diff` shows old vs new outputs). In `eph_01`, also save `all_counts_df` to
+   `/root/capsule/scratch/all_counts_df_v053.parquet` for the verify notebook's §6.
+7. [ ] **Local copies.** Copy the two pooled v053 tables and the new `all_counts_df.parquet` to `data/for_local/`
+   (the `eph_*` notebooks read the cached `all_counts_df` locally; its kinematics columns are renamed).
+8. [ ] Merge `kinematics-v052` into `wild`.
 
 ---
 

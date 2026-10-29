@@ -4,6 +4,31 @@ _Written 2026-10-28. Library: `aind-dynamic-foraging-behavior-video-analysis` ta
 The batch outputs below were made with v0.5.1, so rerun with
 `force=True` (§2.1 and §2.10 change `movements` and `trials`; command in `TODO.md`)._
 
+## Status (2026-10-29, branch `kinematics-v052`)
+
+The code side is done; the data side runs on Code Ocean (`TODO.md`, "Move to the library's v0.5.x
+kinematics outputs", steps 1-8). How each item below was handled:
+
+| Item | Done |
+|---|---|
+| §2.1 spanning movements | Rule kept (no trial). Pooled cue-response counts: `kin_05`/`kin_06` group on `(session, trial)` and drop movements without a trial before merging |
+| §2.2 `firstMove`, cue response | `ephys_utils` passes `movements` to `get_events_dict`; `build_trial_features` merges `cue_response_movement_number` from `trials`. Old vs new per trial: `verify_kinematics_v053` §5 |
+| §2.3 `reward_before_choice` | Trials kept; dropped only in `kin_07` (value/RPE), after the latents are attached. Pooled table carries the flag |
+| §2.4 sessions, coverage | Threshold 0.90 on `lick_coverage` (`data_loading`, one place); old vs new pass/fail: `verify_kinematics_v053` §2. 3 of 32 ephys sessions are not in the new batch |
+| §2.5 jaw, `max_x_distance` | Library 0.5.3 adds the `extremes` feature group, so `max_x_distance` = \|`x_max`\|, `max_y_distance` = \|`extent_y`\|, `max_x_from_jaw_y` = `y_at_x_max` exactly. `kin_06` no longer recovers the jaw; `kin_07` uses the relative columns |
+| §2.5 `out_duration` filters | Counted old vs new in `verify_kinematics_v053` §3 |
+| §2.6 speeds | Measured in `verify_kinematics_v053` §4 (matched movements) |
+| §2.7 dropped columns | Renamed throughout; `has_lick` = `n_licks > 0` and `movement_before_cue_response` derived where used; `kin_07`'s absolute-pixel columns and `time_to_endpoint` dropped from its screen; `kin_04` keeps `rewarded` NA on lick-less movements |
+| §2.8 frame table | `kinematics.parquet` read by keypoint and time window; video frames from the `frame` column; `lickometer_qc` on `pose.parquet` + `signal.mask` |
+| §2.9 bouts | `eph_07` keeps the repo rule (`behavior_utils.annotate_movement_bouts`) |
+| §3 step 1 image | Pinned v0.5.2; move to v0.5.3 once tagged |
+| §3 steps 2-5 | Shared modules, pooled builder, one session root (`kin_utils.KINEMATICS_ROOT`), every notebook in the table; the "file names only" notebooks and other pre-0.5.0 tools archived (`code/archive/README.md`) |
+
+Each migrated notebook gave the same numbers as before when run locally on the old pooled table
+renamed to the new columns; exceptions are listed in `CHANGELOG.md` (2026-10-29).
+
+## Background
+
 The library replaced the old tongue pipeline (`tongue_analysis`, `tongue_kinematics_utils`) with a
 general kinematics core plus a dynamic-foraging task module. New outputs for the 53-session list
 are in `/root/capsule/scratch/kinematics_v050/<session>/` (48 processed; see §4).

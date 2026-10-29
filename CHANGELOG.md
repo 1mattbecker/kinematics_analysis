@@ -2,6 +2,46 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-10-29
+
+### Tongue kinematics on the library's 0.5.x core (branch `kinematics-v052`)
+
+Works through `docs/kinematics_core_handoff.md`. Every `kin_*`, `eph_*` and `val_*` notebook and the shared
+modules read the library batch's per-session tables (`kin_utils.KINEMATICS_ROOT/<session>/`) and the new pooled
+tables instead of `session_analysis_mlk/<session>/intermediate_data/` and `all_tongue_movements_04022026`. Column
+names are the library's (`peak_speed`, `path_length`, `end_x`, `angle_deg`, `number_in_trial`, `latency_from_go`,
+`n_licks`, `lick_side`, …).
+
+- **Checked locally:** each migrated notebook was run on the old pooled table converted to the new names (and the
+  eph_* notebooks on the cached `all_counts_df` with renamed columns) against the pre-migration notebook on the old
+  data. Identical numbers except where listed below. What the new *data* change is checked on Code Ocean by
+  `verify_kinematics_v053.ipynb`.
+- **Library 0.5.3 (PR pending):** an `extremes` feature group (`x_max`, `y_at_x_max`, `x_min`, … `y_at_extent_x`,
+  `x_at_extent_y`), so the old `max_x_distance` (= |`x_max`|), `max_y_distance` (= |`extent_y`|) and
+  `max_*_from_jaw_*` are reproduced exactly instead of approximated by `extent_x`.
+- Shared modules: `kin_utils` holds the data locations (`KINEMATICS_ROOT`, pooled names, `pooled_path`; `load_kps_raw`
+  and `jaw_position` removed); `data_loading` reads `record.json` through the library (coverage threshold 0.90 on
+  the 0–1 scale); `build_all_tongue_movements` pools `movements.parquet` with the trial columns
+  `cue_response_movement_number`, `lick_latency`, `reward_before_choice`, plus landmarks; `ephys_utils`
+  (`build_trial_features` on the new tables, `firstMove` from movements); `lickometer_qc` (`pose.parquet` +
+  `signal.mask`, spouts still the mean of all points; `filter_timestamps_refractory`); `run_batch_analysis.py` runs
+  the library's `run_batch(ignore_trial_errors=True)`.
+- Decisions (2026-10-29): trials flagged `reward_before_choice` stay, and are dropped only in `kin_07` (value/RPE);
+  `eph_07` keeps the repo bout rule; `kin_07`'s value screen drops the absolute-pixel columns (`min_x` … `max_yv`) and
+  `time_to_endpoint` (= `out_duration`), 24 → 15 columns.
+- Where results change by design: `kin_03`'s UMAP uses jaw-relative `end_x/y` (absolute before); `kin_06` no longer
+  recovers the jaw (y positions differed by ≤ 0.2 px from the old grid estimate); `kin_04` keeps `rewarded` NA on
+  lick-less movements, as before (the library writes False). Fix: `kin_05` §7 no longer pools movements without a
+  trial into one pseudo-trial per session (14,149 → 14,138 trials on the old table).
+- `eph_08` uses `data_loading`'s quality filter instead of its inline copy (same criteria). `val_02`/`val_03` use
+  `lickometer_qc.load_session` instead of their own copies.
+- Archived (pre-0.5.0 pipeline or finished one-off checks): `add_outbound`, `attach_data`, `test_session_wrapper`,
+  `run_batch_analysis_modeltest.py`, `tongue_movements_all`, `verify_library_migration`, `model_quality`,
+  `env_00_reference_sessions`, `verify_video_timing_qc`, `test_session_quality_analysis`.
+- `environment/Dockerfile`: library pinned to v0.5.2 (`6860b60`); move to v0.5.3 once tagged.
+- 3 of the 32 ephys sessions (754897 03-14, 758018 03-20, 761038 04-15) fail the new timing checks and are not in
+  the new batch, so their units leave the `eph_*` analyses.
+
 ## 2026-10-27
 
 ### ME table and loaders: ROI traces (branch `me-roi`)
