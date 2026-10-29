@@ -5,6 +5,46 @@ Deferred work items. Newest first. Dates are YYYY-MM-DD. FIP and motion-energy w
 
 ---
 
+## Nose and jaw: default kinematics-core settings and quality numbers (`kin_08_nose_jaw_movement`)
+
+_Logged 2026-10-29._
+
+**Question.** How do `nose_tip` and `jaw` move, and what is noise in their positions? Start
+descriptive; matching their movements to the task and its variables comes after.
+
+**Status.** `code/kin_08_nose_jaw_movement.ipynb` is written and has run only on a synthetic
+session. §1 (session ranking, export) and §6 (video frames) have not run.
+
+**What to do:**
+1. Run `kin_08` on Code Ocean. §1 writes `scratch/kin_08_session_tracking.csv` and copies four
+   example sessions to `scratch/nose_jaw_sessions/`. Download those to
+   `data/for_local/nose_jaw_sessions/` for local work (`kinematics_fip` kernel).
+2. Read §2–§10 on the best-tracked session, then on the other examples (`SESSION`).
+   - Check the frames in §6: are confident outliers the wrong body part?
+   - Revisit the choices made before seeing data: lick contexts (≤ 0.25 s from a lick =
+     licking, > 1 s = no licking) and §7's spectrum windows (1 s, ≥ 95% of frames confident,
+     gaps ≤ 5 frames filled).
+3. Choose defaults for each keypoint:
+   - Likelihood threshold: 0.9 for now, as for the tongue.
+   - Smoothing cutoff, from §7 and §8.
+   - Segmentation: `above_threshold` on speed, since both points are always visible. Set the
+     on/off levels from the no-licking jitter floor in px/s rather than quantiles, then
+     `min_frames` and `max_gap_frames`.
+   - Reference: the nose relative to its session median; the jaw relative to the nose or to
+     its own median (§9).
+4. Per-session quality numbers over every session. Candidates: confident fraction, median step
+   (jitter), large-step rate, nose–jaw distance spread, drift of the median position. Look at
+   frames from the outlier sessions, then set the thresholds.
+5. Write `KeypointSettings` for both keypoints plus a `quality()` function. Keep them in this
+   repo until they settle, then open a library PR (task module, as `TONGUE_SETTINGS`).
+6. Then match nose and jaw movements to the task and its variables.
+
+**Notes.**
+- Numbering clash: `kin_08` is also planned for go-cue-spanning movements (next entry). Renumber
+  one of the two.
+
+---
+
 ## Create `kin_08_go_cue_spanning_movements.ipynb`
 
 _Logged 2026-10-28._
