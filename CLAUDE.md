@@ -169,6 +169,7 @@ and guard those sections behind an `IS_CO` skip so they still run clean locally.
 | `kin_05_nonlick_movements` | Do the lickometer and video streams describe the same events — and what are the movements that aren't licks? |
 | `kin_06_lick_geometry_choice` | Does the direction of a preparatory movement predict which spout is licked? |
 | `kin_07_value_encoding` | Do behavioral-model latents (Q, RPE) show up in *how* the tongue moves? |
+| `kin_08_nose_jaw_movement` | How do `nose_tip` and `jaw` move, and what is noise in their positions? §1 (Code Ocean) ranks sessions by nose/jaw tracking and exports example sessions (`scratch/nose_jaw_sessions/`; locally `data/for_local/nose_jaw_sessions/` or `NOSE_JAW_ROOT`); then for one session: raw traces, likelihood, positions and principal axes, frame-to-frame steps, video frames (CO), spectra and speed at several smoothing cutoffs by lick context, jaw relative to nose, position around licks. Toward default settings and quality numbers for these keypoints |
 
 ### `eph_*` — LC units × tongue kinematics
 
