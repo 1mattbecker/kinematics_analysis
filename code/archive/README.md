@@ -30,6 +30,20 @@ Full account in `TODO.md`.
 
 ## What was archived and why
 
+### Pre-0.5.0 tongue pipeline (archived 2026-10-29)
+
+The library's 0.5.0 kinematics core replaced `tongue_analysis` / `tongue_kinematics_utils`
+(`docs/kinematics_core_handoff.md`). These ran or checked the old pipeline and import modules that
+no longer exist.
+
+| File | Superseded by |
+|---|---|
+| `add_outbound.ipynb` | `out_*` are native in `movements.parquet` (`outbound` feature group) |
+| `test_session_wrapper.ipynb`, `run_batch_analysis_modeltest.py` | `run_batch_analysis.py` (`dynamic_foraging_tongue.run_batch`) |
+| `tongue_movements_all.ipynb` | `build_all_tongue_movements.py` run directly |
+| `verify_library_migration.ipynb` | the 2026-09 migration it checked; the 0.5.x check is `verify_kinematics_v053.ipynb` |
+| `attach_data.ipynb` | attached the old pipeline's input assets by hand |
+
 ### FIP notebooks, reorganized by analysis type (archived 2026-10-08)
 
 The `fip_*` series was regrouped into `fip_10`–`fip_17`, one notebook per kind of analysis, all on
