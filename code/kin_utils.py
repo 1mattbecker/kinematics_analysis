@@ -1,21 +1,52 @@
 """
-kin_utils.py — small helpers shared by the ``kin_*`` notebook series (tongue kinematics).
+kin_utils.py — where the tongue-kinematics data live, and small helpers for the ``kin_*`` series.
 
 numpy / pandas only, so the ``kin_*`` notebooks keep running locally on ``data/for_local``
-without the video-analysis library. Keypoint I/O that the batch pipeline needs lives in the
-library (``tongue_kinematics_utils``); these read the intermediates it already wrote.
+without the video-analysis library.
+
+Per-session tables are written by the library's batch
+(``kinematics.tasks.dynamic_foraging_tongue.run_batch``) into ``KINEMATICS_ROOT/<session>/``:
+``movements``, ``submovements``, ``bouts``, ``trials``, ``licks``, ``events``, ``landmarks``,
+``kinematics`` (frames), ``pose`` (raw keypoints) and ``record.json``. Read them with
+``pd.read_parquet`` or the library's ``pipeline.read``. ``build_all_tongue_movements.py`` pools the
+movements of the sessions that pass the quality filter into ``POOLED_MOVEMENTS`` and their
+landmarks into ``POOLED_LANDMARKS``.
 
 Contents
 --------
-:func:`coerce_bool`, :func:`load_kps_raw`, :func:`jaw_position`
+:data:`KINEMATICS_ROOT`, :data:`POOLED_MOVEMENTS`, :data:`POOLED_LANDMARKS`,
+:func:`pooled_path`, :func:`coerce_bool`
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import pandas as pd
+
+# Library v0.5.3 batch output (one folder per session). Change here when it moves to a data asset.
+KINEMATICS_ROOT = Path("/root/capsule/scratch/kinematics_v050")
+
+# Pooled tables written by build_all_tongue_movements.py; the 04022026 file is the pre-0.5.0 table,
+# kept for comparison.
+POOLED_MOVEMENTS = "all_tongue_movements_v053.parquet"
+POOLED_LANDMARKS = "all_landmarks_v053.parquet"
+POOLED_MOVEMENTS_OLD = "all_tongue_movements_04022026.parquet"
+
+_CO_POOLED_DIR = Path("/root/capsule/scratch/all_tongue_movements")
+_LOCAL_DIR = Path(__file__).resolve().parent.parent / "data" / "for_local"
+
+
+def pooled_path(name: str = POOLED_MOVEMENTS) -> Path:
+    """Path of a pooled table: Code Ocean scratch if present, else ``data/for_local``.
+
+    The pre-0.5.0 table (``POOLED_MOVEMENTS_OLD``) sits in its own folder on Code Ocean.
+    """
+    co_dirs = [_CO_POOLED_DIR, Path("/root/capsule/scratch") / Path(name).stem]
+    for d in co_dirs:
+        if (d / name).exists():
+            return d / name
+    return _LOCAL_DIR / name
 
 
 def coerce_bool(series: pd.Series) -> pd.Series:
@@ -23,34 +54,7 @@ def coerce_bool(series: pd.Series) -> pd.Series:
 
     Plain ``astype(bool)`` on an object column turns any non-empty string (including the string
     "False") into True. This treats only True / 1 / "True" as true and everything else, None
-    included, as false.
+    included, as false. (The library's tables have real booleans since 0.5.0; this is kept for
+    the pre-0.5.0 pooled table.)
     """
     return series.isin([True, 1, "True"])
-
-
-def load_kps_raw(intermediate_dir, prefix: str = "kps_raw_") -> Dict[str, pd.DataFrame]:
-    """A session's saved keypoint parquet files, ``{label: per-frame table}``.
-
-    Parameters
-    ----------
-    intermediate_dir : str or pathlib.Path
-        Directory holding files named like ``kps_raw_jaw.parquet``.
-    prefix : str
-        Filename prefix used when the keypoint tables were written.
-    """
-    intermediate_dir = Path(intermediate_dir)
-    return {f.stem[len(prefix):]: pd.read_parquet(f)
-            for f in intermediate_dir.glob("{}*.parquet".format(prefix))}
-
-
-def jaw_position(session: str, session_dir) -> Optional[Tuple[float, float]]:
-    """``(jaw_x, jaw_y)``: the jaw keypoint's mean position over a session, in camera pixels.
-
-    Reads ``<session_dir>/<session>/intermediate_data/kps_raw_jaw.parquet``; returns None when the
-    file is absent (running locally, or an unprocessed session).
-    """
-    path = Path(session_dir) / session / "intermediate_data" / "kps_raw_jaw.parquet"
-    if not path.exists():
-        return None
-    kps_jaw = pd.read_parquet(path, columns=["x", "y"])
-    return float(kps_jaw["x"].mean()), float(kps_jaw["y"].mean())

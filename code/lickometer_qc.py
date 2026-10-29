@@ -16,8 +16,8 @@ The two event tables
 ``lickometer_events``
     One row per lickometer event: ``session``, ``t``.
 
-Both are on session time (seconds from the first go cue), the clock ``tongue_kins.parquet``
-carries as ``time_in_session`` and ``nwb_df_licks.parquet`` carries as ``timestamps``.
+Both are on session time (seconds from the first go cue), the clock of the library's
+``pose.parquet`` (``time``) and ``licks.parquet`` (``timestamps``).
 
 Scoring
 -------
@@ -30,7 +30,7 @@ confirmed contacts, see :func:`contact_reference`. :func:`summarize_sessions` re
 per-event table to one row per session with a Wilson interval, the lickometer-context split,
 the stream-alignment statistics and the gates.
 
-Python 3.9-compatible syntax only (see CLAUDE.md). Only ``numpy`` and ``pandas`` are needed to
+Only ``numpy`` and ``pandas`` are needed to
 score exported tables; the library is imported lazily inside :func:`load_session`, which only
 runs on Code Ocean.
 """
@@ -108,48 +108,47 @@ def pose_excursions(tongue: pd.DataFrame, d: float) -> pd.DataFrame:
     })
 
 
-# ── Code Ocean: raw intermediates → event tables ──────────────────────────────
+# ── Code Ocean: session tables → event tables ─────────────────────────────────
 
-def load_session(inter, conf: float = 0.8) -> Dict[str, object]:
+def load_session(session_dir, conf: float = 0.8) -> Dict[str, object]:
     """Load one session's tongue keypoints, spout positions and lickometer licks.
 
-    Code Ocean only: reads ``kps_raw_*.parquet``, ``tongue_kins.parquet`` and
-    ``nwb_df_licks.parquet`` from a session's ``intermediate_data`` directory.
+    Code Ocean only: reads ``pose.parquet``, ``licks.parquet`` and ``trials.parquet`` from a
+    session folder of the library's batch (``kin_utils.KINEMATICS_ROOT/<session>``).
 
     Parameters
     ----------
-    inter : pathlib.Path
-        The session's ``intermediate_data`` directory.
+    session_dir : pathlib.Path
+        The session's folder.
     conf : float
-        Keypoint confidence floor for masking.
+        Keypoint confidence floor for masking (points with likelihood >= ``conf`` are kept).
 
     Returns
     -------
     dict
-        ``tongue`` (masked keypoint table on session time, with ``spout_distance``),
-        ``spoutL`` / ``spoutR`` (mean positions, de-mirrored), ``licks`` (sorted lickometer
-        times on session time) and ``trial_bounds`` (first go cue, last trial stop; NaN pair
-        when the trials table is missing). Row ``i`` of ``tongue`` is video frame ``i``, so
-        ``tongue["time"]`` is the per-frame time the library's ``video_clips.cut_event_clips``
-        takes to cut clips.
+        ``tongue`` (masked keypoint table on session time, one row per frame, with
+        ``spout_distance``), ``spoutL`` / ``spoutR`` (mean positions, de-mirrored), ``licks``
+        (sorted lickometer times on session time) and ``trial_bounds`` (first go cue, last trial
+        stop; NaN pair when the trials table is missing). Row ``i`` of ``tongue`` is video frame
+        ``i``, so ``tongue["time"]`` is the per-frame time the library's
+        ``video_clips.cut_event_clips`` takes to cut clips.
     """
-    from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_kinematics_utils import (
-        mask_keypoint_data,
+    from aind_dynamic_foraging_behavior_video_analysis.kinematics import signal
+
+    session_dir = Path(session_dir)
+    pose = pd.read_parquet(
+        session_dir / "pose.parquet",
+        filters=[("keypoint", "in", ["tongue_tip_center", "spout_l", "spout_r"])],
     )
+    by_kp = {kp: g.sort_values("frame").reset_index(drop=True) for kp, g in pose.groupby("keypoint")}
 
-    inter = Path(inter)
-    keypoint_dfs = {
-        key: pd.read_parquet(inter / "kps_raw_{}.parquet".format(key))
-        for key in ["tongue_tip_center", "spout_l", "spout_r"]
-    }
-    kins = pd.read_parquet(inter / "tongue_kins.parquet", columns=["time_in_session"])
+    tongue = signal.mask(by_kp["tongue_tip_center"], conf)
 
-    tongue = mask_keypoint_data(keypoint_dfs, "tongue_tip_center", confidence_threshold=conf)
-    tongue["time"] = kins["time_in_session"].values
-
-    # NB the bottom camera mirrors left/right, so spout_r holds the left spout.
-    spoutL = np.mean(keypoint_dfs["spout_r"][["x", "y"]], 0)
-    spoutR = np.mean(keypoint_dfs["spout_l"][["x", "y"]], 0)
+    # Spouts: mean of every tracked point, as before library 0.5.0 (its landmarks.parquet uses the
+    # median of points with likelihood >= 0.9). NB the bottom camera mirrors left/right, so spout_r
+    # holds the left spout.
+    spoutL = by_kp["spout_r"][["x", "y"]].mean()
+    spoutR = by_kp["spout_l"][["x", "y"]].mean()
 
     tracked = tongue[["x", "y"]].notna().all(axis=1)
     xy = tongue.loc[tracked, ["x", "y"]].to_numpy()
@@ -160,19 +159,19 @@ def load_session(inter, conf: float = 0.8) -> Dict[str, object]:
 
     return {
         "tongue": tongue, "spoutL": spoutL, "spoutR": spoutR,
-        "licks": np.sort(pd.read_parquet(inter / "nwb_df_licks.parquet")["timestamps"].to_numpy()),
-        "trial_bounds": trial_bounds(inter),
+        "licks": np.sort(pd.read_parquet(session_dir / "licks.parquet")["timestamps"].to_numpy()),
+        "trial_bounds": trial_bounds(session_dir),
     }
 
 
-def trial_bounds(inter) -> Tuple[float, float]:
-    """First go cue and last trial stop on session time, from ``nwb_df_trials.parquet``.
+def trial_bounds(session_dir) -> Tuple[float, float]:
+    """First go cue and last trial stop on session time, from ``trials.parquet``.
 
     Session time is seconds from the first go cue, so the bounds are the raw go cue and stop
     times shifted by the first go cue. Returns a NaN pair when the table or its columns are
     missing.
     """
-    path = Path(inter) / "nwb_df_trials.parquet"
+    path = Path(session_dir) / "trials.parquet"
     if not path.exists():
         return (np.nan, np.nan)
     trials = pd.read_parquet(path)
@@ -208,7 +207,7 @@ def build_event_tables(session_dirs: Iterable, d: float, conf: float = 0.8,
     Parameters
     ----------
     session_dirs : iterable of path
-        Session directories, each holding an ``intermediate_data`` folder.
+        Session folders of the library's batch.
     d : float
         Excursion distance in pixels.
     conf : float
@@ -224,20 +223,18 @@ def build_event_tables(session_dirs: Iterable, d: float, conf: float = 0.8,
         The two event tables and a per-session sidecar with ``lick_coverage``,
         ``trial_start`` / ``trial_end``, ``duration_s`` and ``tracked_frac``.
     """
-    needed = ["kps_raw_tongue_tip_center.parquet", "kps_raw_spout_l.parquet",
-              "kps_raw_spout_r.parquet", "tongue_kins.parquet", "nwb_df_licks.parquet"]
+    needed = ["pose.parquet", "licks.parquet"]
     pose_rows, licko_rows, sess_rows = [], [], []
     session_dirs = list(session_dirs)
     for k, sdir in enumerate(session_dirs, 1):
         sdir = Path(sdir)
-        inter = sdir / "intermediate_data"
-        if not all((inter / f).exists() for f in needed):
+        if not all((sdir / f).exists() for f in needed):
             if verbose:
                 print("  [{}/{}] {}: incomplete intermediates, skipped".format(
                     k, len(session_dirs), sdir.name))
             continue
         try:
-            sess = load_session(inter, conf=conf)
+            sess = load_session(sdir, conf=conf)
         except Exception as exc:  # one bad session should not stop the batch
             if verbose:
                 print("  [{}/{}] {}: FAILED ({})".format(k, len(session_dirs), sdir.name, exc))

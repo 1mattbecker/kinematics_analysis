@@ -13,7 +13,8 @@ boundary".
 
 Depends on:
   aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys
-    (find_session_dir, load_intermediate_data, get_events_dict, build_event_df)
+    (find_session_dir, load_intermediate_data, get_events_dict, build_event_df), which read the
+    library's per-session tables (movements, trials, licks, events, kinematics; library >= 0.5.0)
 """
 
 from __future__ import annotations
@@ -104,44 +105,38 @@ def build_trial_features(
 ) -> pd.DataFrame:
     """
     Return per-trial kinematics features joined from the movements table.
-    Requires movs to already be annotated by annotate_movement_timing +
-    add_lick_metadata_to_movements.
+
+    ``movs`` and ``df_trials`` are a session's ``movements.parquet`` and ``trials.parquet``
+    (library >= 0.5.0). ``cue_response_movement_number`` is a trial column there and is
+    merged onto the movements here. One row per trial that has a movement; movements
+    without a trial (before the first go cue, spanning a go cue, after the last trial)
+    are left out.
     """
-    tm = movs.copy()
+    tm = movs.merge(
+        df_trials[["trial", "cue_response_movement_number"]],
+        on="trial", how="left", validate="many_to_one",
+    )
 
     required_cols = {
         "cue_response_movement_number",
-        "movement_latency_from_go",
-        "movement_number_in_trial",
+        "latency_from_go",
+        "number_in_trial",
         "cue_response",
     }
     missing = required_cols - set(tm.columns)
     if missing:
         raise ValueError(
-            f"movs is missing required timing columns {missing}. "
-            "Run annotate_movement_timing + add_lick_metadata_to_movements first."
+            f"movs is missing required columns {missing}; expected the library's movements.parquet."
         )
 
     crmn = tm.groupby("trial")["cue_response_movement_number"].first().astype("Int64")
-    rt_first = tm.groupby("trial")["movement_latency_from_go"].min()
+    rt_first = tm.groupby("trial")["latency_from_go"].min()
 
-    if "cue_response" in tm.columns:
-        rt_cr = (
-            tm.loc[tm["cue_response"] == True]
-              .groupby("trial")["movement_latency_from_go"]
-              .first()
-        )
-    else:
-        tmp = tm.copy()
-        tmp["movement_number_in_trial"] = pd.to_numeric(
-            tmp["movement_number_in_trial"], errors="coerce"
-        ).astype("Int64")
-        tmp = tmp.join(crmn.rename("crmn"), on="trial")
-        rt_cr = (
-            tmp.loc[tmp["movement_number_in_trial"] == tmp["crmn"]]
-               .groupby("trial")["movement_latency_from_go"]
-               .first()
-        )
+    rt_cr = (
+        tm.loc[tm["cue_response"] == True]
+          .groupby("trial")["latency_from_go"]
+          .first()
+    )
 
     out = pd.DataFrame({
         "cue_response_movement_number": crmn,
@@ -149,14 +144,17 @@ def build_trial_features(
         "reaction_time_cueresponse": rt_cr,
     })
 
+    # Library 0.5.0 names (before: peak_velocity, excursion_angle_deg, endpoint_x/y [absolute
+    # pixels; end_x/y are relative to the jaw], out_peak_velocity, out_mean_velocity,
+    # out_total_distance).
     kcols = [
-        "peak_velocity", "duration", "excursion_angle_deg",
-        "endpoint_x", "endpoint_y",
-        "out_duration", "out_peak_velocity", "out_mean_velocity", "out_total_distance",
+        "peak_speed", "duration", "angle_deg",
+        "end_x", "end_y",
+        "out_duration", "out_peak_speed", "out_mean_speed", "out_path_length",
     ]
 
     first_moves = (
-        tm.loc[tm["movement_number_in_trial"] == 1, ["trial", *kcols]]
+        tm.loc[tm["number_in_trial"] == 1, ["trial", *kcols]]
           .drop_duplicates("trial", keep="first")
           .set_index("trial")
           .rename(columns={c: f"first_move_{c}" for c in kcols})
@@ -216,14 +214,14 @@ def make_session_bundle(
         session, Ev, align_times, trial_features, session_offset
     """
     sdir = find_session_dir(session, roots=base_dirs)
-    data = load_intermediate_data(sdir)
-    movs, trials, licks, kins, evnts = (
-        data["movs"], data["trials"], data["licks"], data["kins"], data["events"]
+    movs, trials, licks, evnts = (
+        pd.read_parquet(sdir / f"{name}.parquet")
+        for name in ("movements", "trials", "licks", "events")
     )
 
     offset = session_offset(evnts)
 
-    events_dict = get_events_dict(trials, licks, kins)
+    events_dict = get_events_dict(trials, licks, movs)
     E = build_event_df(events_dict)
     if cfg.align_key not in E.columns:
         raise KeyError(f"align_key '{cfg.align_key}' not in events: {list(E.columns)}")

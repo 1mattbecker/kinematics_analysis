@@ -9,7 +9,6 @@ Three stages:
 
 from __future__ import annotations
 
-import json
 import pickle
 import re
 from pathlib import Path
@@ -17,19 +16,42 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_analysis import (
-    get_quality_summary,
-    get_session_name_from_path,
-    load_tongue_quality_stats,
-    session_already_done,
+from aind_dynamic_foraging_behavior_video_analysis.kinematics import pipeline
+from aind_dynamic_foraging_behavior_video_analysis.kinematics.tasks.dynamic_foraging_tongue import (
+    quality_summary,
+    session_name_from_path,
 )
 from aind_dynamic_foraging_behavior_video_analysis.ephys.tongue_ephys import get_session_prefix
 
 
 # ── Stage 1: session quality filter ──────────────────────────────────────────
 
-DEFAULT_COVERAGE_MIN   = 90.0
-DEFAULT_DURATION50_MIN = 0.06   # seconds
+# Fraction of lickometer licks inside a tracked tongue movement (record.json → quality.lick_coverage;
+# 0–1 since library 0.5.0, was coverage_pct 0–100).
+DEFAULT_COVERAGE_MIN   = 0.90
+DEFAULT_DURATION50_MIN = 0.06   # median movement duration, seconds
+
+
+def session_quality(session_dir: Path) -> Optional[dict]:
+    """``{session, lick_coverage, movement_duration_p50}`` of a finished session folder, else None.
+
+    Read from the folder's ``record.json`` through the library (``quality_summary``); None when the
+    batch has not finished the session.
+    """
+    if not pipeline.is_done(session_dir):
+        return None
+    return quality_summary(session_dir)
+
+
+def passes_quality(
+    q: Optional[dict],
+    coverage_min: float = DEFAULT_COVERAGE_MIN,
+    duration50_min: float = DEFAULT_DURATION50_MIN,
+) -> bool:
+    """True if a :func:`session_quality` result clears both thresholds (strictly greater)."""
+    return (q is not None and q["lick_coverage"] > coverage_min
+            and q["movement_duration_p50"] > duration50_min)
+
 
 def load_session_quality_filter(
     base_dirs: List[Path],
@@ -37,44 +59,29 @@ def load_session_quality_filter(
     duration50_min: float = DEFAULT_DURATION50_MIN,
 ) -> List[Path]:
     """
-    Scan session subdirectories for tongue_quality_stats.json and return
-    the paths of sessions meeting coverage and duration thresholds.
+    Scan session subdirectories of ``base_dirs`` and return the paths of finished sessions
+    meeting the lick-coverage and median-duration thresholds, best coverage first.
     """
-    rows_pass, rows_fail = [], []
-
+    rows_pass = []
     for base_dir in base_dirs:
         if not base_dir.exists():
             continue
         for subdir in base_dir.iterdir():
-            if not (subdir.is_dir() and session_already_done(subdir)):
+            if not subdir.is_dir():
                 continue
-            # Schema is declared next to the writer in the library
-            # (tongue_analysis.TONGUE_QUALITY_STATS_FILENAME).
-            try:
-                q = get_quality_summary(load_tongue_quality_stats(subdir))
-            except Exception as e:
-                print(f"[skip] {subdir.name}: {e}")
-                continue
-
-            cov   = q["coverage_pct"]
-            dur50 = q["duration_p50"]
-            row   = {
-                "session_path": subdir,
-                "session_id":   q["session_id"] or subdir.name,
-                "coverage_pct": cov,
-                "duration_p50": dur50,
-            }
-            (rows_pass if cov > coverage_min and dur50 > duration50_min else rows_fail).append(row)
+            q = session_quality(subdir)
+            if passes_quality(q, coverage_min, duration50_min):
+                rows_pass.append({"session_path": subdir, **q})
 
     passed = pd.DataFrame(rows_pass).sort_values(
-        ["coverage_pct", "duration_p50"], ascending=False
+        ["lick_coverage", "movement_duration_p50"], ascending=False
     ) if rows_pass else pd.DataFrame()
 
     print(f"Sessions passing quality filter: {len(passed)} "
-          f"(coverage>{coverage_min}%, median dur>{duration50_min}s)")
+          f"(lick coverage>{coverage_min}, median dur>{duration50_min}s)")
     for _, r in passed.iterrows():
         print(f"  {r['session_path'].name}  "
-              f"(cov={r['coverage_pct']:.1f}%, dur50={r['duration_p50']:.3f}s)")
+              f"(cov={r['lick_coverage']:.3f}, dur50={r['movement_duration_p50']:.3f}s)")
 
     return passed["session_path"].tolist() if not passed.empty else []
 
@@ -116,7 +123,7 @@ def filter_ephys_units(
     Apply QC criteria and session allowlist to combined_ephys_data.
     Returns filtered_ephys with a session_prefix column added.
     """
-    session_order   = [get_session_name_from_path(str(p)) for p in filtered_session_paths]
+    session_order   = [session_name_from_path(str(p)) for p in filtered_session_paths]
     prefix_allow    = set(get_session_prefix(s) for s in session_order)
 
     df = combined_ephys_data.copy()

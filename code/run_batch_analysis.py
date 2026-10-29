@@ -1,21 +1,26 @@
-from pathlib import Path
+"""Reproducible-run entry point: the library's tongue-kinematics batch over the session list, then
+the pooled tables.
+
+Each session goes to ``kin_utils.KINEMATICS_ROOT/<session>/`` (library ``run_batch``; finished
+sessions are skipped unless ``FORCE``). Trial-check errors from data-utils ("Reward before choice
+time", 2025 sessions) are turned into the ``trials.reward_before_choice`` flag instead of stopping
+the session. ``build_all_tongue_movements`` then pools the sessions that pass the quality filter.
+"""
 import json
-import datetime
+from pathlib import Path
 
-from aind_dynamic_foraging_behavior_video_analysis.kinematics.tongue_analysis import run_batch_analysis
+from aind_dynamic_foraging_behavior_video_analysis.kinematics.tasks import dynamic_foraging_tongue as dft
+
 from build_all_tongue_movements import build_all_tongue_movements
+from kin_utils import KINEMATICS_ROOT
 
-save_root = "/root/capsule/scratch/session_analysis_fall2026"
-data_root = Path("/root/capsule/data")
+DATA_ROOT = Path("/root/capsule/data")
+POSE_LIST = Path("/root/capsule/scratch/pred_csv_list_20250113.json")
+FORCE = False   # True reprocesses finished sessions (needed after a library version change)
 
-# Load list from JSON
-pred_list_path = Path("/root/capsule/scratch/pred_csv_list_20250113.json")
-with open(pred_list_path, "r") as f:
-    pred_csv_list = json.load(f)
-
-run_batch_analysis(pred_csv_list, data_root, save_root, extract_clips=False)
-
-# pool into a freshly dated parquet
-date_tag = datetime.date.today().strftime("%m%d%Y")
-out = Path(f"/root/capsule/scratch/temp/all_tongue_movements_{date_tag}.parquet")
-build_all_tongue_movements(base=Path(save_root), out=out)
+if __name__ == "__main__":
+    pose_paths = list(dict.fromkeys(json.loads(POSE_LIST.read_text())))
+    status = dft.run_batch(pose_paths, DATA_ROOT, KINEMATICS_ROOT,
+                           ignore_trial_errors=True, force=FORCE)
+    print(status.to_string())
+    build_all_tongue_movements()
