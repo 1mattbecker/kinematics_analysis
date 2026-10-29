@@ -32,6 +32,15 @@ Full account in `TODO.md`.
 
 ### Pre-0.5.0 tongue pipeline (archived 2026-10-29)
 
+**To run any of these, or the pre-migration `kin_*`/`eph_*`/`val_*` notebooks:** `git switch -c
+pre-kinematics-core archive/pre-kinematics-core` and rebuild the image. That tag is the repo as of `me-roi`
+`8d12321` with the video-analysis library pinned to v0.4.0 (`a6bac04`), the last version with the whole old
+pipeline (the library's own `pre-kinematics-core` tag, `706ce32`, already lacks `video_clip_utils`, which these
+import). Run the notebooks from `code/`, where they lived. Their inputs: the old per-session folders are data
+asset `3f03b848` (`keypoint_tracking_bottomview_LCrecordings_20260403`, 53 sessions, public S3; its
+`tongue_movs.parquet` lack the later `out_*` backfill), the old pooled table is
+`all_tongue_movements_04022026`.
+
 The library's 0.5.0 kinematics core replaced `tongue_analysis` / `tongue_kinematics_utils`
 (`docs/kinematics_core_handoff.md`). These ran or checked the old pipeline and import modules that
 no longer exist.

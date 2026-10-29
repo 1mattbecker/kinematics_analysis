@@ -34,9 +34,11 @@ and code editing. Data lives on Code Ocean — do not expect data files to be pr
     once the changes have been run and checked. Do not commit to or push `main` unless the
     user explicitly asks for that promotion.
   - `kinematics-manuscript` — forward-looking manuscript work; periodically takes `wild`.
-  - Retired, kept as tags (not branches): `archive/local-dev` (old careful-dev branch) and
+  - Retired, kept as tags (not branches): `archive/local-dev` (old careful-dev branch),
     `archive/main-py39` (main before its 2026-09-25 promotion to `wild`; Python 3.9 image,
-    with AIND libraries pinned so it still builds). Restore one with
+    with AIND libraries pinned so it still builds) and `archive/pre-kinematics-core` (the repo on
+    the pre-0.5.0 tongue pipeline, library pinned to v0.4.0, so the old and archived tongue notebooks
+    run; their inputs are in data asset `3f03b848`, see `code/archive/README.md`). Restore one with
     `git switch -c <name> archive/<tag>`.
 - **Preserve existing function signatures** unless explicitly told to change them.
   Other notebooks may depend on them.
