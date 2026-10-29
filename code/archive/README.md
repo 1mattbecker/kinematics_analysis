@@ -44,6 +44,9 @@ no longer exist.
 | `verify_library_migration.ipynb` | the 2026-09 migration it checked; the 0.5.x check is `verify_kinematics_v053.ipynb` |
 | `attach_data.ipynb` | attached the old pipeline's input assets by hand |
 | `model_quality.ipynb` | step-by-step walkthrough of the old pipeline on its step functions and QC plotters (removed in 0.5.0); `kin_sandbox_core.ipynb` walks through the 0.5.x core |
+| `env_00_reference_sessions.ipynb` | the Python 3.12 environment check (done 2026-09-25) on the old batch |
+| `verify_video_timing_qc.ipynb` | the check of the video timing QC (library 0.1.0) on the old pipeline; 0.5.x applies the QC in `run_batch` |
+| `test_session_quality_analysis.ipynb` | session and model selection on the old pipeline's `tongue_quality_stats.json` from several model runs; the filter it fed is `data_loading.passes_quality` |
 
 ### FIP notebooks, reorganized by analysis type (archived 2026-10-08)
 
