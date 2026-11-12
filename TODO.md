@@ -136,7 +136,7 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
      (they start 0.3-0.5 s after t+1's go cue, ~6 s after t's), and each t+1 is a `reward_before_choice`
      trial. The new table assigns them to t+1 only, so the old row for t was a duplicate.
 4. [x] **Image** rebuilt on v0.5.3 (2026-10-29).
-5. [x] **Data asset** `kinematics_tongue_v053` (the batch output); `kin_utils.KINEMATICS_ROOT` points at it. The pooled
+5. [x] **Data asset** `kinematics_tongue_v053` (`6d3ae735-5c10-434b-9013-2603b5268b5f`, the batch output); `kin_utils.KINEMATICS_ROOT` points at it. The pooled
    tables are still read from `scratch/all_tongue_movements/`: keep that folder, or save them too.
 6. [ ] **Rerun the notebooks on Code Ocean**, `kin_00`–`kin_07`, `eph_00`–`eph_09`, `val_02`–`val_05`, and compare each
    with its committed figures (`git diff` shows old vs new outputs). Expect `eph_*` to lose the 11 units above
