@@ -2,6 +2,28 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-12
+
+### `men_06_whisker_pad_me`: the whisker-pad ME trace (branch `me-roi`)
+
+New notebook describing the side camera's whisker-pad ROI trace (`SideCameraRight_whiskerpad_box`, asset
+`e542022e`) next to the whole-frame bottom and side traces, on men_00's 100 Hz grid and the `floor_sd` scale. 64
+sessions from 8 mice (62 with the bottom camera); loaded through `mu.load_sessions` with
+`cameras=(BottomCamera, SideCameraRight, SideCameraRight:whiskerpad_box)` into its own cache. Run locally.
+
+- The box on one mid-video frame per mask group (6 groups with usable side cameras; `c0_l33` holds only
+  screen-excluded cameras). It sits on the whisker pad behind the nose in every group.
+- r over the task span, mean ± SEM over animals: pad × side 0.85 ± 0.01, pad × bottom 0.88 ± 0.02,
+  side × bottom 0.89 ± 0.01.
+- Around the go cue, choice, licks and lick-bout onsets the pad trace has the shape of the whole-frame traces,
+  including the lick-locked ripple, ~10–20% lower in session SDs (0–1 s after the cue: pad 1.68, side 1.91,
+  bottom 2.04 SD above p1).
+- `floor_sd` on the pad: still periods sit 0.050 ± 0.003 SD above 0 (bottom 0.071, side 0.059), with a smaller
+  spread over the session (p90 − p10 of 60-s window floors 0.042 vs 0.071 / 0.063) and no drift.
+- The pad's lick-triggered peak lag (+0.03 ± 0.03 s; +0.09 and +0.18 s in 818585 and 818586) differs from the
+  whole frame's (−0.02 / −0.03 s). The pad's lick-triggered trace is flat from about −0.1 to +0.1 s, so the
+  argmax moves within that plateau; the frames are the side camera's, so no clock offset is possible.
+
 ## 2026-10-27
 
 ### ME table and loaders: ROI traces (branch `me-roi`)

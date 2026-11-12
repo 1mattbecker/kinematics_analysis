@@ -82,11 +82,12 @@ their sessions:
 | Whisker pad | 4 | 15 | 0 | 19 | 3 | 7 | 5 | 7 | 4 |
 
 **Next, in order:**
-1. Describe the whisker-pad trace (a new `men_06`, loading as `men_00` with
-   `cameras=("BottomCamera", "SideCameraRight", "SideCameraRight:whiskerpad_box")`):
-   - the box on one frame per mask group (7 groups, `fu.load_roi_masks`; groups in `index.csv` `roi_masks`);
-   - the trace against the whole frame around the go cue, the choice and licking;
-   - whether `floor_sd` behaves on it (the scale was chosen on bottom-camera whole-frame ME).
+1. ~~Describe the whisker-pad trace~~ Done 2026-11-12: `men_06_whisker_pad_me` (run locally, 64 sessions, 8 mice).
+   The box sits on the whisker pad in all 6 usable mask groups. The pad trace follows the whole frame (r 0.85 with
+   the side, 0.88 with the bottom camera) with the same shape around the go cue, choice and licks, ~10–20% lower in
+   session SDs. `floor_sd` behaves: stillness 0.05 SD above 0, steadier across the session than the whole-frame
+   traces. Open: the pad's lick-triggered peak lag is +0.03 s (whole frame −0.02/−0.03 s), from a flat top over
+   ±0.1 s around the lick; run `men_06` on Code Ocean.
 2. `men_04`'s go-cue items on the whisker pad: 500 Hz whisker-pad ME in the first 150 ms. Is the 10–16 ms jump and the
    ~24 / ~55 ms peaks there, and in which of the five "jump" and four "no jump" mice? This tests the startle-plus-whisking
    reading that so far rests on the maps.
