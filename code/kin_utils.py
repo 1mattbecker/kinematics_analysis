@@ -24,8 +24,8 @@ from pathlib import Path
 
 import pandas as pd
 
-# Library v0.5.3 batch output (one folder per session). Change here when it moves to a data asset.
-KINEMATICS_ROOT = Path("/root/capsule/scratch/kinematics_v050")
+# Library v0.5.3 batch output (one folder per session): data asset kinematics_tongue_v053.
+KINEMATICS_ROOT = Path("/root/capsule/data/kinematics_tongue_v053")
 
 # Pooled tables written by build_all_tongue_movements.py; the 04022026 file is the pre-0.5.0 table,
 # kept for comparison.
