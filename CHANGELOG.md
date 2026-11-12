@@ -23,6 +23,10 @@ sessions from 8 mice (62 with the bottom camera); loaded through `mu.load_sessio
 - The pad's lick-triggered peak lag (+0.03 ± 0.03 s; +0.09 and +0.18 s in 818585 and 818586) differs from the
   whole frame's (−0.02 / −0.03 s). The pad's lick-triggered trace is flat from about −0.1 to +0.1 s, so the
   argmax moves within that plateau; the frames are the side camera's, so no clock offset is possible.
+- §5, whisker-pad ME events without licking (men_00's onset rule on the z-scored pad trace; no lick from 0.5 s
+  before to 1 s after): 2.8 ± 0.3 per min, 39% of pad events, 69% in quiet inter-trial time. Bottom and side
+  whole-frame ME rise as much as the pad in them (0–0.5 s: 2.10, 2.05, 2.09 SD above p1), so they are face and
+  body movements seen by every camera; the box alone does not separate whisking.
 
 ## 2026-10-27
 
