@@ -108,7 +108,10 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
      only in the old spanning-movement trials.
    - `all_counts_df`: spike counts, baselines and both RTs identical in all 28,365 shared unit-trials. Units
      lost: 11, all in the 3 refused sessions (754897 03-14: 5, 758018 03-20: 4, 761038 04-15: 2). Four other
-     sessions keep every unit but lose one trial each (the capped last trial).
+     sessions keep every unit but lose one trial each (752014 03-28 #288, 763590 05-01 #303, 782394 04-24
+     #286, 791691 06-27 #287): the old pipeline filed trial t+1's movements and cue response under trial t
+     (they start 0.3-0.5 s after t+1's go cue, ~6 s after t's), and each t+1 is a `reward_before_choice`
+     trial. The new table assigns them to t+1 only, so the old row for t was a duplicate.
 4. [x] **Image** rebuilt on v0.5.3 (2026-10-29).
 5. [ ] **Data asset.** Save `scratch/kinematics_v050` as a data asset and point `kin_utils.KINEMATICS_ROOT` at its
    mount (one line).
