@@ -27,6 +27,10 @@ sessions from 8 mice (62 with the bottom camera); loaded through `mu.load_sessio
   before to 1 s after): 2.8 ± 0.3 per min, 39% of pad events, 69% in quiet inter-trial time. Bottom and side
   whole-frame ME rise as much as the pad in them (0–0.5 s: 2.10, 2.05, 2.09 SD above p1), so they are face and
   body movements seen by every camera; the box alone does not separate whisking.
+- `make_me_example_clip.py`: `--roi` (box outlined on the side camera, its trace in the strip with both whole-frame
+  traces), `--marks-csv` (labelled times, e.g. the pad events `men_06` §5 writes), `--playback-fps` (slow motion),
+  `--prefix`; frames cut with the library's `video_clips.cut_clip` instead of its own ffmpeg call. `men_06` §5
+  prints the command for its example window (809491 2025-10-30, 30 s at 0.2×; alignment check offset 0 on both cameras).
 
 ## 2026-10-27
 
