@@ -2,6 +2,21 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-12
+
+### `kin_08_nose_jaw_movement`: full frames, nose likelihood, grooming flag
+
+- §6 shows the full video frame (it showed a ±120 px crop around the nose and jaw medians, which hid where
+  off-face points landed; `FRAME_HALF` crops on request).
+- §11: distance from each keypoint's usual position by likelihood band and lick context, and nose frames at
+  likelihood 0.7–0.9 and 0.5–0.7, to choose the nose's threshold.
+- §12: a grooming flag from the paw keypoints (a confident paw point within `GROOM_RADIUS_PX` of the jaw median,
+  a first guess to set from the distance histogram), nose and jaw confidence inside and outside it, the share of
+  the largest confident steps inside it, and frames to check it. Grooming gave the largest confident jaw jumps in
+  the first example sessions. §1's export now includes the paws (delete old export folders to re-export).
+- All figures are saved per session (`FIG_DIR/<SESSION>/`).
+- Checked locally on a synthetic session only; the frames need Code Ocean.
+
 ## 2026-10-29
 
 ### `kin_08_nose_jaw_movement`: description of nose and jaw movement

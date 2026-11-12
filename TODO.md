@@ -12,8 +12,19 @@ _Logged 2026-10-29._
 **Question.** How do `nose_tip` and `jaw` move, and what is noise in their positions? Start
 descriptive; matching their movements to the task and its variables comes after.
 
-**Status.** `code/kin_08_nose_jaw_movement.ipynb` is written and has run only on a synthetic
-session. §1 (session ranking, export) and §6 (video frames) have not run.
+**Status (2026-11-12).** `kin_08` has run on Code Ocean for four example sessions (figures in
+`data/figures/kin_08_nose_jaw_movement/`, not in git). First findings:
+- The nose falls into two groups across sessions: about 35 sessions at 65–100% confident, about 15
+  under 45%. In 752014 the nose is in view but hard to see (image quality).
+- Low-likelihood nose points in good sessions land at consistent wrong places, mostly during licking;
+  nose steps at likelihood 0.7–0.9 are close to those of confident frames (§11 checks this).
+- Grooming gives the largest *confident* jaw jumps (§12 flags it from the paws).
+- The jaw's lick cycle is about 25–45 px along image x at about 6 Hz; 30 Hz smoothing keeps it.
+- 761038 has long ~6 Hz jaw rhythms between trials with no lickometer licks.
+Next: pull on Code Ocean, rerun §6 (now full frames), §11 and §12 on the four sessions, set
+`GROOM_RADIUS_PX` from §12's histogram. The export folders need re-exporting to include the paws
+for local runs. Open: confirm which body part each keypoint marks (sets the face axis); frames at
+lick + 10 ms for the nose dip after licks (not added).
 
 **What to do:**
 1. Run `kin_08` on Code Ocean. §1 writes `scratch/kin_08_session_tracking.csv` and copies four
