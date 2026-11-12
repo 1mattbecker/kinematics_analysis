@@ -24,20 +24,43 @@ session. §1 (session ranking, export) and §6 (video frames) have not run.
    - Revisit the choices made before seeing data: lick contexts (≤ 0.25 s from a lick =
      licking, > 1 s = no licking) and §7's spectrum windows (1 s, ≥ 95% of frames confident,
      gaps ≤ 5 frames filled).
-3. Choose defaults for each keypoint:
-   - Likelihood threshold: 0.9 for now, as for the tongue.
-   - Smoothing cutoff, from §7 and §8.
-   - Segmentation: `above_threshold` on speed, since both points are always visible. Set the
-     on/off levels from the no-licking jitter floor in px/s rather than quantiles, then
-     `min_frames` and `max_gap_frames`.
-   - Reference: the nose relative to its session median; the jaw relative to the nose or to
-     its own median (§9).
-4. Per-session quality numbers over every session. Candidates: confident fraction, median step
-   (jitter), large-step rate, nose–jaw distance spread, drift of the median position. Look at
-   frames from the outlier sessions, then set the thresholds.
-5. Write `KeypointSettings` for both keypoints plus a `quality()` function. Keep them in this
-   repo until they settle, then open a library PR (task module, as `TONGUE_SETTINGS`).
+3. Settle the remaining defaults (decisions taken are under **Decided** below):
+   - Likelihood threshold per keypoint. 0.9 for now. If §5's step-vs-likelihood panel shows the
+     nose's positions at 0.5–0.9 are still accurate (likely under-confident during licking), give
+     the nose a lower threshold (`min_likelihood` is per keypoint).
+   - The size or peak-speed cutoff for real submovements, from the jitter floor in §5 and §8,
+     per session if it varies.
+4. Per-session quality numbers over every session. Low confidence is not a failure: in
+   well-tracked sessions it marks real occlusion (grooming), so the confident fraction describes
+   behaviour, not tracking. Measure confident errors instead (project noise definition): jumps
+   between confident frames, confident frames with nose–jaw distance or position out of range,
+   drift of the median position. Look at frames from the outlier sessions, then set thresholds.
+   Optional, not yet agreed: label occlusion stretches with the paw keypoints (paw near the face
+   while nose/jaw confidence drops).
+5. Write `KeypointSettings` for both keypoints, the face frame and a `quality()` function. Keep
+   them in this repo until they settle, then open a library PR (task module, as
+   `TONGUE_SETTINGS`); the face frame may stay in the repo.
 6. Then match nose and jaw movements to the task and its variables.
+
+**Decided (2026-11-12).**
+- **Smoothing:** 30 Hz low-pass for nose and jaw.
+- **Filter, not threshold:** segment with no speed threshold, splitting every movement at each
+  reversal or speed dip and keeping every piece, as the tongue's submovements do. What counts as
+  real movement is a filter on the submovement table (size, peak speed) applied afterwards. A
+  default cutoff is stored with the session or in one shared helper so analyses filter the same
+  way.
+  - Nose: `speed_minima` (no direction needed).
+  - Jaw: `zero_crossings` on `vx` (reversals along image x), for now.
+  - Movements to split: `tracked_runs` (both points are tracked nearly all session; runs end at
+    occlusions).
+- **One shared origin:** every keypoint gets the same `reference`, the jaw's session median
+  (the tongue already uses it), so the face's layout within a session is kept in pixels.
+- **Animal-centred face axis** (further processing, in this repo): from two stable midline
+  landmarks (nose and jaw medians, `landmarks.parquet`), an origin, an axis along the face
+  midline and optionally a scale (their distance). Positions become along-midline and
+  left/right-of-midline, so a deviation to one side is measured against the animal's face, not
+  the camera. Mind the sign: the bottom camera mirrors (`spout_l` is the animal's right). The
+  notebook's choices about where to measure from (§2, §4) predate these decisions.
 
 **Notes.**
 - Numbering clash: `kin_08` is also planned for go-cue-spanning movements (next entry). Renumber
