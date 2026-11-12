@@ -326,6 +326,10 @@
 			"mount": "DA_NE_4channels"
 		},
 		{
+			"id": "6d3ae735-5c10-434b-9013-2603b5268b5f",
+			"mount": "kinematics_tongue_v053"
+		},
+		{
 			"id": "6d95a3b7-0e7c-488d-b249-cb2f83fb0307",
 			"mount": "behavior_784803_2025-07-02_13-41-41"
 		},
