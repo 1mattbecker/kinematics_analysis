@@ -74,6 +74,11 @@ tell Rachel / file on `aind-fip-dff`.
 2. **Replicate the iso physics on our sessions.** Iso spectrum against each channel's noise floor; coherence
    iso × bleach-only channel by band; β by band (slow < 0.05 Hz as the pipeline, 0.5–3 Hz, and in windows
    around ME onsets); power added by the correction per band. Per fiber and session; DA and NE fibers.
+   Include the subtraction arithmetic as a worked example (§4, notebook §2a): per band,
+   var(G − β·iso) = var(G) − 2β·cov(G, iso) + β²·var(iso); the middle term is removal and needs coherence,
+   the last is added whatever iso holds. Ask upstream why PR #38 (2025-03) switched from subtracting the
+   0.05 Hz-filtered iso to the unfiltered one; subtracting the filtered iso would keep the slow removal
+   without the fast addition.
 3. **Iso and red against ME.** Iso (and PL red) × ME through the same xcorr and ME-onset averages as
    `fip_10` §2 / `fip_12` §1: how large the movement artifact is per fiber, at what timescale, and how
    mouse-specific. Then corrected and bleach-only NE/DA at ME onsets next to iso: an iso-shaped deflection
@@ -97,6 +102,7 @@ cached under `scratch/fip_18/`). Each section is one plan item; figures listed a
 | 0 | Methods note: §1 of this file, condensed, with the commit link; the stage names in the NWB | — |
 | 1 | Pipeline QC and parameters, 97 sessions | β per fiber-session (strip by mouse, DA vs NE fibers, β = 0 marked); F0 terms kept; QC status counts |
 | 2 | Iso physics | Power spectra iso / G / R per fiber type with noise floors; coherence by band; β by band vs the pipeline's; power ratio corrected / bleach-only by band |
+| 2a | Why subtracting adds: one PL session | (i) 20 s of bleach-only NE, β·iso and corrected NE, raw and band-passed 1–3 Hz, with the band's variance of each in the legend; (ii) the three terms of the variance identity per band (removed = 2β·cov, added = β²·var(iso), net) as grouped bars across 0.01–0.05, 0.05–0.2, 0.2–1, 1–3 Hz, next to coherence per band; (iii) the same identity with iso low-passed at 0.05 Hz before subtraction (what the pipeline did before PR #38) and with a synthetic iso of matched power but independent noise, to show the addition is set by var(iso) alone. Same for one NAc session, where β ≈ 0 makes every term vanish |
 | 3 | Iso and red vs ME | xcorr and ME-onset averages for iso, red, corrected and bleach-only sensor, per mouse; residual-artifact panel (corrected − bleach-only at ME onsets against iso) |
 | 4 | Fiber events and the post-event step | Peak robust-SD per iso trace (distribution, threshold); example sessions; event-triggered iso/DA/NE at go cue and outcome out to 6 s for the step |
 | 5 | Downstream | Key numbers of `fip_10` §2, `fip_12` §1, `fip_13` for corrected vs bleach-only, per animal, same figures as those notebooks |
