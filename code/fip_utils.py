@@ -580,12 +580,11 @@ def inventory_pairs(asset_roots: Dict[str, str]) -> pd.DataFrame:
     pandas.DataFrame
         Columns ``asset, subject, session, side, da_event, ne_event, path``.
     """
-    import pyarrow.parquet as pq
-
     rows = []
     for asset, root in asset_roots.items():
         for f in sorted(glob.glob(os.path.join(root, "*", "*", "df_fip.parquet"))):
-            events = set(pq.read_table(f, columns=["event"]).column("event").to_pylist())
+            # pandas picks pyarrow or fastparquet, whichever is installed
+            events = set(pd.read_parquet(f, columns=["event"])["event"])
             da = {DA_RE.match(e).group(1): e for e in events if DA_RE.match(e)}
             ne = {NE_RE.match(e).group(1): e for e in events if NE_RE.match(e)}
             session_dir = os.path.dirname(f)
