@@ -148,10 +148,15 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
      trial. The new table assigns them to t+1 only, so the old row for t was a duplicate.
 4. [x] **Image** rebuilt on v0.5.3 (2026-10-29).
 5. [x] **Data asset** `kinematics_tongue_v053` (`6d3ae735-5c10-434b-9013-2603b5268b5f`, the batch output); `kin_utils.KINEMATICS_ROOT` points at it. The pooled
-   tables are still read from `scratch/all_tongue_movements/`: keep that folder, or save them too.
+   tables are still read from `scratch/all_tongue_movements/`: keep that folder, or save them too (then point
+   `kin_utils.pooled_path` at the new mount). Check on Code Ocean that `python -c "from kin_utils import
+   KINEMATICS_ROOT as r; print(r, len(list(r.glob('*/record.json'))))"` prints
+   `/root/capsule/data/kinematics_tongue_v053 48`.
 6. [ ] **Rerun the notebooks on Code Ocean**, `kin_00`–`kin_07`, `eph_00`–`eph_09`, `val_02`–`val_05`, and compare each
-   with its committed figures (`git diff` shows old vs new outputs). Expect `eph_*` to lose the 11 units above
-   and `eph_08`'s poster-figure replication to move with them.
+   with its committed figures (`git diff` shows old vs new outputs). Expected changes: speed-based results move
+   by about 9% (`peak_speed`; smoothing per tracked run), `kin_03`'s UMAP changes, `kin_07`'s screen goes from
+   24 to 15 columns (absolute-pixel columns dropped), and `eph_*` lose the 11 units above, with `eph_08`'s
+   poster-figure replication moving with them. Anything else that moves needs an explanation.
 7. [ ] **Local copies.** Copy the two pooled v053 tables and the new `all_counts_df.parquet` to `data/for_local/`
    (the `eph_*` notebooks read the cached `all_counts_df` locally; its kinematics columns are renamed).
 8. [ ] Merge `kinematics-v052` into `wild`.
