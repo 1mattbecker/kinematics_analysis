@@ -25,15 +25,26 @@ that also runs locally once the final FIP asset is on open data (S3).
 **Done 2026-11-16.** One place for data locations (`fu.DATA_ROOT`, `CACHE_ROOT`, `FIG_ROOT`,
 `fu.fip_asset_roots`, capsule layout `data/` + `scratch/`); no notebook or script carries paths;
 `DANE_bilateral` (Rachel's combined asset, `4686d370`, test version) is used when attached; the
-archived notebooks' NWB-list path removed from `fip_utils`.
+archived notebooks' NWB-list path removed from `fip_utils`. All 15 notebooks rerun: text outputs identical.
+`inventory_pairs` reads parquet through pandas, so `fastparquet` alone is enough.
+
+**Tested on the shared capsule's pins (2026-11-16).** The 12 core + optional notebooks ran locally on the
+`da-ne-paper-figures` image's versions (rachel-analysis-utils `36a4615`, data-utils `v0.1.36`, basic-analysis
+`improve_fip`, numpy 1.26.4, scipy 1.16.0, matplotlib 3.7.5, no pyarrow), caches rebuilt. No errors; text
+outputs identical except four Wilcoxon p-values on lag measures (stepped values, so ties and zeros), all
+far from 0.05: `fip_10` DA–NE peak lag 0.327 → 0.383 and DA–ME 0.484 → 0.547; `fip_11` §4 DA with NE
+0.652 → 0.617, DA solo 0.652 → 0.664. Probably scipy's `wilcoxon` handling ties and zeros differently
+(not checked against scipy's changelog). Means, SEMs and n unchanged. `scipy.signal.coherence` is ~6× slower in scipy 1.16
+(45 vs 7.5 ms per call), so `fip_10` takes ~60 min instead of 13. Settle the shared image's scipy pin with
+Rachel before quoting p-values.
 
 **Next.**
 1. When Rachel's final combined asset exists: add its folder name to `fu.FIP_ASSET_SETS` if it differs,
    attach it, rerun. Check how many of its 295 sessions are same-side DA/NE pairs (`fu.inventory_pairs`)
    and which have no ME (the ME table covers the current 97); update the notebooks' **Data** paragraphs.
-2. Copy into the shared repo's layout; rename notebooks by question; one `requirements`/environment
-   for the libraries (Rachel's utils `864550d`, data-utils, basic-analysis, `aind_hierarchical_bootstrap`;
-   the video library only for the ME build).
+2. Copy into the shared repo (proposed: `code/movement_da_ne/`, modules next to the notebooks); rename
+   notebooks by question; agree the image's pins with Rachel (above); attach `DANE_bilateral` and the ME
+   table (`e542022e`) to the capsule; decide where figures go (`fu.FIG_ROOT`; `results/` in a figures capsule?).
 3. Local runs from open data: a download step for the FIP asset and the ME table into `data/`.
 
 ---
