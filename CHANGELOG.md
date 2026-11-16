@@ -9,11 +9,16 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 - §6: 70 ± 6% of the whisker-pad events without licking have no bottom-camera ME event within ±0.25 s (1.8 ±
   0.3 per min; 36–89% by mouse). The bottom camera's ME still rises after them as much as the pad's (0–0.5 s:
   bottom 1.95, side 1.88, pad 1.96 SD above p1); it stays below its own event threshold.
-- §7: spectra of the 500 Hz traces (`fu.motion_energy_to_session`) in the 1 s after each event without licking,
-  Hann periodogram divided by 1–50 Hz power. No source has a peak at 8–15 Hz. The pad trace has more power than
-  the side whole frame from ~10 to 40 Hz; its share in 8–15 Hz is 0.105 ± 0.008 against 0.090 ± 0.010 (side,
-  Wilcoxon p = 0.04, 8 mice) and 0.093 ± 0.010 (bottom, p = 0.11); the same with no bottom-camera event. The
-  bottom camera has a peak at ~28 Hz in the mean spectrum, with a wide spread across mice.
+- §7 (revised the same day): spectra of the 500 Hz traces (`fu.motion_energy_to_session`, Hann periodogram of the
+  1 s after each event) against still windows (≤ 300 random 1 s segments per session with no whisker-pad event or
+  lick from 2 s before to 1 s after). ME is unsigned, so 8–15 Hz whisking appears at 16–30 Hz (licking likewise
+  at ~6 and ~12 Hz). After events without licking the whisker pad's power over still rises more in 16–30 Hz than
+  in 2–8 Hz in all 8 mice (log10 contrast 0.23 ± 0.03; bottom 0.08 ± 0.04, side 0.04 ± 0.06; pad − side p = 0.008,
+  pad − bottom p = 0.016, Wilcoxon on animals), peaking at 18–30 Hz in 7 mice (818586: 9 Hz, weakest contrast
+  0.06). The same holds for events with no bottom-camera event (§6). Several mice (800886, 809491, 816212, 816214)
+  show a 16–30 Hz bump in the pad's absolute spectrum, also after events with licking. The ~28 Hz peak in the
+  first version's bottom-camera mean spectrum is one mouse (808054) and is as large in still windows (with a line
+  at ~55 Hz and a smaller copy on its side camera): an imaging artefact.
 - Numbers moved to §8.
 
 ## 2026-11-12

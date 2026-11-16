@@ -90,9 +90,11 @@ their sessions:
    ±0.1 s around the lick; run `men_06` on Code Ocean.
    §5: pad ME events without licking (2.8/min, 39% of pad events, mostly quiet inter-trial) come with as much
    bottom- and side-camera ME as pad ME, so the box does not isolate whisking. 2026-11-16, §6–7: 70% of them have
-   no bottom-camera event, but the bottom ME rises as much after those too; 500 Hz spectra after them have no
-   8–15 Hz peak in any trace, and the pad's 8–15 Hz share is only slightly above the whole frame's (0.105 vs
-   0.090 / 0.093). Not yet done: a smaller box on the whisker shafts in front of the snout (new ROI, ME rebuild);
+   no bottom-camera event, but the bottom ME rises as much after those too. In 500 Hz spectra against still
+   windows the pad gains more power at 16–30 Hz (8–15 Hz whisking, doubled because ME is unsigned) than at
+   2–8 Hz, in all 8 mice and more than either whole frame (p = 0.008 / 0.016): a whisking signature in the
+   level-matched pad trace, though not in its event timing. 808054's bottom camera has an imaging line at ~28 Hz.
+   Not yet done: a smaller box on the whisker shafts in front of the snout (new ROI, ME rebuild);
    whisker tracking.
 2. `men_04`'s go-cue items on the whisker pad: 500 Hz whisker-pad ME in the first 150 ms. Is the 10–16 ms jump and the
    ~24 / ~55 ms peaks there, and in which of the five "jump" and four "no jump" mice? This tests the startle-plus-whisking
