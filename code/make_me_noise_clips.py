@@ -141,11 +141,11 @@ def main():
     ap.add_argument("--set", choices=sorted(SETS), default="across")
     ap.add_argument("--sessions", nargs="+", help="session:label ... (overrides --set)")
     ap.add_argument("--name", help="output prefix (default: the set's name)")
-    ap.add_argument("--me-root", default=os.environ.get("ME_DATA_ROOT", "../../data"))
-    ap.add_argument("--fip-roots", nargs="+", default=["../../data/results-a278f830-9bf2-48e8-9928-a2ff78e4818f",
-                                                      "../../data/results-ddcccb0f-f18f-44a6-a2b1-caba680d28a1"])
-    ap.add_argument("--out-dir", default="../data/figures/men/noise_clips")
+    ap.add_argument("--me-root", default=fu.DATA_ROOT, help="folder holding the ME table and the FIP asset(s)")
+    ap.add_argument("--fip-roots", nargs="+", default=None, help="FIP asset roots (default: fu.fip_asset_roots)")
+    ap.add_argument("--out-dir", default=os.path.join(fu.FIG_ROOT, "men", "noise_clips"))
     args = ap.parse_args()
+    args.fip_roots = args.fip_roots or list(fu.fip_asset_roots(args.me_root).values())
     chosen = [tuple(s.split(":", 1)) for s in args.sessions] if args.sessions else SETS[args.set]
     name = args.name or args.set
     os.makedirs(args.out_dir, exist_ok=True)

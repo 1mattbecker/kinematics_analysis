@@ -1,50 +1,25 @@
 """
-fip_utils.py — shared code for the ``fip_*`` notebook series (and ``men_*``'s trial tables).
+fip_utils.py — shared code for the ``fip_*`` and ``men_*`` notebooks.
 
-Two data paths, one per kind of FIP asset:
+Data locations (:data:`DATA_ROOT`, :data:`CACHE_ROOT`, :data:`FIG_ROOT`) follow the Code Ocean
+capsule layout, ``data/`` and ``scratch/`` next to ``code/``, so the same paths work in the capsule
+and in a local clone; ``$FIP_DATA_ROOT`` and ``$FIP_CACHE_ROOT`` point elsewhere.
+:func:`fip_asset_roots` finds the CSV-curated FIP asset(s) (:data:`FIP_ASSET_SETS`).
 
-* **NWB-list assets with JSON curation** (``DA_NE_4channels``; only the archived ``fip_00``–``fip_04``):
-  :func:`load_curated_sessions` reads the saved parquet hierarchy with Rachel's
-  ``load_nwb_list`` and applies the JSON curation; :func:`select_session`, :func:`build_meta`,
-  :func:`pick_example` set up one session; :func:`process_session` adds motion energy.
-* **CSV-curated assets read directly** (``DANE_3channels_curated``, the 4-channel rebuild;
-  ``fip_10``–``fip_17``, ``men_00``): :func:`find_asset_root`, :func:`inventory_pairs`,
-  :func:`choose_side`, :func:`load_pairs` put same-side DA/NE pairs on a uniform grid,
-  :func:`add_motion_energy` adds bottom- or side-camera ME on that grid (scale from
-  :func:`normalise_me`);
-  :func:`trial_measures`, :func:`fit_rpe_terms`, :func:`residualize`, :func:`task_residuals`
-  measure them. (This was ``fip_coupling.py``.)
+* **FIP pairs**: :func:`inventory_pairs`, :func:`choose_side`, :func:`load_pairs` put same-side
+  DA/NE pairs on a uniform grid; :func:`add_motion_energy` adds bottom- or side-camera ME on that
+  grid (scale from :func:`normalise_me`).
+* **Motion energy on the FIP clock** from the aligned ME table: :func:`load_me_index`,
+  :func:`load_me`, :func:`motion_energy_to_session`; ``roi=`` picks an ROI trace instead of the
+  whole frame (:func:`me_rois` lists them, :func:`load_roi_masks` gives their masks).
+* **Per-trial measures and the task model**: :func:`trial_measures`, :func:`fit_rpe_terms`,
+  :func:`residualize`, :func:`event_design`, :func:`task_residuals`, :func:`large_transients`.
 
-Motion energy on the FIP clock (:func:`load_me`, :func:`motion_energy_to_session`) serves both;
-``roi=`` picks an ROI trace from the table instead of the whole frame (:func:`me_rois` lists them,
-:func:`load_roi_masks` gives their masks).
 Generic signal code is in ``signal_utils``, across-animal statistics in ``stats_utils``, task
 context and lick bouts in ``behavior_utils``.
 
-This module does **not** own the choice of FIP normalization. The three
-``aind_dynamic_foraging_data_utils.enrich_dfs`` entry points are three different
-normalizations, not three steps of one pipeline:
-
-* ``zscore_fip``              -> whole-session ``data_z``
-* ``enrich_fip_in_df_trials`` -> re-cuts signals into per-trial windows (z-scores internally;
-                                 a prior ``zscore_fip`` would double-process)
-* ``remove_tonic_df_fip``     -> per-trial ``data_z_*_baseline`` / ``_norm``
-
-Which one a notebook runs defines what "elevated" means for onset detection and what its AUC
-figures measure, so that call stays visible in each notebook. :func:`attach_me_to_df_fip`
-bridges motion energy into that pipeline and takes **raw** motion energy because those
-functions z-score ``data`` themselves.
-
-Usage (notebooks run with ``code/`` as cwd)::
-
-    %load_ext autoreload
-    %autoreload 2
-    import fip_utils as fu
-
-    nwb_list = fu.load_curated_sessions()
-    nwb, df_fip, df_trials = fu.select_session(nwb_list, 0)
-
-``autoreload`` matters for the NWB path: a session load is tens of GB and several minutes.
+This module does **not** own the choice of FIP normalization: notebooks that run Rachel's
+pipeline (``aind_dynamic_foraging_data_utils.enrich_dfs``) keep that call visible.
 
 Clock: every time is session time (s from the first go cue), shared by
 ``df_fip['timestamps']`` and the ``*_in_session`` trial columns. A loaded pair is on a uniform
@@ -53,13 +28,11 @@ Clock: every time is session time (s from the first go cue), shared by
 
 from __future__ import annotations
 
-import gc
 import glob
-import json
 import os
 import pickle
 import re
-from typing import Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -68,38 +41,41 @@ from scipy.sparse import csr_matrix, hstack
 import signal_utils as su
 from me_results import ROI_MASKS_SUFFIX, me_column, read_roi_masks
 
-import fastparquet  # noqa: F401  # load_nwb_list uses pd.read_parquet(engine="fastparquet")
 
-# Rachel's lab utilities (installed / mounted in the Code Ocean capsule).
-from rachel_analysis_utils import nwb_utils as r_utils
+# ── Data locations ────────────────────────────────────────────────────────────
 
-# AIND event-alignment primitive (peri-event windowing). df_fip['timestamps'] and the
-# df_trials '*_in_session' columns share one clock: t=0 is the first go cue of the session.
-from aind_dynamic_foraging_data_utils import alignment
+#: Repository root (the folder holding ``code/``). On Code Ocean this is ``/root/capsule``.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+#: True on Code Ocean.
+IS_CO = os.path.isdir("/root/capsule")
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+#: Folder holding the data assets (the FIP asset and the ME table): ``data/`` in the repository,
+#: which is Code Ocean's data mount. Locally, ``$FIP_DATA_ROOT`` points elsewhere
+#: (``$ME_DATA_ROOT`` is read too, for kernels set up before it existed).
+DATA_ROOT = (os.environ.get("FIP_DATA_ROOT") or os.environ.get("ME_DATA_ROOT")
+             or os.path.join(REPO_ROOT, "data"))
 
-#: Root of the attached asset's saved parquet hierarchy, as load_nwb_list wants it:
-#: ``plot_loc/<subject>/<session>/df_fip.parquet``. Asset 6babbf3d-6970-4456-aab5-d730ed57c269.
-DEFAULT_PLOT_LOC = "/root/capsule/data/DA_NE_4channels/"
+#: Folder for caches and figures: ``scratch/`` in the repository (Code Ocean's scratch), or
+#: ``$FIP_CACHE_ROOT``. Every cache is keyed on what it was built from, so it can be deleted.
+CACHE_ROOT = os.environ.get("FIP_CACHE_ROOT") or os.path.join(REPO_ROOT, "scratch")
 
-#: Curation JSON shipped inside the rachel_analysis_utils package; carries ``correct_mapping``
-#: and the per-session ``misconnect_fixes`` that annotate ``df_fip['intended_measurement']``.
-DEFAULT_CURATION_FILE = "DA_NE_4channel_datacuration_firstpass"
+#: Figures, one folder per series (``fip``, ``men``).
+FIG_ROOT = os.path.join(CACHE_ROOT, "figures")
 
-#: Where Code Ocean mounts attached data assets.
-DEFAULT_DATA_ROOT = "/root/capsule/data"
+#: The CSV-curated FIP assets under :data:`DATA_ROOT`, in order of preference. Each entry is one
+#: complete set ``{name: candidate folder names}``; :func:`fip_asset_roots` uses the first set
+#: whose every member is present. Folder names are the Code Ocean mount names, then the names a
+#: local download has.
+FIP_ASSET_SETS = (
+    # Rachel's 3- and 4-channel assets in one (asset 4686d370-a207-4fcf-9653-20754c145eac,
+    # 2026-11-13, a test version; adds the ignore-rate, square-pulse and Q-spread curation)
+    {"bilateral": ("DANE_bilateral", "DANE_bilateral_curated_permissive_test")},
+    # The two assets it combines: 3-channel and the 4-channel rebuild
+    {"3ch": ("DANE_3channels_curated", "results-a278f830-9bf2-48e8-9928-a2ff78e4818f"),
+     "4ch": ("DANE_4channels_curated", "results-ddcccb0f-f18f-44a6-a2b1-caba680d28a1")},
+)
 
-#: Go-cue times on the df_fip clock (first-go-cue-zeroed) drive every peri-event alignment.
-ALIGN_COL = "goCue_start_time_in_session"
-
-#: (label, region substring, plot colour) for each example signal type.
-EXAMPLE_SPECS = [
-    ("NAc DA (dLight)", "dLight", "#2ca02c"),
-    ("PL (GCaMP)", "Gcamp", "#1f77b4"),
-    ("NAc ACh (rAch)", "rAch", "#d62728"),
-]
 
 #: Reward/failure streak bins from ``num_reward_past``
 #: (positive = consecutive rewards, negative = consecutive failures).
@@ -113,415 +89,6 @@ STREAK_BINS = [
 ]
 
 
-# ── Loading + curation ────────────────────────────────────────────────────────
-
-def discover_plot_locs(data_root: str = DEFAULT_DATA_ROOT) -> List[str]:
-    """Rediscover candidate ``plot_loc`` roots by globbing for df_fip.parquet.
-
-    Fallback for when the asset layout changes and :data:`DEFAULT_PLOT_LOC` no longer
-    resolves; normally unnecessary.
-
-    Parameters
-    ----------
-    data_root : str
-        Directory to search recursively.
-
-    Returns
-    -------
-    list of str
-        Sorted, de-duplicated ``plot_loc`` roots.
-    """
-    fip_files = glob.glob(os.path.join(data_root, "**", "df_fip.parquet"), recursive=True)
-    locs = sorted({os.path.dirname(os.path.dirname(os.path.dirname(f))) for f in fip_files})
-    print("%d session(s) found across %d root(s): %s" % (len(fip_files), len(locs), locs))
-    return locs
-
-
-def find_curation_json(curation_file: str = DEFAULT_CURATION_FILE) -> str:
-    """Locate a curation JSON inside the installed rachel package, with a /src fallback.
-
-    Parameters
-    ----------
-    curation_file : str
-        Basename without the ``.json`` extension.
-
-    Returns
-    -------
-    str
-        Absolute path to the curation JSON.
-    """
-    try:
-        import rachel_analysis_utils
-
-        pkg_dir = os.path.dirname(rachel_analysis_utils.__file__)
-        cand = os.path.join(pkg_dir, "data_curation", curation_file + ".json")
-        if os.path.exists(cand):
-            return cand
-    except Exception:
-        pass
-    hits = glob.glob("/src/**/data_curation/" + curation_file + ".json", recursive=True)
-    assert hits, "Could not locate " + curation_file + ".json"
-    return hits[0]
-
-
-def patch_curation_helpers() -> None:
-    """Inject the private helpers ``apply_curation_nwb_list`` calls but never imports.
-
-    Upstream bug: ``data_curation_helpers.apply_curation_nwb_list`` calls
-    ``_parse_session_id``, ``_actual_map_for_session``, ``_get_df_trials_col_mapping``,
-    ``_map_event_to_intended_measurement`` and ``_apply_channel_drops_to_nwb`` without
-    importing them. They live in ``nwb_utils`` and work fine there.
-
-    Skipping curation is *not* a safe shortcut instead: several subjects (e.g. 808054) have
-    per-session ``misconnect_fixes`` overriding the global ``correct_mapping``, so applying
-    ``correct_mapping`` alone would silently mislabel most of their sessions' regions.
-
-    Gated on ``hasattr`` so it becomes a no-op once the helpers are imported upstream.
-    """
-    from rachel_analysis_utils import data_curation_helpers as r_curation
-
-    for helper in (
-        "_parse_session_id",
-        "_actual_map_for_session",
-        "_get_df_trials_col_mapping",
-        "_map_event_to_intended_measurement",
-        "_apply_channel_drops_to_nwb",
-    ):
-        if not hasattr(r_curation, helper):
-            setattr(r_curation, helper, getattr(r_utils, helper))
-
-
-def load_curated_sessions(
-    plot_loc: str = DEFAULT_PLOT_LOC,
-    curation_file: str = DEFAULT_CURATION_FILE,
-    use_curation: bool = True,
-    return_tables: bool = False,
-    verbose: bool = True,
-):
-    """Load the saved parquet hierarchy and apply curation, releasing the raw copy.
-
-    Memory note: the pre-curation ``nwb_list_raw`` and the unused second curated list
-    are locals here, so both are released when this returns. Curation deep-copies, so
-    holding the raw list alongside the curated one roughly doubles peak RSS — which
-    matters at this dataset's ~32 GB per copy.
-
-    ``drop_borderline`` is pinned to False: it only controls whether a *second* list
-    (``curated_with_borderline``) gets built. ``nwb_list`` itself is identical either way,
-    but with True ``apply_curation_nwb_list`` deep-copies and processes every session again
-    to build a list nothing here uses.
-
-    Parameters
-    ----------
-    plot_loc : str
-        Root of the saved parquet hierarchy.
-    curation_file : str
-        Curation JSON basename, without extension.
-    use_curation : bool
-        When False, return the uncurated list (no ``intended_measurement`` region labels,
-        so :func:`pick_example` will not work).
-    return_tables : bool
-        Also return the ``df_sess`` / ``df_slope`` / ``df_bg`` side tables, which
-        ``load_nwb_list`` returns but the ``fip_*`` notebooks do not use.
-    verbose : bool
-        Print progress and per-session summaries.
-
-    Returns
-    -------
-    list
-        ``nwb_list``, or ``(nwb_list, df_sess, df_slope, df_bg)`` when ``return_tables``.
-    """
-    assert os.path.isdir(plot_loc), (
-        "%s not found. Attach asset 6babbf3d-6970-4456-aab5-d730ed57c269 "
-        "(saved parquet hierarchy) to this capsule, or fix the path." % plot_loc
-    )
-    if verbose:
-        print("plot_loc =", plot_loc)
-
-    # load_nwb_list returns df_bg (background-coefficient csvs, bg_coef*.csv) as a 4th
-    # value; unused here (same as df_sess/df_slope) but must be unpacked.
-    nwb_list_raw, df_sess, df_slope, df_bg = r_utils.load_nwb_list(plot_loc, load_fip=True)
-    if verbose:
-        print("Loaded %d session(s)" % len(nwb_list_raw))
-
-    if not use_curation:
-        if verbose:
-            print("No curation applied; using raw nwb_list.")
-        nwb_list = nwb_list_raw
-    else:
-        from rachel_analysis_utils import data_curation_helpers as r_curation
-
-        patch_curation_helpers()
-
-        json_path = find_curation_json(curation_file)
-        with open(json_path, "r") as fh:
-            df_curation = json.load(fh)
-        if verbose:
-            print("Using curation:", json_path)
-
-        nwb_list, _unused_with_borderline = r_curation.apply_curation_nwb_list(
-            nwb_list_raw, df_curation, drop_borderline=False
-        )
-        if verbose:
-            print("Curated -> %d session(s) kept." % len(nwb_list))
-
-        del nwb_list_raw, _unused_with_borderline
-        gc.collect()
-
-    if return_tables:
-        return nwb_list, df_sess, df_slope, df_bg
-    return nwb_list
-
-
-# ── Session setup ─────────────────────────────────────────────────────────────
-
-def select_session(
-    nwb_list: Sequence,
-    idx: int = 0,
-    require_trial_zero_gocue: bool = False,
-) -> Tuple[object, pd.DataFrame, pd.DataFrame]:
-    """Pick one session and validate the assumptions downstream code relies on.
-
-    Asserts (rather than sorts) that each series is already time-ordered, so
-    :func:`get_trace` slices and ``np.interp`` stay valid — this fails loudly if upstream
-    ever delivers unsorted rows.
-
-    Parameters
-    ----------
-    nwb_list : sequence
-        Curated sessions from :func:`load_curated_sessions`.
-    idx : int
-        Index into ``nwb_list``.
-    require_trial_zero_gocue : bool
-        Additionally assert ``goCue_start_time_in_trial == 0`` for every trial. Needed only
-        by notebooks that run ``enrich_fip_in_df_trials``, whose per-trial window math
-        assumes the go cue is trial-local time zero.
-
-    Returns
-    -------
-    tuple
-        ``(nwb, df_fip, df_trials)``.
-    """
-    nwb = nwb_list[idx]
-    df_fip = nwb.df_fip
-    assert (df_fip.groupby("event")["timestamps"].diff().dropna() >= 0).all(), (
-        "df_fip timestamps not sorted within an event — sort before use"
-    )
-    df_trials = getattr(nwb, "df_trials", None)
-
-    assert df_trials is not None and ALIGN_COL in df_trials.columns, (
-        "Need '%s' on df_trials (first-go-cue-zeroed clock). Available: %s"
-        % (ALIGN_COL, None if df_trials is None else list(df_trials.columns))
-    )
-
-    if require_trial_zero_gocue:
-        assert "goCue_start_time_in_trial" in df_trials.columns, (
-            "Need 'goCue_start_time_in_trial'"
-        )
-        assert np.allclose(df_trials["goCue_start_time_in_trial"].dropna(), 0.0), (
-            "goCue_start_time_in_trial is not all zero -- enrich_fip_in_df_trials's per-trial "
-            "window math assumes the go cue is trial-local time zero. Re-check before proceeding."
-        )
-
-    print(
-        "session_id:", nwb.session_id, "| df_fip", df_fip.shape, "| trials", df_trials.shape
-    )
-    return nwb, df_fip, df_trials
-
-
-def parse_event(name: str) -> Tuple[str, str, str]:
-    """Split a df_fip event name into (channel, fiber, variant).
-
-    ``'G_1_dff-poly' -> ('G', '1', 'dff-poly')``; ``'R_0' -> ('R', '0', 'raw')``.
-    """
-    parts = name.split("_")
-    channel = parts[0]
-    fiber = parts[1] if len(parts) > 1 else "?"
-    variant = "_".join(parts[2:]) if len(parts) > 2 else "raw"
-    return channel, fiber, variant
-
-
-def get_trace(
-    df_fip: pd.DataFrame, event_name: str, data_col: str = "data"
-) -> Tuple[np.ndarray, np.ndarray]:
-    """``(t, y)`` arrays for one df_fip series (asserted time-sorted per event)."""
-    sub = df_fip[df_fip["event"] == event_name]
-    return sub["timestamps"].to_numpy(), sub[data_col].to_numpy()
-
-
-def build_meta(df_fip: pd.DataFrame) -> pd.DataFrame:
-    """Signal inventory for one session's df_fip.
-
-    Drops ``pearsonR`` series (signal-signal correlations, not photometry) and reads each
-    event's region label from whichever curation format the asset carries:
-
-    * JSON curation applied at load time (:func:`load_curated_sessions`, ``DA_NE_4channels``):
-      events keep their patch-cord names (``G_1_dff-...``) and the region is in
-      ``intended_measurement``.
-    * CSV curation applied when the asset was built (rachel-analysis-utils ``b7b7487`` onward,
-      e.g. ``DANE_3channels_curated``): ``apply_curation_df_fip`` has already replaced each
-      event with its target (``latNAcc(L)-DA``), moved the patch cord to ``patch_cord`` and the
-      variant to ``preprocessing``, and there is no ``intended_measurement``. Load these with
-      ``use_curation=False``.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Columns ``event, channel, fiber, variant`` and, if available, ``region``.
-    """
-    events = [e for e in sorted(df_fip["event"].unique()) if "pearson" not in e.lower()]
-    if "intended_measurement" not in df_fip.columns and "patch_cord" in df_fip.columns:
-        # Curated at build time: the event name is the region label.
-        first = df_fip.groupby("event")[["patch_cord", "preprocessing"]].first()
-        rows = []
-        for e in events:
-            channel, fiber, _ = parse_event(str(first.loc[e, "patch_cord"]))
-            rows.append((e, channel, fiber, str(first.loc[e, "preprocessing"]), e))
-        return pd.DataFrame(rows, columns=["event", "channel", "fiber", "variant", "region"])
-
-    meta = pd.DataFrame(
-        [(e,) + parse_event(e) for e in events],
-        columns=["event", "channel", "fiber", "variant"],
-    )
-    if "intended_measurement" in df_fip.columns:  # curation -> region labels
-        ev2region = (
-            df_fip.dropna(subset=["intended_measurement"])
-            .groupby("event")["intended_measurement"]
-            .agg(lambda s: s.mode().iloc[0] if not s.mode().empty else None)
-        )
-        meta["region"] = meta["event"].map(ev2region)
-    return meta
-
-
-def pick_example(
-    meta: pd.DataFrame,
-    df_fip: pd.DataFrame,
-    region_substr: str,
-    prefer_variant: str = "dff",
-) -> Dict[str, str]:
-    """Choose one df_fip 'event' whose region label matches ``region_substr``.
-
-    Prefers a dff variant, then the series with the most finite samples.
-
-    ``regex=False`` on both matches is required, not cosmetic: region labels contain
-    literal parentheses (``'NAc(R)-dLight'``), and under pandas' default ``regex=True``
-    a substring like ``'NAc(R)'`` is read as a capture group and matches nothing.
-
-    Parameters
-    ----------
-    meta : pandas.DataFrame
-        From :func:`build_meta`; must carry a ``region`` column.
-    df_fip : pandas.DataFrame
-        Used to count finite samples per candidate.
-    region_substr : str
-        Case-insensitive literal substring of the region label, e.g. ``'dLight'``,
-        ``'Gcamp'``, ``'NAc(R)'``.
-    prefer_variant : str
-        Preferred preprocessing variant substring.
-
-    Returns
-    -------
-    dict
-        ``{'event', 'region', 'channel', 'variant'}``.
-    """
-    if "region" not in meta.columns or meta["region"].dropna().empty:
-        raise RuntimeError(
-            "No region labels on `meta` -- load with use_curation=True so df_fip carries "
-            "intended_measurement."
-        )
-    cand = meta[meta["region"].fillna("").str.contains(region_substr, case=False, regex=False)]
-    if cand.empty:
-        raise ValueError(
-            "No FIP series with region matching %r. Have: %s"
-            % (region_substr, sorted(meta["region"].dropna().unique()))
-        )
-    pref = cand[cand["variant"].str.contains(prefer_variant, case=False, regex=False)]
-    pool = pref if not pref.empty else cand
-    best = max(pool["event"], key=lambda ev: int(np.isfinite(get_trace(df_fip, ev)[1]).sum()))
-    row = pool[pool["event"] == best].iloc[0]
-    return {
-        "event": best,
-        "region": row["region"],
-        "channel": row["channel"],
-        "variant": row["variant"],
-    }
-
-
-def pick_examples(
-    meta: pd.DataFrame, df_fip: pd.DataFrame, specs: Optional[Sequence] = None
-) -> List[Dict[str, str]]:
-    """Run :func:`pick_example` over ``specs``, attaching each spec's label and colour.
-
-    Parameters
-    ----------
-    meta, df_fip : pandas.DataFrame
-        As for :func:`pick_example`.
-    specs : sequence of (label, region_substr, colour), optional
-        Defaults to :data:`EXAMPLE_SPECS`.
-
-    Returns
-    -------
-    list of dict
-        One :func:`pick_example` result per spec, plus ``label`` and ``color``.
-    """
-    if specs is None:
-        specs = EXAMPLE_SPECS
-    examples = []
-    for label, substr, color in specs:
-        info = pick_example(meta, df_fip, substr)
-        info["label"], info["color"] = label, color
-        examples.append(info)
-    return examples
-
-
-def iter_region_signals(sessions: Sequence[dict], region_substr: str) -> Iterator[Tuple[dict, str]]:
-    """Yield ``(session_dict, event)`` for every FIP series whose region matches, across sessions.
-
-    ``regex=False`` for the same reason as :func:`pick_example`.
-    """
-    for s in sessions:
-        meta = s["meta"]
-        if "region" not in meta.columns:
-            continue
-        hit = meta[meta["region"].fillna("").str.contains(region_substr, case=False, regex=False)]
-        for ev in hit["event"]:
-            yield s, ev
-
-
-
-
-def enrich_trials(df_trials: pd.DataFrame, verbose: bool = True) -> pd.DataFrame:
-    """Add ``num_reward_past``, ``RPE-binned3`` and the rest of Rachel's trial columns.
-
-    Calls ``rachel_analysis_utils.analysis_utils.enrich_df_trials``. Upstream is all-or-nothing
-    and needs ``RPE_earned``, ``Q_chosen``, ``animal_response`` and ``choice_time_in_trial``, so a
-    loop over many sessions should catch its errors (see :func:`process_session`).
-
-    Parameters
-    ----------
-    df_trials : pandas.DataFrame
-        Trial table for one session (or several, keyed by ``ses_idx``).
-    verbose : bool
-        Unused; kept so existing calls keep working.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Enriched trial table.
-    """
-    from rachel_analysis_utils import analysis_utils as r_analysis
-
-    return r_analysis.enrich_df_trials(df_trials)
-
-
-def streak_go_cues(df_trials: pd.DataFrame, bin_fn) -> Optional[np.ndarray]:
-    """Go-cue times (session clock) for trials whose ``num_reward_past`` satisfies ``bin_fn``."""
-    if "num_reward_past" not in df_trials.columns:
-        return None
-    sub = df_trials.dropna(subset=[ALIGN_COL, "num_reward_past"])
-    mask = sub["num_reward_past"].map(bin_fn).astype(bool)
-    return sub.loc[mask, ALIGN_COL].to_numpy()
-
-
 # ── Motion energy ─────────────────────────────────────────────────────────────
 
 #: Aligned motion-energy table under ``data_root`` (asset e542022e-7d56-48ec-a940-d2dcc7ec4733, 2026-10-28,
@@ -531,9 +98,8 @@ def streak_go_cues(df_trials: pd.DataFrame, bin_fn) -> Optional[np.ndarray]:
 #: ``<camera>_roi_masks.npz`` and the ``rois`` / ``roi_masks`` index columns.
 ME_TABLE_NAME = "fip_motion_energy_aligned"
 
-#: Folder holding the ME table: Code Ocean's data mount, or ``$ME_DATA_ROOT`` when set (a local
-#: copy, e.g. ``../../data`` from ``code/``).
-ME_DATA_ROOT = os.environ.get("ME_DATA_ROOT", DEFAULT_DATA_ROOT)
+#: Folder holding the ME table (:data:`DATA_ROOT`; the name the ME functions' defaults use).
+ME_DATA_ROOT = DATA_ROOT
 
 #: Per-camera video screen (timing + image quality) from the video-analysis library's
 #: ``screen_sessions`` over the 301 curated FIP sessions (library 0.2.0). ``use`` is False for a
@@ -925,50 +491,6 @@ def motion_energy_to_session(
     return t_session, me, first_go_cue - float(info["harp_start"])
 
 
-def attach_me_to_df_fip(
-    df_fip: pd.DataFrame,
-    t_me: np.ndarray,
-    me: np.ndarray,
-    ses_idx: str,
-    event_name: str = "ME",
-) -> pd.DataFrame:
-    """Append **raw** motion energy to df_fip as a pseudo-channel (``event='ME'``).
-
-    This is the bridge into the upstream FIP machinery: ``plot_fip``'s PSTH functions and
-    the ``enrich_dfs`` normalizations all select a signal via ``df_fip['event'] == channel``,
-    so once ME is a channel they treat it exactly like photometry.
-
-    Pass **raw** ME, not z-scored: ``zscore_fip`` / ``enrich_fip_in_df_trials`` /
-    ``remove_tonic_df_fip`` all z-score ``data`` themselves, so pre-z-scored input would be
-    silently double-processed. To plot z-scored ME afterwards, run ``zscore_fip`` and ask
-    for ``data_column="data_z"``.
-
-    Parameters
-    ----------
-    df_fip : pandas.DataFrame
-        Tidy FIP table to append to.
-    t_me, me : numpy.ndarray
-        Motion energy on the session clock, from :func:`motion_energy_to_session`.
-    ses_idx : str
-        Session id, matching df_fip's ``ses_idx``.
-    event_name : str
-        Channel name for the pseudo-channel.
-
-    Returns
-    -------
-    pandas.DataFrame
-        ``df_fip`` with the ME rows appended.
-    """
-    me_rows = pd.DataFrame({
-        "timestamps": np.asarray(t_me, float),
-        "data": np.asarray(me, float),
-        "event": event_name,
-        "intended_measurement": "motion_energy",
-        "ses_idx": ses_idx,
-    })
-    return pd.concat([df_fip, me_rows], ignore_index=True)
-
-
 # ── CSV-curated assets: loading ───────────────────────────────────────────────
 
 #: Same-side DA and NE labels. ``medNAcc`` is left out so every animal contributes one DA site
@@ -1008,6 +530,41 @@ def find_asset_root(candidates: Sequence[str]) -> Optional[str]:
             if glob.glob(os.path.join(d, "df_curation_*.csv")):
                 return d
     return None
+
+
+def fip_asset_roots(data_root: str = DATA_ROOT, verbose: bool = True) -> Dict[str, str]:
+    """Roots of the first complete set in :data:`FIP_ASSET_SETS` found under ``data_root``.
+
+    Parameters
+    ----------
+    data_root : str
+        Folder holding the assets (:data:`DATA_ROOT`).
+    verbose : bool
+        Print the set used.
+
+    Returns
+    -------
+    dict
+        ``{asset name: root}``, roots as :func:`find_asset_root` returns them; the input of
+        :func:`inventory_pairs` and ``men_utils.inventory_sessions``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no set is complete. A partial set is never used, since it would silently drop the
+        animals of the missing asset.
+    """
+    for asset_set in FIP_ASSET_SETS:
+        roots = {name: find_asset_root([os.path.join(data_root, c) for c in cands])
+                 for name, cands in asset_set.items()}
+        if all(roots.values()):
+            if verbose:
+                for name, root in roots.items():
+                    print(f"FIP asset {name}: {root}")
+            return roots
+    wanted = " or ".join(" + ".join(c[0] for c in s.values()) for s in FIP_ASSET_SETS)
+    raise FileNotFoundError(f"no complete FIP asset set under {data_root}: attach {wanted} "
+                            "(or set FIP_DATA_ROOT)")
 
 
 def inventory_pairs(asset_roots: Dict[str, str]) -> pd.DataFrame:
@@ -1536,151 +1093,3 @@ def large_transients(z_a: np.ndarray, z_b: np.ndarray, t0: float, fs: float,
     big["lag"] = lag
     big["partner"] = np.abs(lag) <= match_win_s
     return big[["i", "t", "prominence", "lag", "partner"]]
-
-
-# ── Signal helpers ────────────────────────────────────────────────────────────
-
-
-def peri_event(
-    t,
-    y,
-    event_times,
-    t_before: float = 1.0,
-    t_after: float = 3.0,
-    fs: int = 20,
-    censor: bool = True,
-    censor_times=None,
-) -> pd.DataFrame:
-    """Align signal ``(t, y)`` to ``event_times`` via the AIND ETR primitive.
-
-    Returns a tidy DataFrame ``[time, event_number, event_time, data]``, ready to
-    ``groupby('time')``.
-
-    Parameters
-    ----------
-    t, y : array_like
-        Signal and its timestamps. NaNs are dropped before alignment.
-    event_times : array_like
-        Alignment times, on the same clock as ``t``.
-    t_before, t_after : float
-        Window around each event, in seconds.
-    fs : int
-        Output sampling rate for the common time grid.
-    censor : bool
-        Blank samples spilling past the next event. Use True for go cues; pass False for
-        closely-spaced events such as movement onsets, where censoring would erase most
-        of the window.
-    censor_times : array_like, optional
-        The full set of neighbouring events to censor against when ``event_times`` is a
-        subset (e.g. go cues for one reward-streak bin). Without it the primitive censors
-        only against the sparse subset and lets intervening trials bleed in.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Tidy event-triggered response.
-    """
-    s = pd.DataFrame({
-        "timestamps": np.asarray(t, float),
-        "data": np.asarray(y, float),
-    }).dropna()
-    return alignment.event_triggered_response(
-        data=s,
-        t="timestamps",
-        y="data",
-        event_times=np.asarray(event_times, float),
-        t_before=t_before,
-        t_after=t_after,
-        output_sampling_rate=fs,
-        output_format="tidy",
-        censor=censor,
-        censor_times=censor_times,
-    )
-
-
-def window_mean(series: pd.Series, lo: float, hi: float) -> float:
-    """Mean of a time-indexed Series over ``[lo, hi)`` seconds (NaN-safe).
-
-    Operates on a per-session ETR *mean trace* (time-indexed), which is why this is not
-    ``aind_dynamic_foraging_basic_analysis.metrics.trial_metrics.get_average_signal_window``
-    — that one adds a per-trial column to ``df_trials`` instead.
-    """
-    idx = series.index.to_numpy(float)
-    m = (idx >= lo) & (idx < hi)
-    return float(np.nanmean(series.values[m])) if m.any() else np.nan
-
-
-# ── Multi-session ─────────────────────────────────────────────────────────────
-
-def process_session(
-    nwb,
-    data_root: str = DEFAULT_DATA_ROOT,
-    onset_kw: Optional[dict] = None,
-    camera: str = "BottomCamera",
-) -> dict:
-    """Run the single-session pipeline and return a dict for cross-session analyses.
-
-    Mirrors the single-session path exactly, reusing :func:`build_meta` and
-    :func:`motion_energy_to_session`.
-
-    Parameters
-    ----------
-    nwb : object
-        One curated session.
-    data_root : str
-        Where Code Ocean mounts attached assets (the ME table among them).
-    onset_kw : dict, optional
-        Passed to ``signal_utils.threshold_onsets`` for the motion-energy onsets. Defaults to
-        :data:`ME_ONSET_KW`.
-    camera : str
-        Camera whose motion energy to use.
-
-    Returns
-    -------
-    dict
-        ``session_id, subject_id, nwb, df_fip, df_trials, meta, t_me, me, me_z,
-        me_onsets, go_cues``.
-
-    Raises
-    ------
-    ValueError, FileNotFoundError
-        When df_trials is missing, the session has no ME, or the ME table refused the camera
-        (:class:`MotionEnergyRefused`, a ValueError), so the caller can skip.
-    """
-    if onset_kw is None:
-        onset_kw = ME_ONSET_KW
-
-    df_trials = getattr(nwb, "df_trials", None)
-    if df_trials is None or ALIGN_COL not in df_trials.columns:
-        raise ValueError("missing df_trials / %s" % ALIGN_COL)
-
-    # Upstream enrich_df_trials is all-or-nothing, so one session missing a column must not fail
-    # the whole loop.
-    try:
-        df_trials_enr = enrich_trials(df_trials.copy(), verbose=False)
-    except Exception as e:
-        print(
-            "  [%s] enrich_trials failed (%s); streak bins off for this session"
-            % (nwb.session_id, type(e).__name__)
-        )
-        df_trials_enr = df_trials
-
-    t_me, me, _offset = motion_energy_to_session(
-        nwb.session_id, nwb.df_trials, camera=camera, data_root=data_root
-    )
-    me_z = su.zscore(me)
-    me_onsets = su.threshold_onsets(t_me, me_z, already_z=True, **onset_kw)
-
-    return {
-        "session_id": nwb.session_id,
-        "subject_id": nwb.session_id.split("_")[0],
-        "nwb": nwb,
-        "df_fip": nwb.df_fip,
-        "df_trials": df_trials_enr,
-        "meta": build_meta(nwb.df_fip),
-        "t_me": t_me,
-        "me": me,
-        "me_z": me_z,
-        "me_onsets": me_onsets,
-        "go_cues": df_trials_enr[ALIGN_COL].dropna().to_numpy(),
-    }

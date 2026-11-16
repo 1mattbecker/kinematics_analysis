@@ -68,7 +68,7 @@ def plot_etr(ax, etr: pd.DataFrame, color, label: Optional[str] = None, value_co
     """Mean ± SEM over events of a tidy event-triggered response.
 
     ``etr`` is the tidy output of ``aind_dynamic_foraging_data_utils.alignment
-    .event_triggered_response`` (or ``fip_utils.peri_event``): columns ``time``, ``event_number``
+    .event_triggered_response``: columns ``time``, ``event_number``
     and ``value_col``. Keyword arguments go to :func:`plot_mean_sem`.
     """
     if etr is None or etr.empty:

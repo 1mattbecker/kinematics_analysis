@@ -57,6 +57,7 @@ from aind_video_utils import read_mp4_frame_index  # noqa: E402
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
 import cue_me_maps as cmm  # noqa: E402  # video_url: S3 URL from the ME index, either raw layout
+import fip_utils as fu  # noqa: E402  # data locations
 import me_results as mr  # noqa: E402  # ME column names, ROI masks
 
 FONT = "/System/Library/Fonts/Supplemental/Arial.ttf"
@@ -142,15 +143,15 @@ def main():
     p.add_argument("--start", type=float, default=2342.8998720000964, help="session time, s from first go cue")
     p.add_argument("--duration", type=float, default=60.0)
     p.add_argument("--step", type=int, default=10, help="keep every step-th 500-Hz frame (10 = 50 fps, real time)")
-    p.add_argument("--me-root", default=os.environ.get("ME_DATA_ROOT", "../../data"))
-    p.add_argument("--fip-roots", nargs="+", default=["../../data/results-a278f830-9bf2-48e8-9928-a2ff78e4818f",
-                                                      "../../data/results-ddcccb0f-f18f-44a6-a2b1-caba680d28a1"])
-    p.add_argument("--out-dir", default="../data/figures/men")
+    p.add_argument("--me-root", default=fu.DATA_ROOT, help="folder holding the ME table and the FIP asset(s)")
+    p.add_argument("--fip-roots", nargs="+", default=None, help="FIP asset roots (default: fu.fip_asset_roots)")
+    p.add_argument("--out-dir", default=os.path.join(fu.FIG_ROOT, "men"))
     p.add_argument("--roi", default=None, help="side-camera ROI to outline and plot, e.g. whiskerpad_box")
     p.add_argument("--marks-csv", default=None, help="CSV of time (session s) and label to mark on the strip")
     p.add_argument("--playback-fps", type=float, default=None, help="output frame rate (default 500 / step: real time)")
     p.add_argument("--prefix", default="men01_example_clip", help="output file name before _<session>.mp4")
     args = p.parse_args()
+    args.fip_roots = args.fip_roots or list(fu.fip_asset_roots(args.me_root).values())
 
     index = pd.read_csv(os.path.join(args.me_root, "fip_motion_energy_aligned", "index.csv"))
     index["ses_idx"] = index["session"].str.split("_").str[1:3].str.join("_")

@@ -45,6 +45,8 @@ from aind_dynamic_foraging_behavior_video_analysis import video_clips as vc
 from scipy.ndimage import gaussian_filter, uniform_filter1d
 from scipy.signal import butter, filtfilt, find_peaks
 
+import fip_utils as fu  # data locations
+
 OPEN_DATA_URL = "https://aind-open-data.s3.us-west-2.amazonaws.com"
 CO_DATA_ROOT = "/root/capsule/data/"
 ME_TABLE_NAME = "fip_motion_energy_aligned"
@@ -334,12 +336,12 @@ def main():
     p.add_argument("--before", type=float, default=0.06, help="s before the cue")
     p.add_argument("--after", type=float, default=0.16, help="s after the cue")
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--me-root", default=os.environ.get("ME_DATA_ROOT", "../../data"))
-    p.add_argument("--fip-roots", nargs="+", default=["../../data/results-a278f830-9bf2-48e8-9928-a2ff78e4818f",
-                                                      "../../data/results-ddcccb0f-f18f-44a6-a2b1-caba680d28a1"])
-    p.add_argument("--clip-dir", default="../../data/cue_me_clips")
-    p.add_argument("--out-dir", default="../data/figures/men")
+    p.add_argument("--me-root", default=fu.DATA_ROOT, help="folder holding the ME table and the FIP asset(s)")
+    p.add_argument("--fip-roots", nargs="+", default=None, help="FIP asset roots (default: fu.fip_asset_roots)")
+    p.add_argument("--clip-dir", default=os.path.join(fu.CACHE_ROOT, "cue_me_clips"))
+    p.add_argument("--out-dir", default=os.path.join(fu.FIG_ROOT, "men"))
     args = p.parse_args()
+    args.fip_roots = args.fip_roots or list(fu.fip_asset_roots(args.me_root).values())
 
     import matplotlib
     matplotlib.use("Agg")

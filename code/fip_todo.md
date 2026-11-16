@@ -6,6 +6,38 @@ regrouped by analysis type; old names → new in `archive/README.md`).
 
 ---
 
+## Moving to the DA/NE paper's shared repo (started 2026-11-16)
+
+The ME and DA–NE analyses go into a shared repo with the paper's other authors: a Code Ocean capsule
+that also runs locally once the final FIP asset is on open data (S3).
+
+**What goes.**
+- Core: `men_00`, `men_01`, `men_03`, `fip_10`, `fip_11`, `fip_12`, `fip_13`, `fip_16`.
+- Optional: `fip_14`, `fip_15`, `fip_17`, `men_02`.
+- Stays here (exploratory): `men_04`, `men_05`, `men_06`.
+- Modules: `fip_utils`, `signal_utils`, `stats_utils`, `plot_utils`, `plotstyle`, `behavior_utils`,
+  `men_utils`, `me_results`.
+- ME table build (a `pipeline/` folder with the `inputs/` CSVs): `build_me_asset_map`,
+  `build_me_table`, `check_leading_lost_frames`, `s3_utils`. `build_me_asset_map` imports
+  `trigger_batch.make_client` from `../aind-motion-energy-batch-capsule/scripts`; ship
+  `me_assets_fip.csv` as its output, or copy `make_client`.
+
+**Done 2026-11-16.** One place for data locations (`fu.DATA_ROOT`, `CACHE_ROOT`, `FIG_ROOT`,
+`fu.fip_asset_roots`, capsule layout `data/` + `scratch/`); no notebook or script carries paths;
+`DANE_bilateral` (Rachel's combined asset, `4686d370`, test version) is used when attached; the
+archived notebooks' NWB-list path removed from `fip_utils`.
+
+**Next.**
+1. When Rachel's final combined asset exists: add its folder name to `fu.FIP_ASSET_SETS` if it differs,
+   attach it, rerun. Check how many of its 295 sessions are same-side DA/NE pairs (`fu.inventory_pairs`)
+   and which have no ME (the ME table covers the current 97); update the notebooks' **Data** paragraphs.
+2. Copy into the shared repo's layout; rename notebooks by question; one `requirements`/environment
+   for the libraries (Rachel's utils `864550d`, data-utils, basic-analysis, `aind_hierarchical_bootstrap`;
+   the video library only for the ME build).
+3. Local runs from open data: a download step for the FIP asset and the ME table into `data/`.
+
+---
+
 ## Plan: motion energy × DA/NE (talk for the brain-wide NM meeting)
 
 Questions: how do DA and NE relate to movement; does RPE coding relate to movement; what movement

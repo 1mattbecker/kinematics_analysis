@@ -8,8 +8,7 @@ Two kinds of input:
 
 * **Irregular samples** ``(t, y)``: :func:`threshold_onsets`, :func:`bin_to_grid`.
   (For event alignment of irregular samples use the AIND primitive,
-  ``aind_dynamic_foraging_data_utils.alignment.event_triggered_response``, or its wrapper
-  ``fip_utils.peri_event``.)
+  ``aind_dynamic_foraging_data_utils.alignment.event_triggered_response``.)
 * **A uniform grid** ``x`` with sample ``i`` at ``t0 + i / fs``: everything else.
 
 Lag convention (one for the whole repo): for :func:`norm_xcorr` and :func:`circular_xcorr`,

@@ -4,6 +4,29 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-11-16
 
+### `fip_*` / `men_*`: one place for data locations; old NWB-list path removed (branch `me-roi`)
+
+Getting the ME and DA–NE analyses ready for the DA/NE paper's shared repo (a Code Ocean capsule that
+also runs locally). Plan and what goes there: `fip_todo.md`, "Moving to the DA/NE paper's shared repo".
+
+- `fip_utils`: `DATA_ROOT` (`data/` next to `code/`, which is `/root/capsule/data` on Code Ocean;
+  locally `$FIP_DATA_ROOT`, or `$ME_DATA_ROOT` as before), `CACHE_ROOT` (`scratch/`, or `$FIP_CACHE_ROOT`),
+  `FIG_ROOT` (`scratch/figures`), `FIP_ASSET_SETS` and `fip_asset_roots`. It returns the first complete set:
+  Rachel's combined `DANE_bilateral` (asset `4686d370`, a test version) when attached, else
+  `DANE_3channels_curated` + `DANE_4channels_curated`. It never uses a partial set: before, a missing
+  4-channel asset silently dropped its six animals.
+- `fip_10`–`fip_17`, `men_00`–`men_06`: the copied `ASSET_CANDIDATES` table, `IS_CO` switches and
+  `../../data` paths replaced by `fu.fip_asset_roots(DATA_ROOT)` and the locations above
+  (`ME_DATA_ROOT` → `DATA_ROOT` in the notebooks). `cue_me_maps.py`, `make_me_example_clip.py`,
+  `make_me_noise_clips.py`: `--me-root`, `--fip-roots`, `--clip-dir`, `--out-dir` default to the same.
+- Caches renamed: `fip_05/pairs.pkl` → `fip/pairs.pkl`, `fip_07/trial_tables.pkl` → `fip/trial_tables.pkl`
+  (on Code Ocean they rebuild once; `men_00`, `men_04`, `men_06` keep their scratch folders). Locally the
+  caches and the `fip`/`men` figures moved into `scratch/` (now in `.gitignore`).
+- `fip_utils` drops the NWB-list path used only by the archived `fip_00`–`fip_04` (`load_curated_sessions`,
+  `select_session`, `build_meta`, `pick_example(s)`, `iter_region_signals`, `enrich_trials`,
+  `streak_go_cues`, `process_session`, `attach_me_to_df_fip`, `peri_event`, `window_mean` and their
+  constants) and its `fastparquet`, `rachel_analysis_utils` and `alignment` imports: 1,686 → ~1,100 lines.
+
 ### `men_06` §6–7: whisker-pad events without licking, against the bottom camera and in the whisking band (branch `me-roi`)
 
 - §6: 70 ± 6% of the whisker-pad events without licking have no bottom-camera ME event within ±0.25 s (1.8 ±

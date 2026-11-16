@@ -36,6 +36,10 @@ The `fip_*` series was regrouped into `fip_10`–`fip_17`, one notebook per kind
 the CSV-curated assets. Cells were copied, not rewritten; the table says where each part went.
 Everything shown in the 2026-10-07 talk ("DA, NE and movement") is in the new notebooks.
 
+`fip_00`–`fip_04` called `fip_utils`' NWB-list path (`load_curated_sessions`, `select_session`,
+`build_meta`, `pick_example`, `process_session`, `peri_event`, …), removed on 2026-11-16; check out
+commit `3064d4a` to run them as they were.
+
 | Notebook | Where its content went |
 |---|---|
 | `fip_00_explore.ipynb` | Retired. Single-session exploration on the JSON-curated `DA_NE_4channels` asset; superseded by `fip_10`/`fip_12` and `men_00` |
