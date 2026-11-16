@@ -2,6 +2,20 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-16
+
+### `men_06` §6–7: whisker-pad events without licking, against the bottom camera and in the whisking band (branch `me-roi`)
+
+- §6: 70 ± 6% of the whisker-pad events without licking have no bottom-camera ME event within ±0.25 s (1.8 ±
+  0.3 per min; 36–89% by mouse). The bottom camera's ME still rises after them as much as the pad's (0–0.5 s:
+  bottom 1.95, side 1.88, pad 1.96 SD above p1); it stays below its own event threshold.
+- §7: spectra of the 500 Hz traces (`fu.motion_energy_to_session`) in the 1 s after each event without licking,
+  Hann periodogram divided by 1–50 Hz power. No source has a peak at 8–15 Hz. The pad trace has more power than
+  the side whole frame from ~10 to 40 Hz; its share in 8–15 Hz is 0.105 ± 0.008 against 0.090 ± 0.010 (side,
+  Wilcoxon p = 0.04, 8 mice) and 0.093 ± 0.010 (bottom, p = 0.11); the same with no bottom-camera event. The
+  bottom camera has a peak at ~28 Hz in the mean spectrum, with a wide spread across mice.
+- Numbers moved to §8.
+
 ## 2026-11-12
 
 ### `men_06_whisker_pad_me`: the whisker-pad ME trace (branch `me-roi`)

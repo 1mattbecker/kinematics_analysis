@@ -89,9 +89,11 @@ their sessions:
    traces. Open: the pad's lick-triggered peak lag is +0.03 s (whole frame −0.02/−0.03 s), from a flat top over
    ±0.1 s around the lick; run `men_06` on Code Ocean.
    §5: pad ME events without licking (2.8/min, 39% of pad events, mostly quiet inter-trial) come with as much
-   bottom- and side-camera ME as pad ME, so the box does not isolate whisking. Ways to get at whisking alone, not
-   yet done: pad events with no bottom-camera event; whisking-band (~8–15 Hz) power of the 500 Hz pad trace; a
-   smaller box on the whisker shafts in front of the snout; whisker tracking.
+   bottom- and side-camera ME as pad ME, so the box does not isolate whisking. 2026-11-16, §6–7: 70% of them have
+   no bottom-camera event, but the bottom ME rises as much after those too; 500 Hz spectra after them have no
+   8–15 Hz peak in any trace, and the pad's 8–15 Hz share is only slightly above the whole frame's (0.105 vs
+   0.090 / 0.093). Not yet done: a smaller box on the whisker shafts in front of the snout (new ROI, ME rebuild);
+   whisker tracking.
 2. `men_04`'s go-cue items on the whisker pad: 500 Hz whisker-pad ME in the first 150 ms. Is the 10–16 ms jump and the
    ~24 / ~55 ms peaks there, and in which of the five "jump" and four "no jump" mice? This tests the startle-plus-whisking
    reading that so far rests on the maps.
