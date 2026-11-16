@@ -43,6 +43,13 @@ To compare iso with the corrected channels, put iso through the same 3 Hz low-pa
 
 ## Open
 
+First, check what the pipeline's own QC already measures, so the items below don't redo it. Each processed
+asset's `dff-qc/` holds `quality_control.json` (one status per ROI and method; per the README: calibration
+ratio of the F0 fit, baseline level at start/middle/end, motion-correction noise inflation, pre-GoCue drift;
+auto-fail when β > 10) and the figures (fit; Iso-vs-channel scatter with the fitted line; power spectra with
+the 0.05 and 3 Hz cutoffs). The raw-data QC (`qc-raw/`, `aind-fip-qc-raw`) is a separate set. Read these for
+the curated sessions, note which items below they already answer, and whether Rachel's curation uses any of them.
+
 Do not use motion-corrected iso: the correction sets it to 0. Residual artifact is the part of a channel's
 artifact that iso does not contain. Instead:
 
@@ -58,3 +65,14 @@ artifact that iso does not contain. Instead:
    fiber and session. If they differ, the correction is miscalibrated at the timescale of movement:
    under-corrected if the fast β is larger, over-corrected if smaller. The slow β may be set by leftover
    bleaching or blood volume, the fast one by licking.
+6. Iso SNR per fiber. A weak iso gives a large β and adds iso's noise to the corrected trace; that was the
+   failure in `aind-fip-dff` issue #50 (open), where the developer suggested using the uncorrected trace for
+   such data. Measure iso's signal (slow and movement-locked variance) against its noise per fiber and
+   session, alongside the fitted β.
+7. Corrected vs uncorrected. Rerun the ME analyses (`fip_10` §2, `fip_12` §1, `fip_13`) on `dff-bright`
+   (no `mc`, same 3 Hz low-pass) next to the curated traces: how much of each result the correction changes.
+
+Background on the regression's asymmetric weights (c = 2 above the line, 4.685 below): issue #50, comment of
+2025-08-13 — iso holds only the artifact and the channel the artifact plus mostly upward activity, so the fit
+follows the lower edge of the channel-vs-iso cloud. The value 2 is not explained anywhere (default since PR
+#57, Oct 2025).
