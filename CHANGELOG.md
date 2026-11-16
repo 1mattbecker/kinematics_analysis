@@ -2,6 +2,16 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-16
+
+### `kin_08_nose_jaw_movement` §11b: low-likelihood positions and the image centre
+
+- Tests whether low-likelihood positions sit at the image centre (where Lightning Pose's heatmap average lands
+  when the heatmap is flat): raw positions below `CONF` by likelihood band with the image centre and the
+  confident median marked, distance to the centre by band, and the jaw's displacement split into the part toward
+  the centre and the part along image x. The image size comes from a §6 frame on Code Ocean
+  (`NOSE_JAW_IMAGE_SIZE` locally). Checked locally on the synthetic session only.
+
 ## 2026-11-12
 
 ### `kin_08_nose_jaw_movement`: full frames, nose likelihood, grooming flag
