@@ -106,10 +106,15 @@ except the `fip_13` regressions; what each found:
    - **DA fiber: β = 0 in 41 of 85 fiber-sessions** (818586 20/20, 808054 7/15, 809487 6/8); median β 0.03.
      Half the curated DA is uncorrected and nothing in `df_fip` says which. Per session (checked 2026-11-16,
      not in the notebook): in those sessions iso moves *opposite* to DA at 0.2–1 Hz in 42 of 43 (median
-     slope −8, coherence 0.16; 808054 and 816214 at −20 to −30, coherence 0.3–0.5) — iso carries an inverted
-     copy of DA (dLight's 415 nm excitation is not isosbestic), not a light-path artifact, and the NAc iso
-     rises at ME onsets as DA does, so movement anticorrelation is not the cause. **The clip to 0 is correct
-     there**: a positive β would add DA back into itself. What stays uncorrected is a positive slow
+     slope −8, coherence 0.16; 808054 and 816214 at −20 to −30, coherence 0.3–0.5). Not a light-path
+     artifact (those are positive) and not movement anticorrelation (the NAc iso rises at ME onsets as DA
+     does). Two candidates: an inverted DA copy in iso (415 nm off dLight's isosbestic point), or a
+     *lagged* positive iso response — the in-band slope is coherence × cos(phase), and iso's hump at 1–2 s
+     after an outcome against DA's peak at ~0.3 s is half a period at 0.5 Hz. Fig. 4b favours the lag: the
+     iso hump is larger on rewarded than unrewarded outcomes, i.e. it moves with DA, not against it.
+     Decisive check: cross-spectrum phase at 0.2–1 Hz (linear in frequency = lag; flat 180° = inversion).
+     **Either way β = 0 is the right outcome**: the relation is lagged or inverted, not a same-time shared
+     component one gain could remove. What stays uncorrected is a positive slow
      (0.01–0.05 Hz) relation in 28 of 43, ≤ 0.5 % of DA's power. The β > 0 sessions show the mirror image:
      no relation at 0.2–1 Hz, a positive slow one that the pipeline removes at no cost (fig. 2e at 1.00).
    - **NE fiber: β median 1.11 (IQR 0.83–1.49), β = 0 in 3**; noise inflation median 1.50, up to 2.5, rising
@@ -141,8 +146,8 @@ except the `fip_13` regressions; what each found:
    the PL controls move more (R 0.2–0.4 %, Iso 0.05–0.1 %; fig. 4b), still 10× below NE. This tests only
    artifact visible at 415 nm (and 560 nm); a 470 nm-specific artifact needs a sensor-dead recording.
    NAc fiber: Iso × ME peak r 0.20 (p = 0.012) and +0.15–0.3 % at ME onsets with wide spread across
-   animals — the NAc iso does follow movement; with β = 0 nothing is removed, and given the inverted DA copy
-   in that iso (§4.1) nothing should be.
+   animals — the NAc iso does follow movement; with β = 0 nothing is removed, and given the lagged or inverted
+   iso–DA relation (§4.1) nothing should be.
 4. **Fiber events.** One fiber-session above 30 robust SD: 809491 2025-10-20, DA fiber (126 SD, 65 s above
    10 SD, at 49.9 min; every channel), the session the video-latents work found; the ± 30 s rule removes
    2.5 % of it. Peak |iso| median 5.3 SD, p99 16.
