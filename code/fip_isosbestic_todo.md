@@ -114,7 +114,10 @@ except the `fip_13` regressions; what each found:
 2. **Iso physics on our sessions matches the video-latents result.** On the NE fiber Iso's spectrum is flat
    above 0.2 Hz at the level of R and of G's own noise floor (at 1–3 Hz Iso has 0.9× G's power); coherence
    with G (median over animals) is 0.14 at 0.01–0.05 Hz, 0.09 at 0.05–0.2, 0.06 at 0.2–1 and at the
-   estimator's floor (0.027 vs 0.023) at 1–3 Hz; β fitted within each band above 0.05 Hz is ≤ 0; the
+   estimator's floor (0.027 vs 0.023) at 1–3 Hz; β fitted within each band above 0.05 Hz is ≤ 0 — expected
+   whenever the sensor rises with the same movements that dip iso (cov(signal, artifact) < 0 outweighs the
+   gain term), so it neither measures the 470 nm artifact gain nor rules one out; the slow-band fit and the
+   asymmetric loss are the pipeline's guards against that bias; the
    corrected/bleach-only power ratio is 0.98, 1.07, 1.32 and **2.29 at 1–3 Hz**. On the DA fiber the ratio
    is 1.0 everywhere (β ≈ 0), though Iso × G coherence is 0.12–0.22 below 1 Hz.
    - Worked example (818585 2025-12-16, β 1.19): at 1–3 Hz removed 0.007 %², added 0.285 %², net +0.277 on
