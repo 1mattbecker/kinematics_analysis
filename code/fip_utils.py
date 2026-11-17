@@ -780,7 +780,9 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
 PROCESSED_NWB_CSV = os.path.join(REPO_ROOT, "inputs", "fip_processed_nwb.csv")
 
 #: Stages of a channel in the processed NWB: raw fluorescence (``acquisition``), bleach-corrected
-#: dF/F and motion-corrected dF/F (``processing/fiber_photometry``).
+#: dF/F and motion-corrected dF/F (``processing/fiber_photometry``). The NWBs also hold the same two
+#: dF/F stages for the ``bright-v2`` F0 fit (``dff-bright-v2``, ``dff-bright-v2_mc-iso-IRLS``) and
+#: for ``poly``.
 NWB_STAGES = ("raw", "dff-bright", "dff-bright_mc-iso-IRLS")
 NWB_CHANNELS = ("G", "Iso", "R")
 
@@ -859,7 +861,8 @@ def load_nwb_stages(s3_location: str, fibers: Sequence[int], channels: Sequence[
     channels, stages : sequence of str
         From :data:`NWB_CHANNELS`, :data:`NWB_STAGES`.
     cache_dir : str, optional
-        Folder for one ``.npz`` per NWB; a later call with the same or fewer series reads it.
+        Folder for one ``.npz`` per NWB. Series already cached are read from it; only the missing
+        ones are fetched, and the cache keeps every series fetched so far.
 
     Returns
     -------
@@ -872,23 +875,24 @@ def load_nwb_stages(s3_location: str, fibers: Sequence[int], channels: Sequence[
     name = os.path.basename(s3_location.rstrip("/"))
     keys = [(f, c, s) for f in fibers for c in channels for s in stages]
     cache = os.path.join(cache_dir, name + ".npz") if cache_dir else None
-    out = {}
+    cached = {}
     if cache and os.path.exists(cache):
         with np.load(cache) as z:
-            if "t" in z and all(f"{f}|{c}|{s}" in z for f, c, s in keys):
-                out["t"] = z["t"]
-                for f, c, s in keys:
-                    out[(f, c, s)] = z[f"{f}|{c}|{s}"]
-                return out
-    g = zarr.open_consolidated(fsspec.get_mapper(s3_to_https(s3_location)), mode="r")
+            cached = {k: z[k] for k in z.files}
+    missing = [k for k in keys if f"{k[0]}|{k[1]}|{k[2]}" not in cached]
+    if missing or "t" not in cached:
+        g = zarr.open_consolidated(fsspec.get_mapper(s3_to_https(s3_location)), mode="r")
+        for f, c, s in missing or keys[:1]:
+            series = f"acquisition/{c}_{f}" if s == "raw" else f"processing/fiber_photometry/{c}_{f}_{s}"
+            if "t" not in cached:
+                cached["t"] = g[f"{series}/timestamps"][:]
+            cached[f"{f}|{c}|{s}"] = g[f"{series}/data"][:]
+        if cache:
+            os.makedirs(cache_dir, exist_ok=True)
+            np.savez(cache, **cached)
+    out = {"t": cached["t"]}
     for f, c, s in keys:
-        series = f"acquisition/{c}_{f}" if s == "raw" else f"processing/fiber_photometry/{c}_{f}_{s}"
-        if "t" not in out:
-            out["t"] = g[f"{series}/timestamps"][:]
-        out[(f, c, s)] = g[f"{series}/data"][:]
-    if cache:
-        os.makedirs(cache_dir, exist_ok=True)
-        np.savez(cache, t=out["t"], **{f"{f}|{c}|{s}": out[(f, c, s)] for f, c, s in keys})
+        out[(f, c, s)] = cached[f"{f}|{c}|{s}"]
     return out
 
 
@@ -902,12 +906,14 @@ def load_pipeline_qc(s3_location: str, method: str = "bright", cache_dir: Option
                      ) -> pd.DataFrame:
     """The dF/F pipeline's QC for one session, one row per (fiber, channel).
 
-    Reads ``quality_control.json`` next to the NWB. Columns: ``fiber, channel``, the F0 terms
-    (``b_inf, b_slow, b_fast, b_rapid, b_bright, t_slow, t_fast, t_rapid, t_bright``; a term the
-    model selection left out is 0 / NaN), ``calibration_ratio`` (median negative residual over
-    the Gaussian expectation), ``beta`` (iso coefficient; G and R only, NaN for Iso),
-    ``noise_inflation`` (noise of the corrected over the uncorrected trace) and the evaluation's
-    ``status``.
+    Reads ``quality_control.json`` next to the NWB. Columns: ``fiber, channel``, the F0 terms as
+    the method names them (``bright``: ``b_inf, b_slow, b_fast, b_rapid, b_bright, t_slow, t_fast,
+    t_rapid, t_bright``; ``bright-v2``: ``b_inf, b1, tau1, b2, tau2, b3, tau3, b_bright,
+    tau_bright``; a term the model selection left out is 0 / NaN), ``calibration_ratio`` (median
+    negative residual over the Gaussian expectation), ``pre_gocue_dff`` and ``pre_gocue_drift``
+    (mean dF/F before the go cue and its drift over the session, bleach-only stage), ``beta`` (iso
+    coefficient; G and R only, NaN for Iso), ``noise_inflation`` (noise of the corrected over the
+    uncorrected trace) and the evaluation's ``status``.
     """
     import json
     url = s3_to_https(s3_location.rsplit("/nwb/", 1)[0] + "/quality_control.json")
@@ -938,11 +944,14 @@ def load_pipeline_qc(s3_location: str, method: str = "bright", cache_dir: Option
         for i, ch in enumerate(v["index"]):
             r = rows.setdefault((roi, ch), dict(fiber=roi, channel=ch))
             if m["name"].startswith("Baseline correction"):
-                for k in ("b_inf", "b_slow", "b_fast", "b_rapid", "b_bright",
-                          "t_slow", "t_fast", "t_rapid", "t_bright"):
-                    r[k] = v[k][i] if v[k][i] is not None else np.nan
+                for k in v:
+                    if k != "index":
+                        r[k] = v[k][i] if v[k][i] is not None else np.nan
             elif m["name"].startswith("Calibration ratio"):
                 r["calibration_ratio"] = v["ratio"][i]
+            elif m["name"].startswith("Pre-GoCue") and m["name"].endswith("(dff)"):
+                r["pre_gocue_dff"] = v["mean_dff"][i]
+                r["pre_gocue_drift"] = v["total_drift"][i]
             elif m["name"].startswith("Motion correction"):
                 r["beta"] = v["coefficient"][i]
                 r["noise_inflation"] = v["noise_inflation"][i]

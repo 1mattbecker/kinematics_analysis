@@ -185,6 +185,18 @@ except the `fip_13` regressions; what each found:
    (β ≈ 0); NE at ME onsets +0.03 z (ns). The correction lowers every coupling measure that involves NE,
    as added noise would.
 
+6. **The `bright-v2` F0 fit does not change any of this** (notebook §6, 2026-11-17). `aind-fip-dff` PR #91
+   (2026-11-03) added `bright-v2` and made it the default; these NWBs hold both, and the curated traces use
+   `bright`. The two bleach-only traces agree to 1 − r ≤ 3e-5 in every band from 0.01 to 3 Hz on both
+   fibers; F0 differs only below 0.01 Hz and in its level (DA bleach-only power 0.91× with v2 at every
+   band, NE 0.99×). β correlates 0.93 (DA) and 0.94 (NE) across fiber-sessions, NE median 1.09 vs 1.11,
+   β = 0 in 42 vs 41 DA and 3 vs 3 NE fiber-sessions. On the NE fiber the corrected/bleach-only power
+   ratio is 0.98, 1.07, 1.32, 2.34 with v2 against 0.98, 1.07, 1.32, 2.29 (no band differs, p ≥ 0.5);
+   noise inflation 1.51 vs 1.50. NE × ME peak r rises 0.636 → 0.694 without the subtraction (8/9 animals,
+   p = 0.012) and DA × NE 0.265 → 0.312 (9/9). Where v2 differs is the F0 level the pipeline's own QC
+   sees: median |pre-GoCue dF/F| on G 3.2 % vs 8.8 % (DA) and 0.17 % vs 0.60 % (NE). The calibration
+   ratio also changed its noise estimate in PR #91, so its two values are not comparable.
+
 Decisions still open: (a) switch the NE target to bleach-only, or to a filtered-iso subtraction (the numbers
 above argue for either; `fip_10`, `fip_12`, `fip_13` would rerun); DA stays as the pipeline has it — no case for
 a change. Plan item 8 is a single rule for both fibers that would replace this per-sensor choice; (b) the fiber-event rule (one session affected), (c) what to file on

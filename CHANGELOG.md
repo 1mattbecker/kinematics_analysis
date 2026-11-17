@@ -2,6 +2,21 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-17
+
+### `fip_18` §6: the `bright-v2` F0 fit (branch `me-roi`)
+
+`aind-fip-dff` PR #91 (2026-11-03) added a second F0 fit, `bright-v2`, now the pipeline's default; the
+curated traces use `bright`. New §6 reads both from the same NWBs and repeats §2's power ratios and §5's
+coupling measures with `bright-v2`. Every result about the iso subtraction on NE is unchanged: the two
+bleach-only traces agree to 1 − r ≤ 3e-5 in every band from 0.01 to 3 Hz, β correlates 0.94, and the NE
+power ratio at 1–3 Hz is 2.34 vs 2.29. Old §6 (numbers) is now §7.
+
+- `fip_utils.load_nwb_stages` keeps every series fetched so far in its cache and fetches only the missing
+  ones (it used to rewrite the cache with the requested series only).
+- `fip_utils.load_pipeline_qc` reads either method's F0 terms (`bright-v2` names them `b1`, `tau1`, …) and
+  adds `pre_gocue_dff` and `pre_gocue_drift`.
+
 ## 2026-11-16
 
 ### `fip_18_iso_correction`: what the isosbestic correction does to the curated traces (branch `me-roi`)
