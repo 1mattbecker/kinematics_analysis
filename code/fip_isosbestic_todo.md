@@ -121,10 +121,15 @@ except the `fip_13` regressions; what each found:
      a bleach-only variance of 0.199 (×2.4); at 0.05–0.2 Hz (coherence 0.39) net −0.38. Subtracting the
      0.05 Hz-filtered iso keeps that removal and adds nothing above 0.2 Hz; a phase-shuffled iso adds the
      same as the real one in every band — the addition is set by var(iso) alone.
-3. **Movement is barely in the PL iso.** NE fiber: Iso at ME onsets −0.05 % (p = 0.004, a small dip), R
-   +0.04 %, G +1.1 %; Iso × ME peak r −0.02 (ns). So β·Iso subtracted at ME onsets is noise, not an
-   artifact (fig. 3e). NAc fiber: Iso × ME peak r 0.20 (p = 0.012) and +0.15 % at ME onsets with wide
-   spread across animals — the NAc iso does follow movement, but β ≈ 0 means the pipeline removes none of it.
+3. **Movement is barely in the PL iso.** NE fiber: the movement-locked part of Iso (its average at ME
+   onsets) is a −0.05 % dip (p = 0.004); R +0.04 % at the onset, ~+0.1 % over 1–3 s; G +1.1 %; Iso × ME
+   peak r −0.02 (ns). So β·Iso subtracted trial by trial at those moments is almost entirely Iso's own
+   fluctuation (0.9× G's power at 1–3 Hz, §2), and the correction changes NE's movement response by
+   +0.05 % (1.10 → 1.16 %, the dip removed) while adding that noise (fig. 3e–f). At the go cue and outcome
+   the PL controls move more (R 0.2–0.4 %, Iso 0.05–0.1 %; fig. 4b), still 10× below NE. This tests only
+   artifact visible at 415 nm (and 560 nm); a 470 nm-specific artifact needs a sensor-dead recording.
+   NAc fiber: Iso × ME peak r 0.20 (p = 0.012) and +0.15–0.3 % at ME onsets with wide spread across
+   animals — the NAc iso does follow movement, but β ≈ 0 means the pipeline removes none of it.
 4. **Fiber events.** One fiber-session above 30 robust SD: 809491 2025-10-20, DA fiber (126 SD, 65 s above
    10 SD, at 49.9 min; every channel), the session the video-latents work found; the ± 30 s rule removes
    2.5 % of it. Peak |iso| median 5.3 SD, p99 16.
