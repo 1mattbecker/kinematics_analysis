@@ -1,7 +1,7 @@
 # Isosbestic correction: what it does to the curated traces
 
 Does the pipeline's isosbestic motion correction remove movement artifact from DA and NE, or add noise, and
-what does that do to the ME analyses (`fip_10` §2, `fip_12` §1, `fip_13`)? Asked for by Kyle Severson.
+what does that do to the ME analyses (`fip_10` §2, `fip_12` §1, `fip_13`).
 Technical questions only; the biology stays in the video-latents repo. Split out of `fip_todo.md` 2026-11-16.
 
 ---
@@ -74,7 +74,7 @@ tell Rachel / file on `aind-fip-dff`.
 2. **Replicate the iso physics on our sessions.** Iso spectrum against each channel's noise floor; coherence
    iso × bleach-only channel by band; β by band (slow < 0.05 Hz as the pipeline, 0.5–3 Hz, and in windows
    around ME onsets); power added by the correction per band. Per fiber and session; DA and NE fibers.
-   Include the subtraction arithmetic as a worked example (§4, notebook §2a): per band,
+   Include the subtraction arithmetic as a worked example (notebook §2a): per band,
    var(G − β·iso) = var(G) − 2β·cov(G, iso) + β²·var(iso); the middle term is removal and needs coherence,
    the last is added whatever iso holds. Ask upstream why PR #38 (2025-03) switched from subtracting the
    0.05 Hz-filtered iso to the unfiltered one; subtracting the filtered iso would keep the slow removal
@@ -92,7 +92,56 @@ tell Rachel / file on `aind-fip-dff`.
 6. Open, no plan yet: a sensor-dead control at PL (GFP / mutant sensor) through the same pipeline, if any
    exist; ACh has no same-wavelength reference on the NAc fiber.
 
-## 4. Notebook and documentation
+## 4. Results (`fip_18_iso_correction`, first run 2026-11-16, 85 sessions / 9 animals)
+
+Local run on the 3ch/4ch assets with the public NWBs of `DANE_bilateral` (aind-fip-dff 19.0); 3 of the 88
+ME sessions have no public NWB (818585 2026-01-20, 818586 2026-01-02 and 2026-01-30). Plan items 1–5 done
+except the `fip_13` regressions; what each found:
+
+1. **The pipeline is understood.** The corrected trace is reproduced exactly from the NWB's bleach-only G
+   and Iso and the QC's β (max difference 7e-17). The QC JSON carries everything per fiber and channel
+   (F0 terms, calibration ratio, β, noise inflation); Rachel's curation columns (`snr`, `skewness`,
+   `kurtosis`, `drop_reason`) use none of it. The evaluation status is **Fail for all 85 sessions** (worst
+   of the four fibers wins), so it cannot serve as a filter.
+   - **DA fiber: β = 0 in 41 of 85 fiber-sessions** (818586 20/20, 808054 7/15, 809487 6/8); median β 0.03.
+     Half the curated DA is uncorrected and nothing in `df_fip` says which.
+   - **NE fiber: β median 1.11 (IQR 0.83–1.49), β = 0 in 3**; noise inflation median 1.50, up to 2.5, rising
+     linearly with β.
+   - The curated `data` of the local 3ch/4ch assets (built from the 2025-12 processing, aind-fip-dff v14)
+     differs from the public NWB's corrected trace (v19) in 32 of 85 sessions (r < 0.99); four of 808054's
+     (2025-09-03 to 09-08) barely resemble it (r 0.02–0.56). The two processing versions do not give the
+     same traces; on Code Ocean with `DANE_bilateral` the curated trace is the v19 one.
+2. **Iso physics on our sessions matches the video-latents result.** On the NE fiber Iso's spectrum is flat
+   above 0.2 Hz at the level of R and of G's own noise floor (at 1–3 Hz Iso has 0.9× G's power); coherence
+   with G (median over animals) is 0.14 at 0.01–0.05 Hz, 0.09 at 0.05–0.2, 0.06 at 0.2–1 and at the
+   estimator's floor (0.027 vs 0.023) at 1–3 Hz; β fitted within each band above 0.05 Hz is ≤ 0; the
+   corrected/bleach-only power ratio is 0.98, 1.07, 1.32 and **2.29 at 1–3 Hz**. On the DA fiber the ratio
+   is 1.0 everywhere (β ≈ 0), though Iso × G coherence is 0.12–0.22 below 1 Hz.
+   - Worked example (818585 2025-12-16, β 1.19): at 1–3 Hz removed 0.007 %², added 0.285 %², net +0.277 on
+     a bleach-only variance of 0.199 (×2.4); at 0.05–0.2 Hz (coherence 0.39) net −0.38. Subtracting the
+     0.05 Hz-filtered iso keeps that removal and adds nothing above 0.2 Hz; a phase-shuffled iso adds the
+     same as the real one in every band — the addition is set by var(iso) alone.
+3. **Movement is barely in the PL iso.** NE fiber: Iso at ME onsets −0.05 % (p = 0.004, a small dip), R
+   +0.04 %, G +1.1 %; Iso × ME peak r −0.02 (ns). So β·Iso subtracted at ME onsets is noise, not an
+   artifact (fig. 3e). NAc fiber: Iso × ME peak r 0.20 (p = 0.012) and +0.15 % at ME onsets with wide
+   spread across animals — the NAc iso does follow movement, but β ≈ 0 means the pipeline removes none of it.
+4. **Fiber events.** One fiber-session above 30 robust SD: 809491 2025-10-20, DA fiber (126 SD, 65 s above
+   10 SD, at 49.9 min; every channel), the session the video-latents work found; the ± 30 s rule removes
+   2.5 % of it. Peak |iso| median 5.3 SD, p99 16.
+   - **A step ~3 s after every task event** (go cue, rewarded, unrewarded) is in **every channel of both
+     fibers** — Iso, R and G alike (fig. 4b), and Iso/R also spike at the event itself. Common to all
+     channels means optical or acquisition, not the sensors. Source unknown; a rig-side question.
+5. **Downstream.** Bleach-only vs corrected, per animal: NE × ME peak r 0.64 → 0.70 (8/9 animals up,
+   p = 0.008), its lag 0.18 → 0.10 s; DA × NE peak r 0.27 → 0.31 (9/9, p = 0.004); DA measures unchanged
+   (β ≈ 0); NE at ME onsets +0.03 z (ns). The correction lowers every coupling measure that involves NE,
+   as added noise would.
+
+Decisions still open: (a) switch the NE target to bleach-only (the numbers above argue for it; `fip_10`,
+`fip_12`, `fip_13` would rerun), (b) the fiber-event rule (one session affected), (c) what to file on
+`aind-fip-dff`: β = 0 unlabelled, iso noise added above 0.2 Hz (subtracting the 0.05 Hz-filtered iso would
+avoid it), the 3 s common-mode step.
+
+## 5. Notebook and documentation
 
 One notebook, `fip_18_iso_correction`, Code Ocean plus local (`.venv-fip`; the NWBs read from public S3,
 cached under `scratch/fip_18/`). Each section is one plan item; figures listed are the ones to keep.

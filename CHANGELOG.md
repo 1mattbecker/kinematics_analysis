@@ -4,6 +4,23 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-11-16
 
+### `fip_18_iso_correction`: what the isosbestic correction does to the curated traces (branch `me-roi`)
+
+New notebook and `fip_isosbestic_todo.md` (plan, background and results). The curated `data` column is
+`dff-bright_mc-iso-IRLS` from `aind-fip-dff` 19.0 (`c1733bb`): one iso coefficient β per fiber, fitted on
+traces low-passed at 0.05 Hz and applied at every frequency, then a 3 Hz low-pass. The notebook reads every
+stage of both fibers (raw, bleach-only, corrected; G, Iso, R) and the pipeline's `quality_control.json` from
+the processed NWBs on public S3 and reproduces the corrected trace exactly. Findings on 85 sessions / 9
+animals: the DA fiber has β = 0 in 41 fiber-sessions (uncorrected, unlabelled); on the NE fiber Iso is at
+the noise floor above 0.2 Hz, incoherent with G there, and the subtraction raises NE's power at 1–3 Hz
+2.3× (noise inflation median 1.5); Iso carries almost no movement response on the PL fiber; one fiber event
+(809491 2025-10-20); a common-mode step ~3 s after every task event in all channels; bleach-only NE gives
+higher NE × ME (0.64 → 0.70) and DA × NE (0.27 → 0.31) coupling. Decision on the NE target still open.
+
+- `fip_utils`: `processed_nwb_locations`, `load_nwb_stages` (zarr over HTTPS, cached), `load_pipeline_qc`,
+  `fiber_of_events`, `session_time_offset`, `noise_lowpass`, `s3_to_https`; `inputs/fip_processed_nwb.csv`
+  (session → public NWB, from `DANE_bilateral`'s `df_sess` tables).
+
 ### `fip_*` / `men_*`: one place for data locations; old NWB-list path removed (branch `me-roi`)
 
 Getting the ME and DA–NE analyses ready for the DA/NE paper's shared repo (a Code Ocean capsule that
