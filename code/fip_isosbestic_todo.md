@@ -142,7 +142,7 @@ except the `fip_13` regressions; what each found:
      **Either way β = 0 is the right outcome**: the relation is lagged or inverted, not a same-time shared
      component one gain could remove. What stays uncorrected is a positive slow
      (0.01–0.05 Hz) relation in 28 of 43, ≤ 0.5 % of DA's power. The β > 0 sessions show the mirror image:
-     no relation at 0.2–1 Hz, a positive slow one that the pipeline removes at no cost (fig. 2e at 1.00).
+     no relation at 0.2–1 Hz, a positive slow one that the pipeline removes at no cost (fig. 2d at 1.00).
    - **NE fiber: β median 1.11 (IQR 0.83–1.49), β = 0 in 3**; noise inflation median 1.50, up to 2.5, rising
      linearly with β.
    - The curated `data` of the local 3ch/4ch assets (built from the 2025-12 processing, aind-fip-dff v14)
