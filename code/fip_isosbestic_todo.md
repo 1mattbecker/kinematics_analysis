@@ -104,7 +104,14 @@ except the `fip_13` regressions; what each found:
    `kurtosis`, `drop_reason`) use none of it. The evaluation status is **Fail for all 85 sessions** (worst
    of the four fibers wins), so it cannot serve as a filter.
    - **DA fiber: β = 0 in 41 of 85 fiber-sessions** (818586 20/20, 808054 7/15, 809487 6/8); median β 0.03.
-     Half the curated DA is uncorrected and nothing in `df_fip` says which.
+     Half the curated DA is uncorrected and nothing in `df_fip` says which. Per session (checked 2026-11-16,
+     not in the notebook): in those sessions iso moves *opposite* to DA at 0.2–1 Hz in 42 of 43 (median
+     slope −8, coherence 0.16; 808054 and 816214 at −20 to −30, coherence 0.3–0.5) — iso carries an inverted
+     copy of DA (dLight's 415 nm excitation is not isosbestic), not a light-path artifact, and the NAc iso
+     rises at ME onsets as DA does, so movement anticorrelation is not the cause. **The clip to 0 is correct
+     there**: a positive β would add DA back into itself. What stays uncorrected is a positive slow
+     (0.01–0.05 Hz) relation in 28 of 43, ≤ 0.5 % of DA's power. The β > 0 sessions show the mirror image:
+     no relation at 0.2–1 Hz, a positive slow one that the pipeline removes at no cost (fig. 2e at 1.00).
    - **NE fiber: β median 1.11 (IQR 0.83–1.49), β = 0 in 3**; noise inflation median 1.50, up to 2.5, rising
      linearly with β.
    - The curated `data` of the local 3ch/4ch assets (built from the 2025-12 processing, aind-fip-dff v14)
@@ -134,7 +141,8 @@ except the `fip_13` regressions; what each found:
    the PL controls move more (R 0.2–0.4 %, Iso 0.05–0.1 %; fig. 4b), still 10× below NE. This tests only
    artifact visible at 415 nm (and 560 nm); a 470 nm-specific artifact needs a sensor-dead recording.
    NAc fiber: Iso × ME peak r 0.20 (p = 0.012) and +0.15–0.3 % at ME onsets with wide spread across
-   animals — the NAc iso does follow movement, but β ≈ 0 means the pipeline removes none of it.
+   animals — the NAc iso does follow movement; with β = 0 nothing is removed, and given the inverted DA copy
+   in that iso (§4.1) nothing should be.
 4. **Fiber events.** One fiber-session above 30 robust SD: 809491 2025-10-20, DA fiber (126 SD, 65 s above
    10 SD, at 49.9 min; every channel), the session the video-latents work found; the ± 30 s rule removes
    2.5 % of it. Peak |iso| median 5.3 SD, p99 16.
@@ -146,8 +154,9 @@ except the `fip_13` regressions; what each found:
    (β ≈ 0); NE at ME onsets +0.03 z (ns). The correction lowers every coupling measure that involves NE,
    as added noise would.
 
-Decisions still open: (a) switch the NE target to bleach-only (the numbers above argue for it; `fip_10`,
-`fip_12`, `fip_13` would rerun), (b) the fiber-event rule (one session affected), (c) what to file on
+Decisions still open: (a) switch the NE target to bleach-only, or to a filtered-iso subtraction (the numbers
+above argue for either; `fip_10`, `fip_12`, `fip_13` would rerun); DA stays as the pipeline has it — no case for
+a change; (b) the fiber-event rule (one session affected), (c) what to file on
 `aind-fip-dff`: β = 0 unlabelled, iso noise added above 0.2 Hz (subtracting the 0.05 Hz-filtered iso would
 avoid it), the 3 s common-mode step.
 
