@@ -766,6 +766,191 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
     return out
 
 
+# ── Processed NWBs: every stage of the dF/F pipeline ─────────────────────────
+#
+# The curated df_fip carries one trace per sensor (``dff-bright_mc-iso-IRLS``). The processed NWB
+# it came from (``s3_location`` in Rachel's ``df_sess_<mouse>.csv``) holds every channel (G, Iso,
+# R) of every fiber at every stage: raw, bleach-corrected (``dff-bright``) and motion-corrected,
+# plus the pipeline's ``quality_control.json`` with the fitted F0 terms and the iso coefficient.
+# ``fip_18`` reads them from public S3 (``aind-open-data``, zarr over HTTPS).
+
+#: Session → processed NWB (public S3), from the ``df_sess`` tables of ``DANE_bilateral``
+#: (2026-11-13; NWBs processed 2026-11-10/11 by aind-fip-dff 19.0). Used when the curated asset at
+#: hand lists its NWBs in a private bucket (the 3ch / 4ch assets do).
+PROCESSED_NWB_CSV = os.path.join(REPO_ROOT, "inputs", "fip_processed_nwb.csv")
+
+#: Stages of a channel in the processed NWB: raw fluorescence (``acquisition``), bleach-corrected
+#: dF/F and motion-corrected dF/F (``processing/fiber_photometry``).
+NWB_STAGES = ("raw", "dff-bright", "dff-bright_mc-iso-IRLS")
+NWB_CHANNELS = ("G", "Iso", "R")
+
+#: The pipeline's noise filter on the motion-corrected trace: 2nd-order Butterworth, 3 Hz,
+#: zero-phase (``motion_correct``, ``cutoff_freq_noise``). Bleach-only traces get the same
+#: before any comparison.
+NOISE_LOWPASS_HZ = 3.0
+
+
+def processed_nwb_locations(asset_roots: Optional[Dict[str, str]] = None) -> pd.DataFrame:
+    """Where each session's processed NWB is, from ``df_sess`` tables or the inputs CSV.
+
+    Parameters
+    ----------
+    asset_roots : dict, optional
+        From :func:`fip_asset_roots`. Their ``df_sess_<mouse>.csv`` are read first; sessions whose
+        NWB is not on public S3 (``s3://aind-open-data/``) are then taken from
+        :data:`PROCESSED_NWB_CSV`.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per session: ``session, subject, s3_location, processed`` (date the NWB was
+        processed), ``source`` (``asset`` or ``csv``). Only public NWBs.
+    """
+    rows = []
+    for root in (asset_roots or {}).values():
+        for f in glob.glob(os.path.join(root, "df_sess_*.csv")) + \
+                glob.glob(os.path.join(root, "data", "df_sess_*.csv")):
+            d = pd.read_csv(f, usecols=["ses_idx", "subject_id", "s3_location"])
+            rows.append(d.rename(columns={"ses_idx": "session", "subject_id": "subject"})
+                        .assign(source="asset"))
+    csv = pd.read_csv(PROCESSED_NWB_CSV).assign(source="csv")
+    rows.append(csv[["session", "subject", "s3_location", "source"]])
+    out = pd.concat(rows, ignore_index=True)
+    out = out[out["s3_location"].str.startswith("s3://aind-open-data/", na=False)]
+    out = out.drop_duplicates("session", keep="first").reset_index(drop=True)
+    out["processed"] = out["s3_location"].str.extract(r"processed_(\d{4}-\d{2}-\d{2})")[0]
+    out["subject"] = out["subject"].astype(str)
+    return out[["session", "subject", "s3_location", "processed", "source"]]
+
+
+def s3_to_https(s3_location: str) -> str:
+    """``s3://bucket/key`` → ``https://bucket.s3.amazonaws.com/key``."""
+    bucket, key = s3_location[len("s3://"):].split("/", 1)
+    return f"https://{bucket}.s3.amazonaws.com/{key}"
+
+
+def fiber_of_events(path: str) -> Dict[str, int]:
+    """Curated event name → fiber (ROI) number, from ``df_fip['patch_cord']`` (``G_1`` → 1)."""
+    d = pd.read_parquet(os.path.join(path, "df_fip.parquet"), columns=["event", "patch_cord"])
+    d = d.drop_duplicates("event")
+    return {e: int(str(pc).split("_")[1]) for e, pc in zip(d["event"], d["patch_cord"])}
+
+
+def session_time_offset(path: str) -> float:
+    """Session time minus the NWB clock, from ``df_fip`` (``timestamps − raw_timestamps``)."""
+    d = pd.read_parquet(os.path.join(path, "df_fip.parquet"),
+                        columns=["timestamps", "raw_timestamps"]).iloc[:1000]
+    off = (d["timestamps"] - d["raw_timestamps"]).to_numpy()
+    if np.ptp(off) > 1e-6:
+        raise ValueError(f"{path}: session-time offset is not constant")
+    return float(off[0])
+
+
+def load_nwb_stages(s3_location: str, fibers: Sequence[int], channels: Sequence[str] = NWB_CHANNELS,
+                    stages: Sequence[str] = NWB_STAGES, cache_dir: Optional[str] = None) -> dict:
+    """Every requested channel and stage of the given fibers, from the processed NWB.
+
+    Parameters
+    ----------
+    s3_location : str
+        ``s3://aind-open-data/.../nwb/<name>.nwb`` (a zarr directory).
+    fibers : sequence of int
+        ROI numbers.
+    channels, stages : sequence of str
+        From :data:`NWB_CHANNELS`, :data:`NWB_STAGES`.
+    cache_dir : str, optional
+        Folder for one ``.npz`` per NWB; a later call with the same or fewer series reads it.
+
+    Returns
+    -------
+    dict
+        ``t``: timestamps on the NWB clock (the raw series' own); ``(fiber, channel, stage)``:
+        the trace. Every series in one NWB shares the timestamps.
+    """
+    import fsspec  # noqa: F401 — only this reader needs them
+    import zarr
+    name = os.path.basename(s3_location.rstrip("/"))
+    keys = [(f, c, s) for f in fibers for c in channels for s in stages]
+    cache = os.path.join(cache_dir, name + ".npz") if cache_dir else None
+    out = {}
+    if cache and os.path.exists(cache):
+        with np.load(cache) as z:
+            if "t" in z and all(f"{f}|{c}|{s}" in z for f, c, s in keys):
+                out["t"] = z["t"]
+                for f, c, s in keys:
+                    out[(f, c, s)] = z[f"{f}|{c}|{s}"]
+                return out
+    g = zarr.open_consolidated(fsspec.get_mapper(s3_to_https(s3_location)), mode="r")
+    for f, c, s in keys:
+        series = f"acquisition/{c}_{f}" if s == "raw" else f"processing/fiber_photometry/{c}_{f}_{s}"
+        if "t" not in out:
+            out["t"] = g[f"{series}/timestamps"][:]
+        out[(f, c, s)] = g[f"{series}/data"][:]
+    if cache:
+        os.makedirs(cache_dir, exist_ok=True)
+        np.savez(cache, t=out["t"], **{f"{f}|{c}|{s}": out[(f, c, s)] for f, c, s in keys})
+    return out
+
+
+def noise_lowpass(x: np.ndarray, fs: float, cutoff_hz: float = NOISE_LOWPASS_HZ) -> np.ndarray:
+    """The pipeline's noise filter (2nd-order Butterworth low-pass, zero-phase)."""
+    from scipy.signal import butter, sosfiltfilt
+    return sosfiltfilt(butter(2, cutoff_hz, fs=fs, output="sos"), x)
+
+
+def load_pipeline_qc(s3_location: str, method: str = "bright", cache_dir: Optional[str] = None
+                     ) -> pd.DataFrame:
+    """The dF/F pipeline's QC for one session, one row per (fiber, channel).
+
+    Reads ``quality_control.json`` next to the NWB. Columns: ``fiber, channel``, the F0 terms
+    (``b_inf, b_slow, b_fast, b_rapid, b_bright, t_slow, t_fast, t_rapid, t_bright``; a term the
+    model selection left out is 0 / NaN), ``calibration_ratio`` (median negative residual over
+    the Gaussian expectation), ``beta`` (iso coefficient; G and R only, NaN for Iso),
+    ``noise_inflation`` (noise of the corrected over the uncorrected trace) and the evaluation's
+    ``status``.
+    """
+    import json
+    url = s3_to_https(s3_location.rsplit("/nwb/", 1)[0] + "/quality_control.json")
+    cache = os.path.join(cache_dir, os.path.basename(s3_location) + ".qc.json") if cache_dir else None
+    if cache and os.path.exists(cache):
+        with open(cache) as fh:
+            qc = json.load(fh)
+    else:
+        from s3_utils import read_json
+        qc = read_json(url)
+        if qc is None:
+            raise FileNotFoundError(url)
+        if cache:
+            os.makedirs(cache_dir, exist_ok=True)
+            with open(cache, "w") as fh:
+                json.dump(qc, fh)
+    ev = [e for e in qc["evaluations"] if e["name"] == f"Preprocessing using method '{method}'"]
+    if not ev:
+        raise KeyError(f"no '{method}' evaluation in {url}")
+    ev = ev[0]
+    rows: Dict[Tuple[int, str], dict] = {}
+    for m in ev["metrics"]:
+        roi = re.search(r"ROI (\d+)", m["name"])
+        v = m["value"]
+        if roi is None or not isinstance(v, dict) or "index" not in v:
+            continue
+        roi = int(roi.group(1))
+        for i, ch in enumerate(v["index"]):
+            r = rows.setdefault((roi, ch), dict(fiber=roi, channel=ch))
+            if m["name"].startswith("Baseline correction"):
+                for k in ("b_inf", "b_slow", "b_fast", "b_rapid", "b_bright",
+                          "t_slow", "t_fast", "t_rapid", "t_bright"):
+                    r[k] = v[k][i] if v[k][i] is not None else np.nan
+            elif m["name"].startswith("Calibration ratio"):
+                r["calibration_ratio"] = v["ratio"][i]
+            elif m["name"].startswith("Motion correction"):
+                r["beta"] = v["coefficient"][i]
+                r["noise_inflation"] = v["noise_inflation"][i]
+    out = pd.DataFrame(list(rows.values())).sort_values(["fiber", "channel"]).reset_index(drop=True)
+    out["status"] = ev.get("latest_status")
+    return out
+
+
 # ── CSV-curated assets: per-trial measures ────────────────────────────────────
 
 def trial_measures(pair: dict, windows: Dict[str, Tuple[float, float]],
