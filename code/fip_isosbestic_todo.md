@@ -91,6 +91,32 @@ tell Rachel / file on `aind-fip-dff`.
    the input to decision (a).
 6. Open, no plan yet: a sensor-dead control at PL (GFP / mutant sensor) through the same pipeline, if any
    exist; ACh has no same-wavelength reference on the NAc fiber.
+7. **Pipeline QC against Rachel's curation, included and excluded sessions.** §4.1 checked only the 85
+   included sessions: all Fail, and the curation columns use none of the QC. Still unknown: which metric
+   (calibration ratio, baseline level, noise inflation, pre-GoCue drift, β > 10) drives the Fail, per fiber
+   and channel; whether the sessions and fibers Rachel dropped (`drop_reason`, and the sessions absent from
+   the curated assets) differ on those metrics from the ones kept; whether a QC metric would have caught
+   anything the curation missed (809491 2025-10-20) or excluded anything the curation kept. Needs the QC
+   JSON of every `DANE_bilateral` session (295 in `inputs/fip_processed_nwb.csv`), not only the ME ones.
+8. **A sensor-agnostic correction rule (possible solution to decision (a)).** One rule for every fiber,
+   decided from the iso channel itself, and kept out of reach of G's neural content and of downstream
+   results. Simplest version:
+   - Estimate iso's white-noise floor N from its bleach-corrected spectrum at 5–9 Hz (before the 3 Hz
+     low-pass); check it against R's floor in the same session (heart rate can alias into that band).
+   - Denoise iso with the zero-phase gain g(f) = max(0, 1 − N / P_iso(f)): near 1 where iso has structure,
+     near 0 where it is at its noise floor. G is not used.
+   - Subtract the pipeline's own β (fitted below 0.05 Hz, clipped ≥ 0) times the denoised iso.
+   Per fiber-session it reports N, the frequency where g = 0.5, β and the share of iso's power subtracted.
+   On §4's numbers it would subtract the slow part on PL and little above ~0.1 Hz, and leave the β = 0 DA
+   sessions alone, without the rule knowing the sensor. Fix the floor band and gain before rerunning §5.
+   Test it without a sensor: on R (no sensor, so it should never add power) and on a real G from another
+   fiber plus a known amount of this session's iso structure, including none (residual artifact, added
+   noise, change to the known signal, and whether that change correlates with ME). Known limits: an iso
+   carrying a copy of the sensor's signal is still subtracted in proportion to β (flag with the
+   cross-spectrum phase, §4.1); a stationary gain smooths steps and fiber events, which the fiber-event
+   rule handles. Possible additions once the simple version is tested: a gate that sets β to 0 when it is
+   not distinguishable from 0 within the session; wavelet shrinkage of iso in place of the spectral gain,
+   to keep sharp transients.
 
 ## 4. Results (`fip_18_iso_correction`, first run 2026-11-16, 85 sessions / 9 animals)
 
@@ -161,7 +187,7 @@ except the `fip_13` regressions; what each found:
 
 Decisions still open: (a) switch the NE target to bleach-only, or to a filtered-iso subtraction (the numbers
 above argue for either; `fip_10`, `fip_12`, `fip_13` would rerun); DA stays as the pipeline has it — no case for
-a change; (b) the fiber-event rule (one session affected), (c) what to file on
+a change. Plan item 8 is a single rule for both fibers that would replace this per-sensor choice; (b) the fiber-event rule (one session affected), (c) what to file on
 `aind-fip-dff`: β = 0 unlabelled, iso noise added above 0.2 Hz (subtracting the 0.05 Hz-filtered iso would
 avoid it), the 3 s common-mode step.
 
