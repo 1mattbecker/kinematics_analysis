@@ -123,9 +123,11 @@ except the `fip_13` regressions; what each found:
      same as the real one in every band — the addition is set by var(iso) alone.
 3. **Movement is barely in the PL iso.** NE fiber: the movement-locked part of Iso (its average at ME
    onsets) is a −0.05 % dip (p = 0.004); R +0.04 % at the onset, ~+0.1 % over 1–3 s; G +1.1 %; Iso × ME
-   peak r −0.02 (ns). So β·Iso subtracted trial by trial at those moments is almost entirely Iso's own
-   fluctuation (0.9× G's power at 1–3 Hz, §2), and the correction changes NE's movement response by
-   +0.05 % (1.10 → 1.16 %, the dip removed) while adding that noise (fig. 3e–f). At the go cue and outcome
+   peak r −0.02 (ns). Coherence at the floor and a −0.05 % average dip are the same fact: the movement-locked
+   part is ~1 % of Iso's power (0.05 % against a ~0.5 % trial-by-trial SD at 1–3 Hz). So β·Iso subtracted
+   at an onset is ~99 % Iso's own fluctuation; the correction changes NE's movement response by +0.05 %
+   (1.10 → 1.16 %, the dip removed — whether NE had it is unknowable, and R rises where Iso dips) while
+   adding that noise (fig. 3e–f). At the go cue and outcome
    the PL controls move more (R 0.2–0.4 %, Iso 0.05–0.1 %; fig. 4b), still 10× below NE. This tests only
    artifact visible at 415 nm (and 560 nm); a 470 nm-specific artifact needs a sensor-dead recording.
    NAc fiber: Iso × ME peak r 0.20 (p = 0.012) and +0.15–0.3 % at ME onsets with wide spread across
