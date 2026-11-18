@@ -902,6 +902,93 @@ def noise_lowpass(x: np.ndarray, fs: float, cutoff_hz: float = NOISE_LOWPASS_HZ)
     return sosfiltfilt(butter(2, cutoff_hz, fs=fs, output="sos"), x)
 
 
+MOTION_CUTOFF_HZ = 0.05                     # the pipeline fits β on traces low-passed below this
+BETA_FIT_BANDS = {"<0.01": (None, 0.01), "0.01–0.05": (0.01, 0.05)}   # together: the pipeline's fit range
+
+
+def _asymmetric_tukey(c_pos: float = 2.0, c_neg: float = 4.685):
+    """The pipeline's robust norm for β (``AsymmetricTukeyBiweight(2)``, ``aind-fip-dff`` ``c1733bb``),
+    copied because that package is not installed here. Positive residuals (G above the fit) lose
+    weight from 2 robust SDs, negative ones from 4.685."""
+    from statsmodels.robust.norms import RobustNorm
+
+    class AsymmetricTukey(RobustNorm):
+        def _c(self, z):
+            return np.where(z > 0, c_pos, c_neg)
+
+        def rho(self, z):
+            z = np.asarray(z)
+            c = self._c(z)
+            return np.where(np.abs(z) <= c, c ** 2 / 6 * (1 - (1 - (z / c) ** 2) ** 3), c ** 2 / 6)
+
+        def weights(self, z):
+            z = np.asarray(z)
+            c = self._c(z)
+            return np.where(np.abs(z) <= c, (1 - (z / c) ** 2) ** 2, 0.0)
+
+        def psi(self, z):
+            return np.asarray(z) * self.weights(z)
+
+        def psi_deriv(self, z):
+            z = np.asarray(z)
+            c = self._c(z)
+            t2 = (z / c) ** 2
+            return np.where(np.abs(z) <= c, (1 - t2) ** 2 - 4 * t2 * (1 - t2) / c ** 2, 0.0)
+
+    return AsymmetricTukey()
+
+
+def iso_beta_steps(g: np.ndarray, iso: np.ndarray, fs: float,
+                   bands: Optional[Dict[str, Tuple[Optional[float], float]]] = None) -> dict:
+    """The pipeline's β for one fiber, step by step, next to the slope of G on Iso in each band.
+
+    ``ols_lp`` is least squares on the traces low-passed at :data:`MOTION_CUTOFF_HZ`; it equals the
+    band slopes of :data:`BETA_FIT_BANDS` averaged with weights ``iso_share`` (each band's share of
+    the low-passed Iso power). ``rlm`` adds the pipeline's robust weights and ``pipeline`` its clip
+    at 0, which reproduces the β in ``quality_control.json``.
+
+    Parameters
+    ----------
+    g, iso : np.ndarray
+        Bleach-only (``dff-bright``) sensor and Iso traces of one fiber, full recording, NaNs dropped.
+    fs : float
+        Sampling rate (Hz).
+    bands : dict, optional
+        Extra bands ``name → (low or None, high)`` for slopes and correlations.
+
+    Returns
+    -------
+    dict
+        ``ols_lp``, ``rlm``, ``pipeline``, ``rlm_weight_mean``; per band ``beta|<band>`` (slope of
+        the band-passed G on the band-passed Iso, zero-phase 2nd-order Butterworth) and ``r|<band>``;
+        per fit band ``iso_share|<band>``.
+    """
+    from scipy.signal import butter, sosfiltfilt
+    from statsmodels.robust.robust_linear_model import RLM
+    from statsmodels.tools import add_constant
+
+    def bandpass(x, lo, hi):
+        sos = (butter(2, hi, fs=fs, output="sos") if lo is None
+               else butter(2, [lo, hi], btype="band", fs=fs, output="sos"))
+        return sosfiltfilt(sos, x - x.mean())
+
+    sos = butter(2, MOTION_CUTOFF_HZ, fs=fs, output="sos")
+    g_lp, iso_lp = sosfiltfilt(sos, g), sosfiltfilt(sos, iso)
+    fit = RLM(g_lp, add_constant(iso_lp), M=_asymmetric_tukey()).fit()
+    out = dict(ols_lp=np.polyfit(iso_lp, g_lp, 1)[0], rlm=fit.params[1], pipeline=max(fit.params[1], 0.0),
+               rlm_weight_mean=fit.weights.mean())
+    fit_power = {}
+    for name, (lo, hi) in {**BETA_FIT_BANDS, **(bands or {})}.items():
+        g_b, iso_b = bandpass(g, lo, hi), bandpass(iso, lo, hi)
+        out[f"beta|{name}"] = (g_b @ iso_b) / (iso_b @ iso_b)
+        out[f"r|{name}"] = np.corrcoef(g_b, iso_b)[0, 1]
+        if name in BETA_FIT_BANDS:
+            fit_power[name] = iso_b @ iso_b
+    for name, power in fit_power.items():
+        out[f"iso_share|{name}"] = power / sum(fit_power.values())
+    return out
+
+
 def load_pipeline_qc(s3_location: str, method: str = "bright", cache_dir: Optional[str] = None
                      ) -> pd.DataFrame:
     """The dF/F pipeline's QC for one session, one row per (fiber, channel).

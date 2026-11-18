@@ -2,6 +2,20 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-18
+
+### `fip_18` §2b: the pipeline's β step by step, per fiber-session (branch `me-roi`)
+
+New `fu.iso_beta_steps` reproduces the pipeline's β fit (to 1e-11) and splits it into steps: least
+squares on the 0.05 Hz low-passed traces (= the slopes of G on Iso below 0.01 Hz and at 0.01–0.05 Hz,
+weighted by each band's share of the low-passed Iso power), the robust weights, the clip at 0. The
+band below 0.01 Hz holds a median 82% of that power on both fibers, so the pipeline's β follows the
+slope there (NE r = 0.94). On DA the robust weights move β by a median 1.4 (r = 0.62 with least
+squares), and 38 of the 41 β = 0 fiber-sessions have a negative slope below 0.01 Hz while their
+0.01–0.05 Hz slope is positive in 26. §2b's figure shows every band slope, the fit before the clip and
+r(G, Iso) per band for each fiber-session. The asymmetric Tukey norm is copied into `fip_utils`
+(`aind-fip-dff` is not installed locally).
+
 ## 2026-11-17
 
 ### `fip_18` §6: the `bright-v2` F0 fit (branch `me-roi`)
