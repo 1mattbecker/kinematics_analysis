@@ -906,6 +906,57 @@ MOTION_CUTOFF_HZ = 0.05                     # the pipeline fits β on traces low
 BETA_FIT_BANDS = {"<0.01": (None, 0.01), "0.01–0.05": (0.01, 0.05)}   # together: the pipeline's fit range
 
 
+ISO_FLOOR_BAND_HZ = (5.0, 9.0)              # Iso's noise floor is read from its spectrum here
+
+
+def iso_denoise(iso: np.ndarray, fs: float, floor_band: Tuple[float, float] = ISO_FLOOR_BAND_HZ,
+                nperseg: int = 4096, smooth_octaves: float = 0.25) -> Tuple[np.ndarray, dict]:
+    """Iso with the part at its own noise floor removed, by a zero-phase Wiener gain from Iso alone.
+
+    Test implementation of the correction proposed in ``fip_isosbestic_todo.md`` §3 item 8. The
+    gain at each frequency is ``max(0, 1 − N / P_iso(f))``, where ``P_iso`` is Iso's Welch spectrum
+    (mean over ± ``smooth_octaves`` / 2 octaves) and ``N`` its median over ``floor_band``. Where
+    Iso is at its floor the gain is 0; where Iso's power is well above it, near 1. Nothing about
+    the sensor channel enters.
+
+    Parameters
+    ----------
+    iso : np.ndarray
+        Bleach-only Iso dF/F, no NaNs.
+    fs : float
+        Sampling rate (Hz).
+    floor_band : (float, float)
+        Band (Hz) where Iso is taken to be noise only.
+    nperseg : int
+        Welch segment length.
+    smooth_octaves : float
+        Width of the spectral smoothing, in octaves.
+
+    Returns
+    -------
+    iso_denoised : np.ndarray
+        Denoised Iso, mean removed.
+    info : dict
+        ``floor`` (N), ``f_half`` (lowest frequency above 0.01 Hz where the gain falls below 0.5),
+        ``share`` (variance of the denoised over the original Iso), ``f`` and ``gain`` (the gain
+        on the Welch grid).
+    """
+    from scipy.signal import welch
+    x = iso - iso.mean()
+    f, p = welch(x, fs=fs, nperseg=nperseg)
+    half = 2 ** (smooth_octaves / 2)
+    p_s = np.array([p[(f >= fi / half) & (f <= fi * half)].mean() if fi > 0 else p[0] for fi in f])
+    floor = float(np.median(p[(f >= floor_band[0]) & (f <= floor_band[1])]))
+    gain = np.clip(1 - floor / np.maximum(p_s, 1e-30), 0, 1)
+    gain[0] = 1.0                                         # the mean is removed anyway
+    freqs = np.fft.rfftfreq(len(x), 1 / fs)
+    x_dn = np.fft.irfft(np.fft.rfft(x) * np.interp(freqs, f, gain), len(x))
+    below = np.flatnonzero((f > 0.01) & (gain < 0.5))
+    info = dict(floor=floor, f_half=float(f[below[0]]) if len(below) else np.nan,
+                share=float(x_dn.var() / x.var()), f=f, gain=gain)
+    return x_dn, info
+
+
 def _asymmetric_tukey(c_pos: float = 2.0, c_neg: float = 4.685):
     """The pipeline's robust norm for β (``AsymmetricTukeyBiweight(2)``, ``aind-fip-dff`` ``c1733bb``),
     copied because that package is not installed here. Positive residuals (G above the fit) lose

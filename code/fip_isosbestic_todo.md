@@ -197,9 +197,32 @@ except the `fip_13` regressions; what each found:
    sees: median |pre-GoCue dF/F| on G 3.2 % vs 8.8 % (DA) and 0.17 % vs 0.60 % (NE). The calibration
    ratio also changed its noise estimate in PR #91, so its two values are not comparable.
 
+7. **What sets the pipeline's β** (notebook §2b, `fu.iso_beta_steps`, 2026-11-18; reproduces the QC β to
+   1e-11). Least squares below 0.05 Hz equals the slopes of G on Iso below 0.01 Hz and at 0.01–0.05 Hz
+   weighted by Iso power, and below 0.01 Hz holds a median 82 % of it on both fibers. On NE, β follows
+   the slope below 0.01 Hz (r = 0.94) and no faster band (r ≤ 0.36); the slope at 1–3 Hz is 0 in every
+   session. On DA the robust weights move β by a median 1.4 (r = 0.62 with least squares), the band slopes
+   change sign from band to band, and 38 of the 41 β = 0 fiber-sessions have a negative slope below 0.01 Hz.
+
+8. **First test of plan item 8** (notebook §7, `fu.iso_denoise`, 2026-11-18). Floor band 5–9 Hz, gain
+   smoothed over ¼ octave, the pipeline's β. NE: the gain on Iso falls below 0.5 at a median 0.02 Hz
+   (Iso is at its floor above that), and the fixed trace has the bleach-only power in every band from
+   0.05 to 3 Hz (pipeline → fix: 1.07 → 1.00, 1.32 → 1.01, 2.29 → 1.01) while keeping the slow
+   subtraction (0.98 → 0.96 at 0.01–0.05 Hz). R on the NE fiber: 1.03 → 1.00 above 0.05 Hz. DA: Iso
+   stays well above its floor up to ~2.6 Hz (gain 0.5 at a median 2.64 Hz), so the fix subtracts almost
+   what the pipeline does; DA G power is unchanged by either (ratios 1.00). Injected artifact (0.1–3 Hz,
+   in Iso and G, β = 1): on NE the fix leaves less error than subtracting the whole Iso at every level,
+   and less than no correction once the artifact exceeds ~1 × Iso's floor; on DA the fix and the whole
+   Iso are the same, because Iso's own fast structure, which G does not share (coherence ≤ 0.09), is
+   above the floor and gets subtracted. §5's measures with the fix: NE × ME peak r 0.637 → 0.710 (8/9,
+   p = 0.008; bleach-only 0.697), its lag 0.18 → 0.10 s (= bleach-only), NE at ME onsets 0.635 → 0.680 z
+   (7/9, p = 0.02), DA × NE 0.267 → 0.294 (9/9, p = 0.004; bleach-only 0.312). Open: the DA-fiber Iso
+   structure at 0.2–3 Hz that G does not share (what it is; a gain from Iso alone cannot exclude it);
+   the floor band against R's floor and heart rate; a split of the injection by gain.
+
 Decisions still open: (a) switch the NE target to bleach-only, or to a filtered-iso subtraction (the numbers
 above argue for either; `fip_10`, `fip_12`, `fip_13` would rerun); DA stays as the pipeline has it — no case for
-a change. Plan item 8 is a single rule for both fibers that would replace this per-sensor choice; (b) the fiber-event rule (one session affected), (c) what to file on
+a change. Plan item 8 is a single rule for both fibers that would replace this per-sensor choice (first test: §4 item 8); (b) the fiber-event rule (one session affected), (c) what to file on
 `aind-fip-dff`: β = 0 unlabelled, iso noise added above 0.2 Hz (subtracting the 0.05 Hz-filtered iso would
 avoid it), the 3 s common-mode step.
 

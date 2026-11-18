@@ -4,6 +4,16 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-11-18
 
+### `fip_18` §2c and §7: summary figure and a test of a fix (branch `me-roi`)
+
+§2c is a single summary figure for the NE fiber: bleach-only and corrected spectra, their ratio, and the
+Iso–G coherence against frequency. §7 tests the fix in `fip_isosbestic_todo.md` §3 item 8: new
+`fu.iso_denoise` filters Iso with the zero-phase gain max(0, 1 − N / P_iso) (N = Iso's 5–9 Hz floor), and
+the pipeline's β times the denoised Iso is subtracted. On NE it keeps the slow subtraction and leaves
+bleach-only power at 0.05–3 Hz (1–3 Hz: 2.29 → 1.01 × bleach-only) and on R; NE × ME peak r 0.637 →
+0.710. On DA it subtracts almost what the pipeline does, because the DA fiber's Iso stays above its floor
+up to ~2.6 Hz. Also: injected-artifact test, and §5's measures with the fix. Numbers are now §8.
+
 ### `fip_18` §2b: the pipeline's β step by step, per fiber-session (branch `me-roi`)
 
 New `fu.iso_beta_steps` reproduces the pipeline's β fit (to 1e-11) and splits it into steps: least
