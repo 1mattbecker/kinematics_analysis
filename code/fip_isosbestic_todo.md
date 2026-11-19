@@ -220,8 +220,8 @@ except the `fip_13` regressions; what each found:
    structure at 0.2–3 Hz that G does not share (what it is; a gain from Iso alone cannot exclude it);
    the floor band against R's floor and heart rate; a split of the injection by gain.
    Iso against its own floor (`fip_18_2_iso_floor`, native samples): NE Iso falls below 2 × its floor at
-   a median 0.024 Hz (animals 0.015–0.34) and lies on R above that; DA Iso at 2.1 Hz (0.8–2.7), close to
-   an f^−1.5 spectrum meeting the floor at 3 Hz. Johannes (reply to the FIP-team post) described the pipeline
+   a median 0.024 Hz (animals 0.015–0.34); DA Iso at 2.1 Hz (0.8–2.7), close to
+   a 1/f^α spectrum (α = 1–2) meeting the floor at 3 Hz. Johannes (reply to the FIP-team post) described the pipeline
    as assuming the second shape on every fiber.
 
 Decisions still open: (a) switch the NE target to bleach-only, or to a filtered-iso subtraction (the numbers

@@ -15,8 +15,8 @@ bleach-only power at 0.05–3 Hz (1–3 Hz: 2.29 → 1.01 × bleach-only) and on
 up to ~2.6 Hz. Also: injected-artifact test, and §5's measures with the fix. Numbers are now §8.
 
 §2 also has `fip_18_2_iso_floor`: each Iso spectrum (native NWB samples, full recording) over its own 5–9 Hz
-floor, with R the same way and an f^−1.5 spectrum meeting the floor at 3 Hz for reference. NE Iso falls
-below 2 × its floor at a median 0.024 Hz (animals 0.015–0.34) and lies on R from there; DA Iso at 2.1 Hz.
+floor, against a band of 1/f^α spectra (α = 1–2) meeting the floor at 3 Hz. NE Iso falls
+below 2 × its floor at a median 0.024 Hz (animals 0.015–0.34); DA Iso at 2.1 Hz. §7 now uses R as a no-sensor reference on the PL fiber only (the NAc fiber has a red sensor in some cohorts).
 Spectra of the grid traces are not used for this: the linear interpolation onto the grid attenuates
 power near Nyquist and lowers the 5–9 Hz floor.
 
