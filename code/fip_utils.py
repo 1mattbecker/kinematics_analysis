@@ -44,11 +44,37 @@ from me_results import ROI_MASKS_SUFFIX, me_column, read_roi_masks
 
 # ── Data locations ────────────────────────────────────────────────────────────
 
-#: Repository root (the folder holding ``code/``). On Code Ocean this is ``/root/capsule``.
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 #: True on Code Ocean.
 IS_CO = os.path.isdir("/root/capsule")
+
+
+def _find_repo_root(start: str) -> str:
+    """``/root/capsule`` on Code Ocean, else the nearest folder above ``start`` that holds ``code/``.
+
+    The module may sit directly in ``code/`` or in a subfolder of it (``code/movement_da_ne/`` in the
+    DA/NE paper's capsule), so the depth is not fixed.
+    """
+    if IS_CO:
+        return "/root/capsule"
+    d = os.path.abspath(start)
+    while True:
+        if os.path.isdir(os.path.join(d, "code")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:   # no code/ above: fall back to the parent of the module's folder
+            return os.path.dirname(os.path.abspath(start))
+        d = parent
+
+
+_MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+#: Repository root (the folder holding ``code/``). On Code Ocean this is ``/root/capsule``.
+REPO_ROOT = _find_repo_root(_MODULE_DIR)
+
+#: Small input tables (the video screen, processed-NWB locations): ``inputs/`` next to this module
+#: when there is one, else ``inputs/`` in the repository.
+INPUTS_DIR = (os.path.join(_MODULE_DIR, "inputs") if os.path.isdir(os.path.join(_MODULE_DIR, "inputs"))
+              else os.path.join(REPO_ROOT, "inputs"))
 
 #: Folder holding the data assets (the FIP asset and the ME table): ``data/`` in the repository,
 #: which is Code Ocean's data mount. Locally, ``$FIP_DATA_ROOT`` points elsewhere
@@ -104,8 +130,7 @@ ME_DATA_ROOT = DATA_ROOT
 #: Per-camera video screen (timing + image quality) from the video-analysis library's
 #: ``screen_sessions`` over the 301 curated FIP sessions (library 0.2.0). ``use`` is False for a
 #: camera that failed either check; the ME table's own build applied the timing check only.
-VIDEO_SCREEN_CSV = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                "inputs", "video_screen_fip.csv")
+VIDEO_SCREEN_CSV = os.path.join(INPUTS_DIR, "video_screen_fip.csv")
 
 _ME_INDEX: Dict[Tuple[str, bool], pd.DataFrame] = {}
 
@@ -777,7 +802,7 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
 #: Session → processed NWB (public S3), from the ``df_sess`` tables of ``DANE_bilateral``
 #: (2026-11-13; NWBs processed 2026-11-10/11 by aind-fip-dff 19.0). Used when the curated asset at
 #: hand lists its NWBs in a private bucket (the 3ch / 4ch assets do).
-PROCESSED_NWB_CSV = os.path.join(REPO_ROOT, "inputs", "fip_processed_nwb.csv")
+PROCESSED_NWB_CSV = os.path.join(INPUTS_DIR, "fip_processed_nwb.csv")
 
 #: Stages of a channel in the processed NWB: raw fluorescence (``acquisition``), bleach-corrected
 #: dF/F and motion-corrected dF/F (``processing/fiber_photometry``). The NWBs also hold the same two

@@ -2,6 +2,16 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-19
+
+### `fip_utils`: repository root found at any depth (branch `me-roi`)
+
+`fu.REPO_ROOT` is `/root/capsule` on Code Ocean and otherwise the nearest folder above the module that
+holds `code/`, instead of the module's grandparent, so the same file works in `code/movement_da_ne/` of
+the DA/NE paper's capsule (`da-ne-paper-figures`). New `fu.INPUTS_DIR` (`inputs/` next to the module if
+present, else the repository's `inputs/`) replaces the second fixed-depth path in `VIDEO_SCREEN_CSV` and
+`PROCESSED_NWB_CSV`. Paths here are unchanged.
+
 ## 2026-11-18
 
 ### `fip_18` §2c and §7: summary figure and a test of a fix (branch `me-roi`)
