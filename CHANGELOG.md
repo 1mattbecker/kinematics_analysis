@@ -12,7 +12,11 @@ table covers any curation of these recordings. Rachel's `DANE_bilateral` (`15f8f
 same-side DA/NE sessions, of which the current table (`e542022e`) holds 56. A session without a completed ME run
 is now listed and left out instead of stopping the build. `inputs/me_assets_fip.csv` regenerated: 300 sessions,
 all from the rois_v2 run `5a12ee5d`; `behavior_820688_2026-01-27_13-02-14` has none (left out of rois_v2 for its
-dark side video). The 97 earlier rows are unchanged. The table itself is not rebuilt yet.
+dark side video). The 97 earlier rows are unchanged. Built on a workstation and saved as asset
+`fa56230e-8633-4e0f-9177-cfbcabb9dba2` (20 GB; 534 cameras ok, 66 refused by the timing check; the 97 earlier
+sessions' index rows identical to `e542022e`'s). New `fu.pair_sessions`: the `fip_*` notebooks' sessions, for the
+`men_*` notebooks to restrict the now larger ME index to (done in `da-ne-paper-figures`). `FIP_ASSET_SETS` also
+accepts the final `DANE_bilateral` asset's download name (`15f8fac5`).
 
 ## 2026-11-19
 

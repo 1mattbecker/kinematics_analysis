@@ -94,9 +94,11 @@ FIG_ROOT = os.path.join(CACHE_ROOT, "figures")
 #: whose every member is present. Folder names are the Code Ocean mount names, then the names a
 #: local download has.
 FIP_ASSET_SETS = (
-    # Rachel's 3- and 4-channel assets in one (asset 4686d370-a207-4fcf-9653-20754c145eac,
-    # 2026-11-13, a test version; adds the ignore-rate, square-pulse and Q-spread curation)
-    {"bilateral": ("DANE_bilateral", "DANE_bilateral_curated_permissive_test")},
+    # Rachel's 3- and 4-channel assets in one, with the ignore-rate, square-pulse and Q-spread
+    # curation: asset 15f8fac5-30b9-42a4-a1e8-e6c4be7c1ac7 (2026-11-16); before it the test version
+    # 4686d370-a207-4fcf-9653-20754c145eac (2026-11-13)
+    {"bilateral": ("DANE_bilateral", "DANE_bilateral_curated_permissive",
+                   "DANE_bilateral_curated_permissive_test")},
     # The two assets it combines: 3-channel and the 4-channel rebuild
     {"3ch": ("DANE_3channels_curated", "results-a278f830-9bf2-48e8-9928-a2ff78e4818f"),
      "4ch": ("DANE_4channels_curated", "results-ddcccb0f-f18f-44a6-a2b1-caba680d28a1")},
@@ -117,8 +119,9 @@ STREAK_BINS = [
 
 # ── Motion energy ─────────────────────────────────────────────────────────────
 
-#: Aligned motion-energy table under ``data_root`` (asset e542022e-7d56-48ec-a940-d2dcc7ec4733, 2026-10-28,
-#: aind-motion-energy 0.4.0 with ROIs; before it 90c2d0a7-82e3-4abf-b205-e398c2f7736e; built by ``build_me_table.py``): per session and camera, the corrected Harp time and
+#: Aligned motion-energy table under ``data_root`` (asset fa56230e-8633-4e0f-9177-cfbcabb9dba2, 2026-11-20,
+#: all 301 curated FIP sessions, 300 with ME; aind-motion-energy 0.4.0 with ROIs; before it e542022e-7d56-48ec-a940-d2dcc7ec4733
+#: (the 97 sessions of the earlier analyses) and 90c2d0a7-82e3-4abf-b205-e398c2f7736e; built by ``build_me_table.py``): per session and camera, the corrected Harp time and
 #: ``me_clean`` of every video frame, plus ``index.csv`` with each camera's timing status.
 #: Tables built from aind-motion-energy 0.4.0 ROI runs add ``me_clean_<roi id>`` per ROI,
 #: ``<camera>_roi_masks.npz`` and the ``rois`` / ``roi_masks`` index columns.
@@ -649,6 +652,29 @@ def choose_side(inv: pd.DataFrame, min_sessions: int = 3) -> Tuple[pd.DataFrame,
     kept = inv[(inv["side"] == inv["subject"].map(side_of))
                & inv["subject"].map(table["kept"])].reset_index(drop=True)
     return kept, table[["asset", "L", "R", "side_used", "n_used", "kept"]]
+
+
+def pair_sessions(asset_roots: Dict[str, str], min_sessions: int = 3) -> List[str]:
+    """The sessions the ``fip_*`` notebooks use, as ``<subject>_<date>``.
+
+    :func:`inventory_pairs` then :func:`choose_side`: same-side DA/NE pairs, one hemisphere per
+    animal, animals with at least ``min_sessions`` sessions. The ME table covers every curated FIP
+    session, so the ``men_*`` notebooks restrict its index to these.
+
+    Parameters
+    ----------
+    asset_roots : dict
+        From :func:`fip_asset_roots`.
+    min_sessions : int
+        As :func:`choose_side`.
+
+    Returns
+    -------
+    list of str
+        Sorted session ids (the ME index's ``ses_idx``).
+    """
+    kept, _ = choose_side(inventory_pairs(asset_roots), min_sessions)
+    return sorted(kept["session"])
 
 
 def _load_one(row, fs: float, pre_s: float, post_s: float) -> dict:
