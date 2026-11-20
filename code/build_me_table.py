@@ -69,7 +69,8 @@ from me_results import (
 from s3_utils import download, list_keys, read_json
 
 CODE_DIR = Path(__file__).resolve().parent
-REPO = CODE_DIR.parent
+# On Code Ocean the code folder is /code, whose parent is /, so the capsule root is fixed
+REPO = Path("/root/capsule") if Path("/root/capsule").is_dir() else CODE_DIR.parent
 SESSIONS_CSV = REPO / "inputs" / "me_sessions_fip_curated.csv"
 ME_ASSETS_CSV = REPO / "inputs" / "me_assets_fip.csv"
 DEFAULT_OUT = REPO / "results" / "fip_motion_energy_aligned"
