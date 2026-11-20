@@ -388,7 +388,12 @@ def load_me(
     harp = frames["harp_time"].to_numpy(float)
     exposures = np.diff(frames["frame_number"].to_numpy())
     if (exposures < 1).any():
-        raise ValueError("%s %s: frame numbers do not increase" % (session_id, camera))
+        # Camera metadata glitch: a block of rows with offset frame numbers (820691_2026-01-16,
+        # 319 rows). The timing QC passed the camera on its corrected harp_time, so count the
+        # exposures from its steps instead
+        exposures = np.rint(np.diff(harp) / float(info["frame_interval_s"])).astype(int)
+        if (exposures < 1).any():
+            raise ValueError("%s %s: frame numbers and harp_time do not increase" % (session_id, camera))
 
     # Per-exposure ME (step 1); row 0 has no value
     me = frames[column].to_numpy(float)[1:] / exposures
