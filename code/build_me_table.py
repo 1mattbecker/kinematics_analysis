@@ -1,7 +1,7 @@
 """
 build_me_table.py — aligned motion-energy table for the FIP sessions.
 
-For every ``used_in_fip05_07`` session and each camera, writes per-frame
+For every FIP session in ``inputs/me_assets_fip.csv`` and each camera, writes per-frame
 corrected Harp time plus the cleaned motion-energy traces (whole frame and, for
 aind-motion-energy 0.4.0 runs given ROI masks, one per ROI), so the FIP notebooks
 attach one data asset instead of ~200 raw-behavior and ME assets. The spec is
@@ -314,14 +314,14 @@ def build_session(session, out_dir, dry_run, tmp_root=None):
 
 
 def load_sessions(selected=None):
-    """The ``used_in_fip05_07`` sessions joined to their ME assets."""
-    sessions = pd.read_csv(SESSIONS_CSV)
-    sessions = sessions.loc[sessions["used_in_fip05_07"], ["raw_session", "subject"]]
+    """The listed FIP sessions joined to their ME assets; sessions with none are left out."""
+    sessions = pd.read_csv(SESSIONS_CSV)[["raw_session", "subject"]]
     assets = pd.read_csv(ME_ASSETS_CSV)
     merged = sessions.merge(assets, on="raw_session", how="left", validate="1:1")
     if merged["me_asset_name"].isna().any():
         missing = merged.loc[merged["me_asset_name"].isna(), "raw_session"].tolist()
-        raise ValueError(f"No ME asset in {ME_ASSETS_CSV.name} for {missing}")
+        print(f"No ME asset in {ME_ASSETS_CSV.name}, left out ({len(missing)}): {missing}")
+        merged = merged[merged["me_asset_name"].notna()]
     if selected:
         # Accept full raw names or any leading part after "behavior_"
         keep = merged["raw_session"].map(

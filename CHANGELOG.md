@@ -2,6 +2,18 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-20
+
+### ME table: all FIP sessions, not only the 97 (branch `me-roi`)
+
+`build_me_asset_map.py` and `build_me_table.py` take every session in `inputs/me_sessions_fip_curated.csv`
+(the 301 sessions of the 3- and 4-channel curated assets) instead of the 97 `used_in_fip05_07` ones, so one
+table covers any curation of these recordings. Rachel's `DANE_bilateral` (`15f8fac5`, 2026-11-16) keeps 127
+same-side DA/NE sessions, of which the current table (`e542022e`) holds 56. A session without a completed ME run
+is now listed and left out instead of stopping the build. `inputs/me_assets_fip.csv` regenerated: 300 sessions,
+all from the rois_v2 run `5a12ee5d`; `behavior_820688_2026-01-27_13-02-14` has none (left out of rois_v2 for its
+dark side video). The 97 earlier rows are unchanged. The table itself is not rebuilt yet.
+
 ## 2026-11-19
 
 ### `fip_utils`: repository root found at any depth (branch `me-roi`)

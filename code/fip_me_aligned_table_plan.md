@@ -90,8 +90,8 @@ them; nothing is overridden.
 
 ## Inputs
 
-- **Sessions:** rows of `inputs/me_sessions_fip_curated.csv` with `used_in_fip05_07`
-  (97); `raw_session` is the raw asset name. Made by looping over the curated FIP data assets
+- **Sessions:** every row of `inputs/me_sessions_fip_curated.csv` (301; the 97 `used_in_fip05_07`
+  rows until 2026-11-20) that has a completed ME run (300); `raw_session` is the raw asset name. Made by looping over the curated FIP data assets
   (script not in this repo); see `inputs/README.md`.
 - **ME result per session — explicit, never "newest by tag":** from the batch launcher's
   manifests (`aind-motion-energy-batch-capsule`, runs `ce719ee8`, `2b3a9315`, and the rerun

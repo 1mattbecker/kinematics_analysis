@@ -4,8 +4,9 @@
 # ///
 """Map each FIP session to its motion-energy result asset.
 
-Writes ``inputs/me_assets_fip.csv``: one row per ``used_in_fip05_07`` session
-in ``inputs/me_sessions_fip_curated.csv``, with ``raw_session``,
+Writes ``inputs/me_assets_fip.csv``: one row per session in
+``inputs/me_sessions_fip_curated.csv`` (all FIP sessions of the curated assets, so the
+table covers any curation of them) that has a completed ME run, with ``raw_session``,
 ``me_asset_id``, ``me_asset_name``, ``me_run_id`` and ``raw_asset_id`` (the
 behavior asset the ME run read).
 
@@ -15,7 +16,8 @@ never from "newest result by tag": ~31 leftover test results share the tag.
 Runs are applied in ``RUNS`` order, so a later run replaces an earlier one: the
 ``.mp4`` rerun of the 10 808054 2025-09-02 to 09-15 sessions, then the 0.4.0
 ``rois_v2`` run (whole frame plus a whisker-pad ROI on the side camera), which
-covers every session.
+covers every session but ``behavior_820688_2026-01-27_13-02-14`` (left out of rois_v2: its side
+video is dark for the first ~20 min). Sessions with no completed run are listed and left out.
 
 Asset names come from the Code Ocean API, through the launcher's own
 ``scripts/trigger_batch.make_client`` (token from ``API_SECRET``); the name is also
@@ -68,7 +70,7 @@ def main():
     args = parser.parse_args()
 
     sessions = pd.read_csv(SESSIONS_CSV)
-    used = sessions.loc[sessions["used_in_fip05_07"], "raw_session"].tolist()
+    listed = sessions["raw_session"].tolist()
 
     # Session -> (run, record); later runs replace earlier ones
     chosen = {}
@@ -77,7 +79,7 @@ def main():
             (args.manifests / f"batch_manifest_{run}.json").read_text()
         )
         for record in manifest:
-            if record["session"] not in used:
+            if record["session"] not in listed:
                 print(f"  not a FIP session, ignored: {record['session']} ({run[:8]})")
                 continue
             if record["status"] != "completed":
@@ -90,9 +92,10 @@ def main():
                 )
             chosen[record["session"]] = (run, record)
 
-    missing = [s for s in used if s not in chosen]
+    missing = [s for s in listed if s not in chosen]
     if missing:
-        sys.exit(f"No completed ME result for {len(missing)} sessions: {missing}")
+        print(f"No completed ME result, left out ({len(missing)}): {missing}")
+    used = [s for s in listed if s in chosen]
 
     # Same client (domain, token) as the launcher that made the manifests
     sys.path.insert(0, str(BATCH_CAPSULE / "scripts"))
