@@ -23,6 +23,11 @@ Then :func:`smooth_encoder_cycle` (removes the re-encoding cycle of the clips), 
 :func:`highpass_peaks` (15 Hz zero-phase Butterworth, and its peaks) and :func:`band_power_map`
 (per-pixel power of the high-passed part).
 
+For motion that is rhythmic but not phase-locked to an event (whisking), averaging |difference| over
+events cancels the rhythm, so :func:`clip_band_maps` takes each clip's per-pixel power spectrum
+first and :func:`clip_region_traces` gives a region's |difference| trace per clip; windows come
+from :func:`full_windows`. Used by ``men_06``.
+
 Environment: the video-analysis library (>= v0.3.0) with its ``video-clips`` extra, plus PyAV; ffmpeg
 on the PATH. Both are installed in ``.venv-fip``.
 
@@ -43,7 +48,7 @@ import pandas as pd
 from aind_dynamic_foraging_behavior_video_analysis import video_alignment as va
 from aind_dynamic_foraging_behavior_video_analysis import video_clips as vc
 from scipy.ndimage import gaussian_filter, uniform_filter1d
-from scipy.signal import butter, filtfilt, find_peaks
+from scipy.signal import butter, filtfilt, find_peaks, periodogram
 
 import fip_utils as fu  # data locations
 
@@ -69,11 +74,14 @@ def video_url(index_row):
     return f"{OPEN_DATA_URL}/{path[len(CO_DATA_ROOT):]}"
 
 
-def load_frame_table(me_root, raw_session, camera):
-    """Per-frame ``harp_time`` (corrected) and ``me_clean`` of one camera from the ME table."""
+def load_frame_table(me_root, raw_session, camera, column="me_clean"):
+    """Per-frame ``harp_time`` (corrected) and ME of one camera from the ME table.
+
+    ``column`` is ``me_clean`` (whole frame) or an ROI's ``me_clean_<roi id>``.
+    """
     path = os.path.join(me_root, ME_TABLE_NAME, raw_session, f"{camera}.parquet")
-    table = pd.read_parquet(path, columns=["harp_time", "me_clean"])
-    return table["harp_time"].to_numpy(), table["me_clean"].to_numpy()
+    table = pd.read_parquet(path, columns=["harp_time", column])
+    return table["harp_time"].to_numpy(), table[column].to_numpy()
 
 
 def clip_luma(path):
@@ -113,6 +121,27 @@ def check_alignment(clip_me, table_me, starts, max_shift=5):
     return shifts, np.array(r)
 
 
+def full_windows(event_times, harp_time, before, after, n=None, seed=0):
+    """Frame windows around events with every frame present, a random sample of ``n``.
+
+    ``video_alignment.event_frame_ranges`` on the corrected per-frame ``harp_time``; windows with
+    fewer frames than the usual count (a drop inside) or outside the video are left out.
+
+    Returns
+    -------
+    ranges : pandas.DataFrame
+        The kept windows (``event_frame_ranges`` columns), sorted by ``start_frame``.
+    n_full : int
+        Frames per window.
+    """
+    ranges = va.event_frame_ranges(np.asarray(event_times, float), harp_time, before, after)
+    n_full = int(ranges.loc[ranges.in_video, "n_frames"].mode()[0])
+    ranges = ranges[ranges.in_video & (ranges.n_frames == n_full)]       # no drops inside a window
+    if n is not None:
+        ranges = ranges.sample(min(n, len(ranges)), random_state=seed)
+    return ranges.sort_values("start_frame"), n_full
+
+
 def cue_maps(url, harp_time, me_clean, cue_times, n_cues=100, before=0.06, after=0.16, seed=0,
              clip_dir="clips", prefix="clip", cache_path=None):
     """Mean per-pixel |frame difference| at each lag around a random sample of go cues.
@@ -148,10 +177,7 @@ def cue_maps(url, harp_time, me_clean, cue_times, n_cues=100, before=0.06, after
             if json.loads(str(f["params"])) == params:
                 return {k: f[k] for k in f.files if k != "params"}
 
-    ranges = va.event_frame_ranges(np.asarray(cue_times, float), harp_time, before, after)
-    n_full = int(ranges.loc[ranges.in_video, "n_frames"].mode()[0])
-    ranges = ranges[ranges.in_video & (ranges.n_frames == n_full)]       # no drops inside a window
-    ranges = ranges.sample(min(n_cues, len(ranges)), random_state=seed).sort_values("start_frame")
+    ranges, n_full = full_windows(cue_times, harp_time, before, after, n_cues, seed)
     clips = vc.cut_clips(url, ranges, clip_dir, prefix)
     clips = clips[clips.clip_path.notna()]
 
@@ -191,6 +217,71 @@ def smooth_encoder_cycle(maps, n_frames=4):
     use the end value.
     """
     return uniform_filter1d(np.asarray(maps, np.float32), n_frames, axis=0, mode="nearest")
+
+
+def _block_mean(x, size):
+    """Mean over ``size`` x ``size`` pixel blocks of an (n, H, W) array (edges that do not fill a block dropped)."""
+    n, h, w = x.shape
+    h2, w2 = h // size * size, w // size * size
+    return x[:, :h2, :w2].reshape(n, h2 // size, size, w2 // size, size).mean(axis=(2, 4), dtype=np.float32)
+
+
+def clip_band_maps(clip_paths, bands_hz, fs=500.0, block_px=4):
+    """Per-pixel power of the |frame difference| in frequency bands, one set of maps per clip.
+
+    Each clip's |difference| series is averaged over ``block_px`` x ``block_px`` blocks, then each
+    block gets a Hann periodogram (mean removed) and its power is summed within each band. Taking
+    power per clip before averaging keeps rhythms that are not phase-locked to the clip start.
+
+    Parameters
+    ----------
+    clip_paths : sequence of str
+        Clips of equal length.
+    bands_hz : sequence of (float, float)
+        Frequency bands, Hz (inclusive).
+    fs : float
+        Frame rate, Hz.
+    block_px : int
+        Block size, pixels.
+
+    Returns
+    -------
+    maps : numpy.ndarray
+        ``(n_clips, n_bands, H // block_px, W // block_px)`` band power.
+    reference : numpy.ndarray
+        ``(H // block_px, W // block_px)`` mean frame over all clips.
+    """
+    maps, ref = [], 0.0
+    for path in clip_paths:
+        y = clip_luma(path)
+        d = _block_mean(np.abs(np.diff(y, axis=0)), block_px)
+        freqs, power = periodogram(d, fs=fs, window="hann", detrend="constant", axis=0)
+        maps.append(np.stack([power[(freqs >= a) & (freqs <= b)].sum(0) for a, b in bands_hz]))
+        ref = ref + _block_mean(y.mean(0, keepdims=True), block_px)[0]
+    return np.stack(maps), ref / len(maps)
+
+
+def clip_region_traces(clip_paths, masks):
+    """Mean |frame difference| over each mask, per clip.
+
+    Parameters
+    ----------
+    clip_paths : sequence of str
+        Clips of equal length.
+    masks : dict
+        ``{name: bool mask (H, W)}`` in video pixels.
+
+    Returns
+    -------
+    dict
+        ``{name: (n_clips, n_frames - 1) float array}``.
+    """
+    out = {name: [] for name in masks}
+    for path in clip_paths:
+        d = np.abs(np.diff(clip_luma(path), axis=0))
+        for name, m in masks.items():
+            out[name].append(d[:, m].mean(axis=1))
+    return {name: np.array(v, np.float32) for name, v in out.items()}
 
 
 def excess_maps(maps, lags_s, windows_ms=MAP_WINDOWS_MS):

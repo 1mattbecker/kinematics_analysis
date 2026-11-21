@@ -4,6 +4,22 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-11-20
 
+### `men_04` §5–9: the go-cue response on the side camera, the jump by rig, a second session (branch `me-roi`)
+
+§5 puts the side camera's whole frame and whisker-pad box (500 Hz) next to the bottom camera in the first 150 ms
+after the go cue. In the jump mice the side whole frame jumps 0.94 z and the pad 0.29 z (no-jump mice 0.07 / −0.04 z,
+bottom 0.74 / 0.01 z); the pad rises mostly at 20–50 ms and its first peak (26–36 ms) is later than the bottom's
+(22–26 ms); the second peak (~50–62 ms) is in every trace. §6 fits a smooth rise to each mouse's ME and passes it
+through the 15 Hz high-pass: in 3 of 4 no-jump mice it makes a broader, smaller peak at 28–34 ms, ~6 ms after their
+sharp 22–24 ms peak, so the filter does not make that peak. §7 sets the jump against session settings read from the raw
+assets' JSON on S3 (new `mu.session_settings`): it follows the rig session more than the mouse (808054 jumps in box
+447-1-D, barely in 447-2-D; 818585 flat in 446-7-D, jumping in 447-2-D and 447-3-D; 818586 only at attenuation 10;
+in 447-2-D rig versions 20251111–20251209 jump, 20250923 and 20251222 don't). Tone, calibrated level (71–76 dB),
+camera settings and codec are constant. §8 repeats the maps on a second session per mouse: same whisker fans, region
+peaks within a few ms, clips aligned to the table (r 0.94–0.99 at offset 0). §9 prints `make_me_example_clip.py`
+commands for slowed cue-aligned clips; six are in `scratch/figures/men/men04_cue_*`. `cue_me_maps.load_frame_table`
+reads any column; new `cue_me_maps.full_windows` (used by `cue_maps`; caches unchanged).
+
 ### ME table: all FIP sessions, not only the 97 (branch `me-roi`)
 
 `build_me_asset_map.py` and `build_me_table.py` take every session in `inputs/me_sessions_fip_curated.csv`

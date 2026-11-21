@@ -13,7 +13,7 @@ tests in ``stats_utils``, mean ± SEM plots in ``plot_utils``, lick bouts and ta
 Contents
 --------
 :func:`inventory_sessions`, :func:`split_source`, :func:`load_session`, :func:`load_sessions`, :func:`normalise`,
-:func:`lick_clock_check`, :func:`per_animal_timecourse`
+:func:`lick_clock_check`, :func:`per_animal_timecourse`, :func:`session_settings`
 
 Clock: every time is session time (s from the first go cue). Each session's ME is bin-averaged
 onto a uniform ``fs``-Hz grid; sample ``i`` is the mean over ``[t0 + (i - 0.5) / fs,
@@ -269,3 +269,78 @@ def per_animal_timecourse(series_by_session, t_grid: np.ndarray, min_sessions: i
     arr = np.stack(rows)
     arr[:, np.sum(np.isfinite(arr), axis=0) < max(1, arr.shape[0] / 2)] = np.nan
     return arr
+
+
+#: Raw session assets on public S3 (``behavior_<subject>_<date>_<time>/``).
+OPEN_DATA_URL = "https://aind-open-data.s3.us-west-2.amazonaws.com"
+
+
+def _cue_notes(notes: str) -> dict:
+    # "The duration of go cue is 100 ms. The frequency is 7500 Hz. Amplitude is 75dB." -> numbers
+    import re
+    out = {}
+    for key, pattern in (("cue_duration_ms", r"duration of go cue is ([\d.]+) ?ms"),
+                         ("cue_frequency_hz", r"frequency is ([\d.]+) ?Hz"),
+                         ("cue_level_db", r"Amplitude is ([\d.]+) ?dB")):
+        m = re.search(pattern, notes or "")
+        out[key] = float(m.group(1)) if m else np.nan
+    return out
+
+
+def session_settings(raw_sessions: Sequence[str], cache_path: Optional[str] = None) -> pd.DataFrame:
+    """Rig, go-cue sound, camera and subject settings of each session, from its raw asset on S3.
+
+    Reads three files of ``behavior_<subject>_<date>_<time>/`` on public S3 (``s3_utils``): the
+    foraging GUI's ``behavior/<subject>_<date>_<time>.json`` (box, go-cue level, speaker
+    attenuation, camera exposure, gain and codec), ``session.json`` (rig id, the go cue's
+    duration, frequency and level from the stimulus notes) and ``subject.json`` (sex, genotype,
+    date of birth).
+
+    Parameters
+    ----------
+    raw_sessions : sequence of str
+        Raw asset names (the ME table's ``session`` column).
+    cache_path : str, optional
+        CSV holding earlier results; sessions already in it are not fetched again.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per session: ``session, subject, ses_idx, box, rig_id, go_cue_db, cue_level_db,
+        cue_frequency_hz, cue_duration_ms, attenuation_left, attenuation_right, codec,
+        bottom_exposure_us, bottom_gain, side_exposure_us, side_gain, sex, genotype, age_days``;
+        NaN where a file or field is missing.
+    """
+    import s3_utils as s3
+
+    done = (pd.read_csv(cache_path) if cache_path and os.path.exists(cache_path)
+            else pd.DataFrame(columns=["session"]))
+    rows = []
+    for raw in raw_sessions:
+        if raw in set(done["session"]):
+            continue
+        base = f"{OPEN_DATA_URL}/{raw}"
+        name = raw[len("behavior_"):] if raw.startswith("behavior_") else raw
+        gui = s3.read_json(f"{base}/behavior/{name}.json") or {}
+        session = s3.read_json(f"{base}/session.json") or {}
+        subject = s3.read_json(f"{base}/subject.json") or {}
+        box = gui.get("settings_box", {})
+        notes = " ".join(e.get("notes") or "" for e in session.get("stimulus_epochs", []))
+        start = pd.to_datetime(session.get("session_start_time"), utc=True, errors="coerce")
+        born = pd.to_datetime(subject.get("date_of_birth"), utc=True, errors="coerce")
+        num = lambda v: pd.to_numeric(v, errors="coerce")
+        rows.append(dict(
+            session=raw, subject=name.split("_")[0], ses_idx="_".join(name.split("_")[:2]),
+            box=gui.get("box"), rig_id=session.get("rig_id"), go_cue_db=num(gui.get("Other_go_cue_decibel")),
+            **_cue_notes(notes),
+            attenuation_left=num(box.get("AttenuationLeft")), attenuation_right=num(box.get("AttenuationRight")),
+            codec=box.get("codec"),
+            bottom_exposure_us=num(box.get("BottomCamera_ExposureTime")), bottom_gain=num(box.get("BottomCamera_Gain")),
+            side_exposure_us=num(box.get("SideCameraRight_ExposureTime")), side_gain=num(box.get("SideCameraRight_Gain")),
+            sex=subject.get("sex"), genotype=subject.get("genotype"),
+            age_days=(start - born).days if pd.notna(start) and pd.notna(born) else np.nan))
+    out = pd.concat([done, pd.DataFrame(rows)], ignore_index=True) if rows else done
+    if cache_path and rows:
+        os.makedirs(os.path.dirname(cache_path) or ".", exist_ok=True)
+        out.to_csv(cache_path, index=False)
+    return out[out["session"].isin(raw_sessions)].reset_index(drop=True)

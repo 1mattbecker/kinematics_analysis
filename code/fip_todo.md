@@ -139,22 +139,29 @@ their sessions:
    level-matched pad trace, though not in its event timing. 808054's bottom camera has an imaging line at ~28 Hz.
    Not yet done: a smaller box on the whisker shafts in front of the snout (new ROI, ME rebuild);
    whisker tracking.
-2. `men_04`'s go-cue items on the whisker pad: 500 Hz whisker-pad ME in the first 150 ms. Is the 10–16 ms jump and the
-   ~24 / ~55 ms peaks there, and in which of the five "jump" and four "no jump" mice? This tests the startle-plus-whisking
-   reading that so far rests on the maps.
+2. ~~`men_04`'s go-cue items on the whisker pad~~ Done 2026-11-20 (`men_04` §5): the pad carries a smaller jump
+   (0.29 z against the side whole frame's 0.94 z) in the jump mice only, peaking later than the bottom camera.
 3. If it holds up, a second ME signal in the FIP analyses: `fu.add_motion_energy(..., camera="SideCameraRight",
    roi="whiskerpad_box")` next to the bottom camera in `fip_12` (DA/NE at ME onsets) and `fip_13` (task + ME regression).
 
 ### `men_04`: ME in the first 150 ms after the go cue
 Found so far: five mice jump 10–16 ms after the cue, four don't; the high-passed ME peaks at ~24 and
 ~55 ms, on the whiskers (maps).
-- Is the ~24 ms peak real in the mice without the jump? It falls where their movement starts, and the
-  15 Hz high-pass turns a fast rise into a peak there. Pass a ripple-free rise shaped like theirs
-  through the same filter and see whether it makes a ~24 ms peak. (The ~55 ms peak is clear of this.)
-- Startle plus whisking is inferred from the maps only. Look at the movement: a slowed-down,
-  cue-aligned clip of a few trials, or whisker-angle tracking.
-- Why five mice jump and four don't: check rig, cohort and go-cue sound settings against the split.
-- The maps (where the motion is) come from one session per mouse; repeat on a second session per mouse.
+Done 2026-11-20 (§5–9):
+- ~~Is the ~24 ms peak real in the mice without the jump?~~ A smooth rise fitted to each mouse's ME and passed
+  through the same filter gives a broader, smaller peak at 28–34 ms in 3 of 4 no-jump mice, ~6 ms after their
+  sharp 22–24 ms peak. The filter contributes but does not make the peak.
+- ~~Why five mice jump and four don't~~ The jump follows the rig session more than the mouse: 808054 jumps in
+  box 447-1-D (0.30–1.45) and barely in 447-2-D (0.12); 818585 is flat in 446-7-D and jumps in 447-2-D/447-3-D;
+  818586 jumps only at attenuation 10, not 20; in 447-2-D, rig versions 20251111–20251209 jump and 20250923 /
+  20251222 don't. Tone (100 ms, 7.5 kHz), calibrated level (71–76 dB), camera settings and codec are constant.
+  Open: speaker placement or sound calibration per box and date (not in the metadata).
+- ~~Repeat the maps on a second session per mouse~~ Same whisker fans; region peaks within a few ms.
+- ~~Whisker pad at 500 Hz~~ In jump mice the side whole frame jumps 0.94 z, the pad 0.29 z (no-jump mice ~0);
+  the pad's first peak (26–36 ms) comes after the bottom camera's (22–26 ms); the ~55 ms peak is in all traces.
+- Startle plus whisking: slowed cue-aligned clips of 3 cues in a jump and a no-jump session are in
+  `scratch/figures/men/men04_cue_*` (look at them). Whisker tracking: no whisker model exists (pose has
+  tongue, jaw, nose).
 
 ### Analyses
 - `fip_11` §4 (Q3) by task context: partnered large transients fall mostly at outcomes and licking, so
