@@ -137,8 +137,12 @@ their sessions:
    windows the pad gains more power at 16–30 Hz (8–15 Hz whisking, doubled because ME is unsigned) than at
    2–8 Hz, in all 8 mice and more than either whole frame (p = 0.008 / 0.016): a whisking signature in the
    level-matched pad trace, though not in its event timing. 808054's bottom camera has an imaging line at ~28 Hz.
-   Not yet done: a smaller box on the whisker shafts in front of the snout (new ROI, ME rebuild);
-   whisker tracking.
+   2026-11-20, §8–10: whisking index over time (pad ~0.2 above still after task events; dips at every movement
+   onset); pad and side whole frame simultaneous in lick bouts; per-pixel maps put the 16–30 Hz rise on the
+   whisker shafts, a fan reaching well outside the box. Whisker tracking: no whisker pose model exists.
+   Open: (a) an index that compares 16–30 Hz with its flanking bands instead of 2–8 Hz, so onsets don't pull it
+   down; (b) a fan-shaped region over the shafts (top-3% blocks are fragmented and only match the box on
+   held-out clips) — needs a new ROI and an ME rebuild.
 2. ~~`men_04`'s go-cue items on the whisker pad~~ Done 2026-11-20 (`men_04` §5): the pad carries a smaller jump
    (0.29 z against the side whole frame's 0.94 z) in the jump mice only, peaking later than the bottom camera.
 3. If it holds up, a second ME signal in the FIP analyses: `fu.add_motion_energy(..., camera="SideCameraRight",

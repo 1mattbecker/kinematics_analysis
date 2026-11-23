@@ -4,6 +4,21 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-11-20
 
+### `men_06` §8–10: a whisking index, the pad's timing around licks, the whisking rhythm by pixel (branch `me-roi`)
+
+§8 tracks whisking over time: in 0.5 s windows (50 ms step), log10 power at 16–30 Hz minus at 2–8 Hz, relative to
+still segments. After the go cue, the choice and lick-bout onsets the pad's index stays ~0.2–0.25 above still
+(bottom ~0.1, side whole frame ~0); it drops 0.6–0.9 at every movement onset on every trace, because an onset adds
+low-frequency power, and it is noisy where ME is at its floor. §9 replaces the 100 Hz lick-triggered lag: at 500 Hz
+the peaks around first, within-bout and isolated licks scatter ~±0.1 s on every trace (broad two-humped tops, the
+source of the earlier +0.03 s), and within bouts the pad and side whole frame cross-correlate at 0 ms. §10 cuts 1 s
+side-camera clips after 30 pad events without licking and at 30 still times in one session per mouse (908 clips) and
+maps §7's contrast per 4 × 4 px block (new `cm.clip_band_maps`, `cm.clip_region_traces`; clips match the table's pad
+trace at offset 0, r 0.98–0.99). The rise is on the whisker shafts, a fan from the pad that reaches well outside the
+box, in every mouse. The top 3% of blocks, chosen on half the clips, lies mostly outside the box (0–9% inside; 40% in
+816212); on the other half its contrast exceeds the whole frame's (+0.32, p = 0.039, 8 mice) and the box's by +0.09
+(p = 0.38). Blocks with no motion (black frame edges) get contrast 0.
+
 ### `men_04` §5–9: the go-cue response on the side camera, the jump by rig, a second session (branch `me-roi`)
 
 §5 puts the side camera's whole frame and whisker-pad box (500 Hz) next to the bottom camera in the first 150 ms
