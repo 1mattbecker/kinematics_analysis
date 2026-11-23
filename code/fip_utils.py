@@ -828,7 +828,7 @@ def add_motion_energy(pairs: Sequence[dict], kept: pd.DataFrame, camera: str = "
 # it came from (``s3_location`` in Rachel's ``df_sess_<mouse>.csv``) holds every channel (G, Iso,
 # R) of every fiber at every stage: raw, bleach-corrected (``dff-bright``) and motion-corrected,
 # plus the pipeline's ``quality_control.json`` with the fitted F0 terms and the iso coefficient.
-# ``fip_18`` reads them from public S3 (``aind-open-data``, zarr over HTTPS).
+# ``fip_18`` (now in the fip-controls repo) reads them from public S3 (``aind-open-data``, zarr over HTTPS).
 
 #: Session → processed NWB (public S3), from the ``df_sess`` tables of ``DANE_bilateral``
 #: (2026-11-13; NWBs processed 2026-11-10/11 by aind-fip-dff 19.0). Used when the curated asset at
@@ -969,7 +969,7 @@ def iso_denoise(iso: np.ndarray, fs: float, floor_band: Tuple[float, float] = IS
                 nperseg: int = 4096, smooth_octaves: float = 0.25) -> Tuple[np.ndarray, dict]:
     """Iso with the part at its own noise floor removed, by a zero-phase Wiener gain from Iso alone.
 
-    Test implementation of the correction proposed in ``fip_isosbestic_todo.md`` §3 item 8. The
+    Test implementation of the correction proposed in ``fip_isosbestic_todo.md`` §3 item 8 (now fip-controls ``TODO.md``). The
     gain at each frequency is ``max(0, 1 − N / P_iso(f))``, where ``P_iso`` is Iso's Welch spectrum
     (mean over ± ``smooth_octaves`` / 2 octaves) and ``N`` its median over ``floor_band``. Where
     Iso is at its floor the gain is 0; where Iso's power is well above it, near 1. Nothing about

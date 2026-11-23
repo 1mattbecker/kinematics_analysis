@@ -1,7 +1,7 @@
 # fip_* / men_* to-do
 
 Open work for the FIP and motion-energy notebooks (`fip_10`–`fip_17`, `men_00`–`men_05`). `TODO.md`
-tracks the `kin_*` / `eph_*` work; the isosbestic controls are in `fip_isosbestic_todo.md`. History is in `CHANGELOG.md`. Last revised 2026-11-16 (isosbestic controls split out; 2026-10-28: whisker-pad ROI table built and attached; next steps for ME; 2026-10-22: ME normalization decided; 2026-10-21: ME normalization items; 2026-10-09: isosbestic control added; 2026-10-08: notebooks
+tracks the `kin_*` / `eph_*` work; the isosbestic controls moved to the `fip-controls` repo (2026-11-23; was `fip_isosbestic_todo.md`). History is in `CHANGELOG.md`. Last revised 2026-11-16 (isosbestic controls split out; 2026-10-28: whisker-pad ROI table built and attached; next steps for ME; 2026-10-22: ME normalization decided; 2026-10-21: ME normalization items; 2026-10-09: isosbestic control added; 2026-10-08: notebooks
 regrouped by analysis type; old names → new in `archive/README.md`).
 
 ---
@@ -176,7 +176,7 @@ Done 2026-11-20 (§5–9):
 - Move `fip_16` (was `fip_05`) onto Rachel's code (agreed): `dummy_nwb.load`, her `data_z` / `data_z_norm`,
   `event_triggered_response`, her RPE slope with the outcome split and pre-first-reward trials
   dropped; keep in `fip_utils` only what the libraries don't have.
-- Isosbestic control for the ME correlations: moved to `fip_isosbestic_todo.md` (2026-11-16).
+- Isosbestic control for the ME correlations: moved to `fip_isosbestic_todo.md` (2026-11-16), then to the `fip-controls` repo (2026-11-23).
 - Contralateral control: DA from the opposite NAc × NE.
 - Behavior-model dependence: RPE and value come from one Q-learning fit; a refit or another model
   family would change `fip_16` sections 1–4.

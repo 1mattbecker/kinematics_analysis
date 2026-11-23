@@ -4,6 +4,13 @@ Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
 ## 2026-11-23
 
+### `fip_18` and the isosbestic controls moved to `fip-controls` (branch `me-roi`)
+
+`code/fip_18_iso_correction.ipynb` and `code/fip_isosbestic_todo.md` moved to the personal repo `fip-controls`
+(`notebooks/01_iso_correction.ipynb`, `TODO.md`), which collects the work on the FIP control channels: the iso
+correction, fiber events, and the ITI square wave (aind-fip-qc-raw#30). `scratch/fip_18/` and the `fip_18_*`
+figures moved with it. `fip_utils` keeps its NWB-stage functions; the repo has a verbatim copy.
+
 ### FIP sessions with usable motion energy, per mouse (branch `me-roi`)
 
 `code/me_session_accounting.py` writes `docs/me_session_accounting.md`: for each of the 15 mice, the FIP sessions
