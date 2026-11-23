@@ -2,6 +2,18 @@
 
 Notable changes to this project. Newest first. Dates are YYYY-MM-DD.
 
+## 2026-11-23
+
+### FIP sessions with usable motion energy, per mouse (branch `me-roi`)
+
+`code/me_session_accounting.py` writes `docs/me_session_accounting.md`: for each of the 15 mice, the FIP sessions
+with usable bottom- and side-camera ME, alone and with the same-side DA + LC pair and the 97-session analysis set,
+and the excluded cameras by QC category (clock step, trigger count, clock rate, unreadable, overexposed, blurred,
+image changed). It reads only the two tables in `inputs/`. Of 301 sessions, 264 bottom and 236 side cameras are
+usable; of the 97 analysis sessions, 88 have bottom-camera ME. Bottom-camera losses are timing (28 clock steps,
+6 trigger counts) with 3 image exclusions; the side camera loses another 33 to overexposure (809487 all 13
+otherwise usable, 818586 18).
+
 ## 2026-11-20
 
 ### `men_06` §8–10: a whisking index, the pad's timing around licks, the whisking rhythm by pixel (branch `me-roi`)
