@@ -166,7 +166,8 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
      trials above, 4,911 have no trial). Without those 19 trials the old r is 0.124 (new 0.121). No text read the
      r; §7's comment updated.
    - [ ] kin_06 §: Stay R vs Switch→R cue-response y, per session, p 0.027 → 0.080.
-   - [ ] val_05 §8 skipped (no `val_04_fn_traces.parquet` yet); rerun val_05 once to write and use it.
+   - [x] val_05 rerun (`21e4576`): the trace section runs on 1,498 windows, numbers as before (11 / 22 crossings
+     per s, 0.27 / 0.46 within 15 px).
    - [ ] val_03/val_04 list `errors.txt` in `KINEMATICS_ROOT` as a session ("incomplete intermediates, skipped");
      harmless, but select session folders only.
 7. [ ] **Local copies.** Copy the two pooled v053 tables and the new `all_counts_df.parquet` to `data/for_local/`
