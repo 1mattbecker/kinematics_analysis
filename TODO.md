@@ -157,12 +157,14 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
    09, kin_03, kin_04 had none): 44 → 40 sessions, 104 → 93 units (the 11 expected), eph_08 88 units with RT and
    CCF (reference 99), val_02/val_03 per-session numbers identical, kin_06 shifts by the new jaw (~3 px in x).
    Open:
-   - [ ] **kin_02 latency** of the first cue-response movement: median 0.145 → 0.153 s (k=1, 6,958 → 7,284
-     trials) and the k=2 effect 0.187 → 0.135. Check whether shared trials have the same latency (gained trials
-     vs changed movement starts).
-   - [ ] **kin_05 movements per trial:** max 3,326 → 124 and r(lick, non-lick movements per trial) 0.687 → 0.121.
-     The old pipeline's huge "trials" (spanning / last-trial movements) are gone; the text that reads the r needs
-     rewriting.
+   - [ ] **kin_02:** k=1 trials 6,958 → 7,284; lick-latency SD at k=1 0.145 → 0.153 s; KS of the de-shifted
+     k=2 vs k=1 latencies 0.187 → 0.135 (closer); session-mean lick latency 0.258 → 0.247 s at k=1, k=2-4
+     unchanged. Run `check_kin02_kin05_trials.py` on Code Ocean: same k and lick_latency on shared trials, so
+     the change is the trial set?
+   - [x] **kin_05 movements per trial** (checked locally on the old table): the old maximum of 3,326 and
+     r(lick, non-lick per trial) = 0.687 came from 19 last-of-session trials that took every movement after the
+     task ended (16-46 min, 11,879 movements). Without the last trials the old r is 0.117 (new 0.121). No text
+     read the r; §7's comment updated.
    - [ ] kin_06 §: Stay R vs Switch→R cue-response y, per session, p 0.027 → 0.080.
    - [ ] val_05 §8 skipped (no `val_04_fn_traces.parquet` yet); rerun val_05 once to write and use it.
    - [ ] val_03/val_04 list `errors.txt` in `KINEMATICS_ROOT` as a session ("incomplete intermediates, skipped");
