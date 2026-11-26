@@ -152,11 +152,21 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
    `kin_utils.pooled_path` at the new mount). Check on Code Ocean that `python -c "from kin_utils import
    KINEMATICS_ROOT as r; print(r, len(list(r.glob('*/record.json'))))"` prints
    `/root/capsule/data/kinematics_tongue_v053 48`.
-6. [ ] **Rerun the notebooks on Code Ocean**, `kin_00`–`kin_07`, `eph_00`–`eph_09`, `val_02`–`val_05`, and compare each
-   with its committed figures (`git diff` shows old vs new outputs). Expected changes: speed-based results move
-   by about 9% (`peak_speed`; smoothing per tracked run), `kin_03`'s UMAP changes, `kin_07`'s screen goes from
-   24 to 15 columns (absolute-pixel columns dropped), and `eph_*` lose the 11 units above, with `eph_08`'s
-   poster-figure replication moving with them. Anything else that moves needs an explanation.
+6. [x] **Rerun on Code Ocean** (2026-11-25, `9d0da09`, `70bbd56`): all 22 ran. eph_00 (raster cells had never run) and
+   eph_04 (mesh path) were fixed first. Compared with the last committed run of each (12 have one; eph_00, 02-06, 08,
+   09, kin_03, kin_04 had none): 44 → 40 sessions, 104 → 93 units (the 11 expected), eph_08 88 units with RT and
+   CCF (reference 99), val_02/val_03 per-session numbers identical, kin_06 shifts by the new jaw (~3 px in x).
+   Open:
+   - [ ] **kin_02 latency** of the first cue-response movement: median 0.145 → 0.153 s (k=1, 6,958 → 7,284
+     trials) and the k=2 effect 0.187 → 0.135. Check whether shared trials have the same latency (gained trials
+     vs changed movement starts).
+   - [ ] **kin_05 movements per trial:** max 3,326 → 124 and r(lick, non-lick movements per trial) 0.687 → 0.121.
+     The old pipeline's huge "trials" (spanning / last-trial movements) are gone; the text that reads the r needs
+     rewriting.
+   - [ ] kin_06 §: Stay R vs Switch→R cue-response y, per session, p 0.027 → 0.080.
+   - [ ] val_05 §8 skipped (no `val_04_fn_traces.parquet` yet); rerun val_05 once to write and use it.
+   - [ ] val_03/val_04 list `errors.txt` in `KINEMATICS_ROOT` as a session ("incomplete intermediates, skipped");
+     harmless, but select session folders only.
 7. [ ] **Local copies.** Copy the two pooled v053 tables and the new `all_counts_df.parquet` to `data/for_local/`
    (the `eph_*` notebooks read the cached `all_counts_df` locally; its kinematics columns are renamed).
 8. [ ] Merge `kinematics-v052` into `wild`.
