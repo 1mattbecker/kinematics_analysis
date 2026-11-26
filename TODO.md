@@ -157,14 +157,14 @@ done: `docs/kinematics_core_handoff.md` ("Status"). Remaining, in order:
    09, kin_03, kin_04 had none): 44 → 40 sessions, 104 → 93 units (the 11 expected), eph_08 88 units with RT and
    CCF (reference 99), val_02/val_03 per-session numbers identical, kin_06 shifts by the new jaw (~3 px in x).
    Open:
-   - [ ] **kin_02:** k=1 trials 6,958 → 7,284; lick-latency SD at k=1 0.145 → 0.153 s; KS of the de-shifted
-     k=2 vs k=1 latencies 0.187 → 0.135 (closer); session-mean lick latency 0.258 → 0.247 s at k=1, k=2-4
-     unchanged. Run `check_kin02_kin05_trials.py` on Code Ocean: same k and lick_latency on shared trials, so
-     the change is the trial set?
-   - [x] **kin_05 movements per trial** (checked locally on the old table): the old maximum of 3,326 and
-     r(lick, non-lick per trial) = 0.687 came from 19 last-of-session trials that took every movement after the
-     task ended (16-46 min, 11,879 movements). Without the last trials the old r is 0.117 (new 0.121). No text
-     read the r; §7's comment updated.
+   - [x] **kin_02** (`check_kin02_kin05_trials.py`, 2026-11-25): on the 12,979 trials both tables have, k,
+     movement start, latency and lick_latency are identical. Every change comes from the 4 dropped sessions and
+     1,642 trials only the new table has (in shared sessions; 752014, 791691, 758018, 761038, 782394 most). The
+     old table filed none of their movements under them: they went into the session's last old trial.
+   - [x] **kin_05 movements per trial:** the old maximum of 3,326 and r(lick, non-lick per trial) = 0.687 came from
+     19 last-of-session trials holding every movement after them (16-46 min, 11,879 movements; 6,968 now sit in the
+     trials above, 4,911 have no trial). Without those 19 trials the old r is 0.124 (new 0.121). No text read the
+     r; §7's comment updated.
    - [ ] kin_06 §: Stay R vs Switch→R cue-response y, per session, p 0.027 → 0.080.
    - [ ] val_05 §8 skipped (no `val_04_fn_traces.parquet` yet); rerun val_05 once to write and use it.
    - [ ] val_03/val_04 list `errors.txt` in `KINEMATICS_ROOT` as a session ("incomplete intermediates, skipped");
